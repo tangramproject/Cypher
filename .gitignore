@@ -1,0 +1,10 @@
+# IDE
+/.vscode
+/.vs
+
+# misc
+/bin
+/obj
+
+
+
