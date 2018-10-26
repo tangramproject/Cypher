@@ -28,17 +28,16 @@ namespace TangramCypher
 
             locator.Add<IServiceProvider, ServiceProvider>(serviceProvider);
 
-<<<<<<< HEAD
             logger.LogDebug("Starting application");
 
-=======
+
             var commandService = serviceProvider.GetService<ICommandService>();
             var vaultService = serviceProvider.GetService<IVaultService>();
 
             vaultService.StartVaultService();
 
             while (commandService.PromptLoop());
->>>>>>> 0c60ac672ddd1208d065dee9f4a773bad7d035c2
+
         }
 
         private static void ConfigureServices(IServiceCollection serviceCollection)
