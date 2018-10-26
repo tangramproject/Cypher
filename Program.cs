@@ -36,11 +36,11 @@ namespace TangramCypher
 
             vaultService.StartVaultService();
 
-            while (commandService.PromptLoop());
+            while (commandService.PromptLoop()) ;
 
         }
 
-        private static void ConfigureServices(IServiceCollection serviceCollection)
+        static void ConfigureServices(IServiceCollection serviceCollection)
         {
             serviceCollection
                 .AddSingleton<IActorService, ActorService>()
