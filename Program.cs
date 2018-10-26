@@ -24,10 +24,7 @@ namespace TangramCypher
 
             var commandService = serviceProvider.GetService<ICommandService>();
 
-            while (commandService.PromptLoop())
-            {
-
-            }
+            while (commandService.PromptLoop());
         }
 
         private static void ConfigureServices(IServiceCollection serviceCollection)
