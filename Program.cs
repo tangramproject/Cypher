@@ -2,6 +2,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using TangramCypher.ApplicationLayer.Actor;
+using TangramCypher.ApplicationLayer.Commands;
 using TangramCypher.ApplicationLayer.Wallet;
 using TangramCypher.Helpers.ServiceLocator;
 using TangramCypher.Helpers.LibSodium;
@@ -21,6 +22,12 @@ namespace TangramCypher
 
             locator.Add<IServiceProvider, ServiceProvider>(serviceProvider);
 
+            var commandService = serviceProvider.GetService<ICommandService>();
+
+            while (commandService.PromptLoop())
+            {
+
+            }
         }
 
         private static void ConfigureServices(IServiceCollection serviceCollection)
@@ -28,7 +35,8 @@ namespace TangramCypher
             serviceCollection
                 .AddSingleton<IActorService, ActorService>()
                 .AddSingleton<IWalletService, WalletService>()
-                .AddTransient<ICryptography, Cryptography>();
+                .AddTransient<ICryptography, Cryptography>()
+                .AddSingleton<ICommandService, CommandService>();
         }
     }
 }
