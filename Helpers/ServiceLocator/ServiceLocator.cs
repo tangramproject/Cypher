@@ -12,13 +12,13 @@ namespace TangramCypher.Helpers.ServiceLocator
 
         public Locator()
         {
-            this.servicesType = new Dictionary<object, object>();
+            servicesType = new Dictionary<object, object>();
         }
 
 
         public void Add<TService, TImplementation>(TImplementation Class)
         {
-            this.servicesType.Add(typeof(TService), typeof(TImplementation));
+            servicesType.Add(typeof(TService), typeof(TImplementation));
         }
 
         public static IServiceLocator Instance
