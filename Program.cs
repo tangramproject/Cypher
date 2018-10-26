@@ -1,6 +1,8 @@
 ﻿using System;
 using Microsoft.Extensions.DependencyInjection;
 using TangramCypher.ApplicationLayer.Actor;
+using TangramCypher.ApplicationLayer.Commands;
+using TangramCypher.ApplicationLayer.Vault;
 using TangramCypher.ApplicationLayer.Wallet;
 using TangramCypher.Helpers.ServiceLocator;
 using TangramCypher.Helpers.LibSodium;
@@ -26,8 +28,17 @@ namespace TangramCypher
 
             locator.Add<IServiceProvider, ServiceProvider>(serviceProvider);
 
+<<<<<<< HEAD
             logger.LogDebug("Starting application");
 
+=======
+            var commandService = serviceProvider.GetService<ICommandService>();
+            var vaultService = serviceProvider.GetService<IVaultService>();
+
+            vaultService.StartVaultService();
+
+            while (commandService.PromptLoop());
+>>>>>>> 0c60ac672ddd1208d065dee9f4a773bad7d035c2
         }
 
         private static void ConfigureServices(IServiceCollection serviceCollection)
@@ -35,7 +46,9 @@ namespace TangramCypher
             serviceCollection
                 .AddSingleton<IActorService, ActorService>()
                 .AddSingleton<IWalletService, WalletService>()
-                .AddTransient<ICryptography, Cryptography>();
+                .AddTransient<ICryptography, Cryptography>()
+                .AddSingleton<IVaultService, VaultService>()
+                .AddSingleton<ICommandService, CommandService>();
         }
     }
 }
