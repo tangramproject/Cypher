@@ -1,9 +1,8 @@
 ﻿using McMaster.Extensions.CommandLineUtils;
+using Microsoft.Extensions.DependencyInjection;
 using System;
 using TangramCypher.ApplicationLayer.Vault;
 using TangramCypher.Helpers.ServiceLocator;
-using Vault;
-using Vault.Endpoints.Sys;
 
 namespace TangramCypher.ApplicationLayer.Commands.Vault
 {
@@ -13,6 +12,8 @@ namespace TangramCypher.ApplicationLayer.Commands.Vault
  
         public VaultUnsealCommand()
         {
+            var serviceProvider = Locator.Instance.GetService<IServiceProvider>();
+            vaultService = serviceProvider.GetService<IVaultService>();
         }
 
         public override void Execute()

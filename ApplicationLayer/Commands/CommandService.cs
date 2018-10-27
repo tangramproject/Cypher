@@ -59,16 +59,17 @@ namespace TangramCypher.ApplicationLayer.Commands
             command.Execute();
         }
 
-        public bool PromptLoop()
+        public void InteractiveCliLoop()
         {
-            var args = Prompt.GetString("tangram$", promptColor: ConsoleColor.Cyan)?.Split(' ');
+            while (prompt)
+            {
+                var args = Prompt.GetString("tangram$", promptColor: ConsoleColor.Cyan)?.Split(' ');
 
-            if (args == null)
-                return true;
+                if (args == null)
+                    continue;
 
-            Execute(args);
-
-            return prompt;
+                Execute(args);
+            }
         }
     }
 

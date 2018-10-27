@@ -23,21 +23,19 @@ namespace TangramCypher
                 .AddLogging()
                 .BuildServiceProvider();
 
-
             var logger = serviceProvider.GetService<ILoggerFactory>().CreateLogger<Program>();
 
             locator.Add<IServiceProvider, ServiceProvider>(serviceProvider);
 
             logger.LogDebug("Starting application");
 
-
             var commandService = serviceProvider.GetService<ICommandService>();
             var vaultService = serviceProvider.GetService<IVaultService>();
 
-            vaultService.StartVaultService();
+            var task = vaultService.StartVaultServiceAsync();
+            task.Wait();
 
-            while (commandService.PromptLoop()) ;
-
+            commandService.InteractiveCliLoop();
         }
 
         static void ConfigureServices(IServiceCollection serviceCollection)

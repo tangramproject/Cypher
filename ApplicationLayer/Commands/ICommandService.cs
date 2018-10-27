@@ -8,6 +8,6 @@ namespace TangramCypher.ApplicationLayer.Commands
     {
         void RegisterCommand<T>(string[] name) where T : ICommand;
         void Execute(string[] args);
-        bool PromptLoop();
+        void InteractiveCliLoop();
     }
 }
