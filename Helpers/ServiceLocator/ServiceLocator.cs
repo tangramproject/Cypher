@@ -6,19 +6,17 @@ namespace TangramCypher.Helpers.ServiceLocator
 {
     public class Locator : IServiceLocator
     {
-        readonly IDictionary<object, object> servicesType;
-        static readonly object TheLock = new Object();
+        static readonly IDictionary<Type, object> servicesType = new Dictionary<Type, object>();
+        static readonly object TheLock = new object();
         static IServiceLocator instance;
 
         public Locator()
         {
-            servicesType = new Dictionary<object, object>();
         }
 
-
-        public void Add<TService, TImplementation>(TImplementation Class)
+        public void Add<TService, TImplementation>(TImplementation obj)
         {
-            servicesType.Add(typeof(TService), typeof(TImplementation));
+            servicesType.Add(typeof(TService), obj);
         }
 
         public static IServiceLocator Instance
@@ -26,7 +24,6 @@ namespace TangramCypher.Helpers.ServiceLocator
             get
             {
                 lock (TheLock)
-
                 {
                     if (instance == null)
                     {
@@ -49,6 +46,6 @@ namespace TangramCypher.Helpers.ServiceLocator
                 throw new ApplicationException("The requested service is not registered");
             }
         }
-
     }
 }
+
