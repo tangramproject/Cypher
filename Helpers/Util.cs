@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using TangramCypher.ApplicationLayer.Actor;
 using System.Text;
 using System.Linq;
+using System.Runtime.InteropServices;
 
 namespace TangramCypher.Helpers
 {
@@ -48,6 +49,21 @@ namespace TangramCypher.Helpers
                 array[r] = array[i];
                 array[i] = t;
             }
+        }
+
+        public static OSPlatform GetOSPlatform()
+        {
+            OSPlatform osPlatform = OSPlatform.Create("Other Platform");
+            bool isWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
+            osPlatform = isWindows ? OSPlatform.Windows : osPlatform;
+
+            bool isOSX = RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
+            osPlatform = isOSX ? OSPlatform.OSX : osPlatform;
+
+            bool isLinux = RuntimeInformation.IsOSPlatform(OSPlatform.Linux);
+            osPlatform = isLinux ? OSPlatform.Linux : osPlatform;
+
+            return osPlatform;
         }
     }
 }
