@@ -7,6 +7,7 @@ namespace Cypher.ApplicationLayer.Onion
     {
         Task<string> GetAsync(string url, object data);
         void ChangeCircuit(string password);
+        string GenerateHashPassword(string password);
         Task<T> PostAsync<T>(string url, object data) where T : class, new();
         void StartOnion(string password);
     }

@@ -108,6 +108,31 @@ namespace Cypher.ApplicationLayer.Onion
             }
         }
 
+        public string GenerateHashPassword(string password) {
+            var torProcessStartInfo = new ProcessStartInfo("tor")
+            {
+                Arguments = $"--hash-password {password}",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true
+            };
+
+            TorProcess = Process.Start(torProcessStartInfo);
+
+            var sOut = TorProcess.StandardOutput;
+            var result = sOut.ReadToEnd();
+
+            if (!TorProcess.HasExited)
+            {
+                TorProcess.Kill();
+            }
+
+            sOut.Close();
+            TorProcess.Close();
+
+            return result;
+        }
+
         void SendCommands(string command, string password)
         {
             if (string.IsNullOrEmpty(command))
