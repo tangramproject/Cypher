@@ -11,9 +11,9 @@ namespace TangramCypher.Helpers.LibSodium
             return encrypted;
         }
         
-        public byte[] GenericHash(string message)
+        public byte[] GenericHash(string message, int bytes = 32)
         {
-            var hash = Sodium.GenericHash.Hash(Encoding.UTF8.GetBytes(message), null, 32);
+            var hash = Sodium.GenericHash.Hash(Encoding.UTF8.GetBytes(message), null, bytes);
             return hash;
         }
 
