@@ -8,6 +8,7 @@ using TangramCypher.Helpers.ServiceLocator;
 using TangramCypher.Helpers.LibSodium;
 using Microsoft.Extensions.Logging;
 using System.Threading.Tasks;
+using Cypher.ApplicationLayer.Onion;
 
 namespace TangramCypher
 {
@@ -45,7 +46,8 @@ namespace TangramCypher
                 .AddSingleton<IWalletService, WalletService>()
                 .AddTransient<ICryptography, Cryptography>()
                 .AddSingleton<IVaultService, VaultService>()
-                .AddSingleton<ICommandService, CommandService>();
+                .AddSingleton<ICommandService, CommandService>()
+                .AddSingleton<IOnionService, OnionService>();
         }
     }
 }
