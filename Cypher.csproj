@@ -21,5 +21,8 @@
   <ItemGroup>
     <Folder Include="ApplicationLayer\Onion\" />
   </ItemGroup>
+<<<<<<< HEAD
   
+=======
+>>>>>>> 1a8c7b169d056161ea81b201a08293de8683ab46
 </Project>

@@ -8,7 +8,12 @@ using TangramCypher.Helpers.ServiceLocator;
 using TangramCypher.Helpers.LibSodium;
 using Microsoft.Extensions.Logging;
 using System.Threading.Tasks;
+<<<<<<< HEAD
 using Cypher.ApplicationLayer.Onion;
+=======
+using Microsoft.Extensions.Configuration;
+using System.IO;
+>>>>>>> 1a8c7b169d056161ea81b201a08293de8683ab46
 
 namespace TangramCypher
 {
@@ -36,7 +41,7 @@ namespace TangramCypher
 
             await vaultService.StartVaultServiceAsync();
 
-            commandService.InteractiveCliLoop();
+            await commandService.InteractiveCliLoop();
         }
 
         static void ConfigureServices(IServiceCollection serviceCollection)
@@ -47,7 +52,18 @@ namespace TangramCypher
                 .AddTransient<ICryptography, Cryptography>()
                 .AddSingleton<IVaultService, VaultService>()
                 .AddSingleton<ICommandService, CommandService>()
+<<<<<<< HEAD
                 .AddSingleton<IOnionService, OnionService>();
+=======
+                .Add(new ServiceDescriptor(typeof(IConfiguration),
+                     provider => new ConfigurationBuilder()
+                                    .SetBasePath(Directory.GetCurrentDirectory())
+                                    .AddJsonFile("appsettings.json",
+                                                 optional: false,
+                                                 reloadOnChange: true)
+                                    .Build(),
+                     ServiceLifetime.Singleton));
+>>>>>>> 1a8c7b169d056161ea81b201a08293de8683ab46
         }
     }
 }

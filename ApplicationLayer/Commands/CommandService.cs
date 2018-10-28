@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using McMaster.Extensions.CommandLineUtils;
 using TangramCypher.ApplicationLayer.Commands.Vault;
 
@@ -47,7 +48,7 @@ namespace TangramCypher.ApplicationLayer.Commands
             return command;
         }
 
-        public void Execute(string[] args)
+        public async Task Execute(string[] args)
         {
             var command = GetCommand(args);
 
@@ -56,10 +57,10 @@ namespace TangramCypher.ApplicationLayer.Commands
                 command = GetCommand(new string[] { "help" });
             }
 
-            command.Execute();
+            await command.Execute();
         }
 
-        public void InteractiveCliLoop()
+        public async Task InteractiveCliLoop()
         {
             while (prompt)
             {
@@ -68,7 +69,7 @@ namespace TangramCypher.ApplicationLayer.Commands
                 if (args == null)
                     continue;
 
-                Execute(args);
+                await Execute(args);
             }
         }
     }
