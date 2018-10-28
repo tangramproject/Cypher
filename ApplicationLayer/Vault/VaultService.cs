@@ -1,4 +1,6 @@
 ﻿using McMaster.Extensions.CommandLineUtils;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
@@ -12,6 +14,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 using TangramCypher.ApplicationLayer.Vault.Models;
+using TangramCypher.Helpers.ServiceLocator;
 using VaultSharp;
 using VaultSharp.V1.AuthMethods.Token;
 using VaultSharp.V1.SystemBackend;
@@ -29,14 +32,24 @@ namespace TangramCypher.ApplicationLayer.Vault
         private Process vaultProcess;
         private IVaultClient vaultClient;
 
-        private const int SECRET_SHARES = 5;
-        private const int SECRET_THRESHOLD = 2;
-        private const string VAULT_ENDPOINT = "http://127.0.0.1:8200";
-        private const int VAULT_START_TIMEOUT = 10000;
+        private readonly int secretShares;
+        private readonly int secretThreshold;
 
-        public VaultService()
+        private readonly string endpoint;
+        private readonly int startTimeout;
+
+        public VaultService(IConfiguration configuration)
         {
-            var vaultClientSettings = new VaultClientSettings(VAULT_ENDPOINT, null);
+            var vault_section = configuration.GetSection("vault");
+
+            endpoint = vault_section.GetValue<string>("endpoint");
+            startTimeout = vault_section.GetValue<int>("start_timeout");
+            secretShares = vault_section.GetValue<int>("num_secret_shares");
+            secretThreshold = vault_section.GetValue<int>("num_secret_threshold");
+
+            var children = configuration.GetChildren();
+
+            var vaultClientSettings = new VaultClientSettings(endpoint, null);
             //  TODO: Pull this from settings file.
             vaultClient = new VaultClient(vaultClientSettings);
         }
@@ -92,7 +105,7 @@ namespace TangramCypher.ApplicationLayer.Vault
                 sw.Start();
                 while (!vaultProcess.StandardOutput.EndOfStream)
                 {
-                    if (sw.ElapsedMilliseconds > VAULT_START_TIMEOUT) throw new TimeoutException("Timed out waiting for Vault Server to start.");
+                    if (sw.ElapsedMilliseconds > startTimeout) throw new TimeoutException("Timed out waiting for Vault Server to start.");
 
                     string line = vaultProcess.StandardOutput.ReadLine();
 
@@ -166,8 +179,8 @@ namespace TangramCypher.ApplicationLayer.Vault
         {
             var initResponse = await vaultClient.V1.System.InitAsync(new InitOptions
             {
-                SecretShares = SECRET_SHARES,
-                SecretThreshold = SECRET_THRESHOLD,
+                SecretShares = secretShares,
+                SecretThreshold = secretThreshold,
             });
 
             var userKeys = initResponse.MasterKeys.OfType<string>().ToList().Skip(1).ToArray();
@@ -177,7 +190,7 @@ namespace TangramCypher.ApplicationLayer.Vault
             WriteKeys(userKeys);
 
             //  Unseal Vault so we can create the policy.
-            for (int i = 0; i < SECRET_THRESHOLD; ++i)
+            for (int i = 0; i < secretThreshold; ++i)
             {
                 await Unseal(initResponse.MasterKeys[i]);
             }
@@ -211,7 +224,7 @@ namespace TangramCypher.ApplicationLayer.Vault
 
         private void Login(string token)
         {
-            var vaultClientSettings = new VaultClientSettings(VAULT_ENDPOINT, new TokenAuthMethodInfo(token));
+            var vaultClientSettings = new VaultClientSettings(endpoint, new TokenAuthMethodInfo(token));
             vaultClient = new VaultClient(vaultClientSettings);
         }
 
@@ -281,9 +294,9 @@ namespace TangramCypher.ApplicationLayer.Vault
             }
         }
 
-        private static async Task<Auth> CreateToken(string authToken, List<string> policies, bool orphaned = true)
+        private async Task<Auth> CreateToken(string authToken, List<string> policies, bool orphaned = true)
         {
-            var baseUri = new Uri(VAULT_ENDPOINT);
+            var baseUri = new Uri(endpoint);
             var uri = new Uri(baseUri, "/v1/auth/token/create");
 
             dynamic token = new
