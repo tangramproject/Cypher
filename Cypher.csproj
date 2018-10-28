@@ -9,6 +9,8 @@
 
   <ItemGroup>
     <PackageReference Include="McMaster.Extensions.CommandLineUtils" Version="2.2.5" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.FileExtensions" Version="2.1.1" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="2.1.1" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="2.1.1" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="2.1.1" />
     <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
@@ -17,12 +19,14 @@
     <PackageReference Include="VaultSharp" Version="0.11.0" />
     <PackageReference Include="DotNetTor" Version="2.3.3" />
   </ItemGroup>
-
+  
   <ItemGroup>
     <Folder Include="ApplicationLayer\Onion\" />
   </ItemGroup>
-<<<<<<< HEAD
-  
-=======
->>>>>>> 1a8c7b169d056161ea81b201a08293de8683ab46
+
+  <ItemGroup>
+    <None Update="appsettings.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
 </Project>
