@@ -49,7 +49,7 @@ namespace TangramCypher
                 .AddTransient<ICryptography, Cryptography>()
                 .AddSingleton<IVaultService, VaultService>()
                 .AddSingleton<ICommandService, CommandService>()
-                .AddSingleton<IOnionService, OnionService>();
+                .AddSingleton<IOnionService, OnionService>()
                 .Add(new ServiceDescriptor(typeof(IConfiguration),
                      provider => new ConfigurationBuilder()
                                     .SetBasePath(Directory.GetCurrentDirectory())
