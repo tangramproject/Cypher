@@ -7,12 +7,13 @@ using TangramCypher.ApplicationLayer.Wallet;
 using TangramCypher.Helpers.ServiceLocator;
 using TangramCypher.Helpers.LibSodium;
 using Microsoft.Extensions.Logging;
+using System.Threading.Tasks;
 
 namespace TangramCypher
 {
     class Program
     {
-        static void Main(string[] args)
+        static async Task Main(string[] args)
         {
             IServiceLocator locator = new Locator();
 
@@ -32,8 +33,7 @@ namespace TangramCypher
             var commandService = serviceProvider.GetService<ICommandService>();
             var vaultService = serviceProvider.GetService<IVaultService>();
 
-            var task = vaultService.StartVaultServiceAsync();
-            task.Wait();
+            await vaultService.StartVaultServiceAsync();
 
             commandService.InteractiveCliLoop();
         }

@@ -1,6 +1,7 @@
 ﻿using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.DependencyInjection;
 using System;
+using System.Threading.Tasks;
 using TangramCypher.ApplicationLayer.Vault;
 using TangramCypher.Helpers.ServiceLocator;
 
@@ -16,10 +17,10 @@ namespace TangramCypher.ApplicationLayer.Commands.Vault
             vaultService = serviceProvider.GetService<IVaultService>();
         }
 
-        public override void Execute()
+        public override async Task Execute()
         {
             var vaultShard = Prompt.GetPassword("Vault Shard:", ConsoleColor.Yellow);
-            vaultService.Unseal(vaultShard);
+            await vaultService.Unseal(vaultShard);
         }
     }
 }

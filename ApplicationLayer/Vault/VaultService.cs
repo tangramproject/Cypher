@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Runtime.InteropServices;
@@ -21,6 +22,8 @@ namespace TangramCypher.ApplicationLayer.Vault
     {
         private static readonly DirectoryInfo userDirectory = new DirectoryInfo(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
         private static readonly DirectoryInfo tangramDirectory = new DirectoryInfo(Path.Combine(userDirectory.FullName, ".tangramcli"));
+        private static readonly FileInfo shardFile = new FileInfo(Path.Combine(tangramDirectory.FullName, "shard"));
+        private static readonly FileInfo serviceTokenFile = new FileInfo(Path.Combine(tangramDirectory.FullName, "servicetoken"));
 
         private FileInfo vaultExecutable;
         private Process vaultProcess;
@@ -29,6 +32,7 @@ namespace TangramCypher.ApplicationLayer.Vault
         private const int SECRET_SHARES = 5;
         private const int SECRET_THRESHOLD = 2;
         private const string VAULT_ENDPOINT = "http://127.0.0.1:8200";
+        private const int VAULT_START_TIMEOUT = 10000;
 
         public VaultService()
         {
@@ -84,8 +88,12 @@ namespace TangramCypher.ApplicationLayer.Vault
                     CreateNoWindow = true
                 });
 
+                Stopwatch sw = new Stopwatch();
+                sw.Start();
                 while (!vaultProcess.StandardOutput.EndOfStream)
                 {
+                    if (sw.ElapsedMilliseconds > VAULT_START_TIMEOUT) throw new TimeoutException("Timed out waiting for Vault Server to start.");
+
                     string line = vaultProcess.StandardOutput.ReadLine();
 
                     if (line.Contains("Vault server started!"))
@@ -98,11 +106,34 @@ namespace TangramCypher.ApplicationLayer.Vault
                 }
             }
 
-            var initStatus = await vaultClient.V1.System.GetInitStatusAsync();
-
-            if (!initStatus)
+            if (!await vaultClient.V1.System.GetInitStatusAsync())
             {
                 await Init();
+            }
+            else
+            {
+                if (shardFile.Exists)
+                {
+                    var shard = await File.ReadAllTextAsync(serviceTokenFile.FullName);
+                }
+                else
+                {
+                    PhysicalConsole.Singleton.ResetColor();
+                    PhysicalConsole.Singleton.ForegroundColor = ConsoleColor.Yellow;
+                    PhysicalConsole.Singleton.WriteLine("Warning: Shard missing");
+                }
+
+                if (serviceTokenFile.Exists)
+                {
+                    var serviceTokenJson = await File.ReadAllTextAsync(serviceTokenFile.FullName);
+                    var serviceToken = JsonConvert.DeserializeObject<Auth>(serviceTokenJson);
+
+                    Login(serviceToken.client_token);
+                }
+                else
+                {
+                    throw new Exception("Error: Vault is initialized but required service token is missing.");
+                }
             }
         }
 
@@ -139,7 +170,11 @@ namespace TangramCypher.ApplicationLayer.Vault
                 SecretThreshold = SECRET_THRESHOLD,
             });
 
-            WriteKeys(initResponse.MasterKeys);
+            var userKeys = initResponse.MasterKeys.OfType<string>().ToList().Skip(1).ToArray();
+
+            File.WriteAllText(shardFile.FullName, initResponse.MasterKeys.First());
+
+            WriteKeys(userKeys);
 
             //  Unseal Vault so we can create the policy.
             for (int i = 0; i < SECRET_THRESHOLD; ++i)
@@ -152,10 +187,26 @@ namespace TangramCypher.ApplicationLayer.Vault
             await CreateVaultServicePolicyAsync();
 
             var vaultServiceToken = await CreateVaultServiceToken(initResponse.RootToken);
+            var vaultServiceSerialized = JsonConvert.SerializeObject(vaultServiceToken);
+
+            File.WriteAllText(serviceTokenFile.FullName, vaultServiceSerialized);
 
             await CreateTemplatedWalletPolicyAsync();
+            await EnableUserpassAuth();
             await RevokeToken(initResponse.RootToken);
+
+            //  Reseal the Vault.
             await Seal();
+        }
+
+        private async Task EnableUserpassAuth()
+        {
+            await vaultClient.V1.System.MountAuthBackendAsync(new VaultSharp.V1.AuthMethods.AuthMethod()
+            {
+                Path = "userpass",
+                Type = VaultSharp.V1.AuthMethods.AuthMethodType.UserPass,
+                Description = "Userpass Auth"
+            });
         }
 
         private void Login(string token)
@@ -204,39 +255,46 @@ namespace TangramCypher.ApplicationLayer.Vault
             return await CreateToken(authToken, new List<string> { "servicepolicy" });
         }
 
-        private static async Task<Auth> CreateToken(string authToken, List<string> policies, bool orphaned = true)
+        private static async Task<T> PostAsJsonAsync<T>(object obj, string requestUri, string authToken = null)
         {
-            var baseUri = new Uri(VAULT_ENDPOINT);
-            var uri = new Uri(baseUri, "/v1/auth/token/create");
-
             using (var client = new HttpClient())
             {
-                client.DefaultRequestHeaders.Add("X-Vault-Token", authToken);
+                if(!string.IsNullOrEmpty(authToken))
+                    client.DefaultRequestHeaders.Add("X-Vault-Token", authToken);
+
                 client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
-                dynamic token = new
-                {
-                    policies = policies,
-                    renewable = true
-                };
-
-                string json = JsonConvert.SerializeObject(token, Formatting.Indented);
+                string json = JsonConvert.SerializeObject(obj, Formatting.Indented);
 
                 var httpContent = new StringContent(json, Encoding.UTF8, "application/json");
 
-                var response = await client.PostAsync(uri, httpContent);
+                var response = await client.PostAsync(requestUri, httpContent);
 
                 if (response.IsSuccessStatusCode)
                 {
                     var content = await response.Content.ReadAsStringAsync();
 
-                    var tokenCreateRes = JsonConvert.DeserializeObject<VaultTokenCreateResponse>(content);
-
-                    return tokenCreateRes.auth;
+                    return JsonConvert.DeserializeObject<T>(content);
                 }
-            }
 
-            throw new Exception("Unexpected response when attempting to create token");
+                throw new Exception($"Error: server returned status code {response.StatusCode}");
+            }
+        }
+
+        private static async Task<Auth> CreateToken(string authToken, List<string> policies, bool orphaned = true)
+        {
+            var baseUri = new Uri(VAULT_ENDPOINT);
+            var uri = new Uri(baseUri, "/v1/auth/token/create");
+
+            dynamic token = new
+            {
+                policies,
+                renewable = true
+            };
+
+            var response = await PostAsJsonAsync<VaultTokenCreateResponse>(token, uri.ToString(), authToken);
+
+            return response.auth;
         }
 
         private async Task CreateVaultServicePolicyAsync()
@@ -262,7 +320,7 @@ namespace TangramCypher.ApplicationLayer.Vault
             policy.path["sys/auth"] = new JObject();
             policy.path["sys/auth"]["capabilities"] = new JArray(new string[] { "read" });
 
-            var policyJSON = policy.ToString(Newtonsoft.Json.Formatting.None);
+            var policyJSON = policy.ToString(Formatting.None);
 
             await vaultClient.V1.System.WritePolicyAsync(new Policy { Name = "servicepolicy", Rules = policyJSON });
         }
@@ -281,7 +339,7 @@ namespace TangramCypher.ApplicationLayer.Vault
             policy.path["secret/data/wallets/{{identity.entity.name}}/*"] = new JObject();
             policy.path["secret/data/wallets/{{identity.entity.name}}/*"]["capabilities"] = new JArray(new string[] { "create", "read", "update", "delete", "list" }); ;
 
-            var policyJSON = policy.ToString(Newtonsoft.Json.Formatting.None);
+            var policyJSON = policy.ToString(Formatting.None);
 
             await vaultClient.V1.System.WritePolicyAsync(new Policy { Name = "walletpolicy", Rules = policyJSON });
         }
