@@ -23,10 +23,8 @@ namespace TangramCypher.ApplicationLayer.Wallet
 
             return new PkSkDto()
             {
-                Proof = _Cryptography.GenericHash(_Cryptography.RandomKey().ToHex(), 16).ToHex(),
                 PublicKey = kp.PublicKey.ToHex(),
-                SecretKey = kp.SecretKey.ToHex(),
-                SplitKeys = Util.Split(_Cryptography.RandomKey().ToHex(), 16).ToArray()
+                SecretKey = kp.SecretKey.ToHex()
             };
         }
 
