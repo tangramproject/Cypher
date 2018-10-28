@@ -10,11 +10,10 @@ namespace TangramCypher.Helpers.LibSodium
             var encrypted = SealedPublicKeyBox.Create(Encoding.UTF8.GetBytes(message), pk);
             return encrypted;
         }
-        
+
         public byte[] GenericHash(string message, int bytes = 32)
         {
-            var hash = Sodium.GenericHash.Hash(Encoding.UTF8.GetBytes(message), null, bytes);
-            return hash;
+            return Sodium.GenericHash.Hash(Encoding.UTF8.GetBytes(message), null, bytes);
         }
 
         public byte[] HashPwd(string pwd)
@@ -29,11 +28,11 @@ namespace TangramCypher.Helpers.LibSodium
 
         public KeyPairDto KeyPair()
         {
-            var kp = Sodium.PublicKeyBox.GenerateKeyPair();
+            var kp = PublicKeyBox.GenerateKeyPair();
             return new KeyPairDto() { PublicKey = kp.PublicKey, SecretKey = kp.PrivateKey };
         }
 
-        public string OpenBoxSeal(byte[] cipher, Sodium.KeyPair keyPair)
+        public string OpenBoxSeal(byte[] cipher, KeyPair keyPair)
         {
             var decrypted = SealedPublicKeyBox.Open(cipher, keyPair);
             return Encoding.UTF8.GetString(decrypted);
@@ -44,10 +43,19 @@ namespace TangramCypher.Helpers.LibSodium
             return Sodium.GenericHash.GenerateKey();
         }
 
+        public byte[] ScalarMultBase(byte[] sk)
+        {
+            return Sodium.ScalarMult.Base(sk);
+        }
+
+        public byte[] ScalarMult(byte[] bobSk, byte[] alicePk)
+        {
+            return Sodium.ScalarMult.Mult(bobSk, alicePk);
+        }
+
         public bool VerifiyPwd(byte[] hash, byte[] pwd)
         {
-            var isValid = PasswordHash.ArgonHashStringVerify(hash, pwd);
-            return isValid;
+            return PasswordHash.ArgonHashStringVerify(hash, pwd);
         }
     }
 }
