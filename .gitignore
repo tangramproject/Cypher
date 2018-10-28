@@ -1,10 +1,9 @@
 # IDE
 /.vscode
 /.vs
+/.DS_Store
 
 # misc
 /bin
 /obj
-
-
 
