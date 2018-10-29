@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using System.Web;
@@ -25,6 +26,7 @@ namespace Cypher.ApplicationLayer.Onion
         const string CONTROL_HOST = "onion_control_host";
         const string CONTROL_PORT = "onion_control_port";
         const string HASHED_CONTROL_PASSWORD = "onion_hashed_control_password";
+        const string ONION_TORRC = "onion/torrc";
 
         readonly ICryptography cryptography;
         readonly IConfigurationSection onionSection;
@@ -34,6 +36,8 @@ namespace Cypher.ApplicationLayer.Onion
         readonly string controlHost;
         readonly int controlPort;
         readonly string hashedPassword;
+        readonly string onionDirectory;
+        readonly string torrcPath;
 
         Process TorProcess { get; set; }
 
@@ -50,7 +54,8 @@ namespace Cypher.ApplicationLayer.Onion
             controlPort = onionSection.GetValue<int>(CONTROL_PORT);
             hashedPassword = onionSection.GetValue<string>(HASHED_CONTROL_PASSWORD);
 
-            var os = Util.GetOSPlatform().ToString();
+            onionDirectory = Path.Combine(Util.EntryAssemblyPath(), ONION);
+            torrcPath = Path.Combine(Util.EntryAssemblyPath(), ONION_TORRC);
         }
 
         public async Task<string> GetAsync(string url, object data)
@@ -111,7 +116,8 @@ namespace Cypher.ApplicationLayer.Onion
             }
         }
 
-        public string GenerateHashPassword(string password) {
+        public string GenerateHashPassword(string password)
+        {
             var torProcessStartInfo = new ProcessStartInfo("tor")
             {
                 Arguments = $"--hash-password {password}",
@@ -208,6 +214,8 @@ namespace Cypher.ApplicationLayer.Onion
                 throw new ArgumentException("message", nameof(password));
             }
 
+            CreateTorrc();
+
             TorProcess = null;
             var controlPortClient = new DotNetTor.ControlPort.Client(controlHost, controlPort, password);
 
@@ -219,7 +227,7 @@ namespace Cypher.ApplicationLayer.Onion
             {
                 var torProcessStartInfo = new ProcessStartInfo("tor")
                 {
-                    Arguments = $"SOCKSPort {socksPort} ControlPort {controlPort} HashedControlPassword 16:{ hashedPassword }",
+                    Arguments = $"-f { onionDirectory }",
                     UseShellExecute = false,
                     CreateNoWindow = true,
                     RedirectStandardOutput = true
@@ -256,6 +264,60 @@ namespace Cypher.ApplicationLayer.Onion
                              select p.Name + "=" + HttpUtility.UrlEncode(p.GetValue(obj, null).ToString());
 
             return String.Join("&", properties.ToArray());
+        }
+
+
+        void CreateTorrc()
+        {
+            if (string.IsNullOrEmpty(hashedPassword))
+            {
+                throw new ArgumentException("Hashed control password is not set.", nameof(hashedPassword));
+            }
+
+            if (!Directory.Exists(onionDirectory))
+            {
+                try
+                {
+                    Directory.CreateDirectory(onionDirectory);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex.Message);
+                    throw new Exception(ex.Message);
+                }
+            }
+
+            if (File.Exists(torrcPath))
+                return;
+
+            var torrcContent = new string[] {
+                "AvoidDiskWrites 1",
+                string.Format("HashedControlPassword {0}", hashedPassword),
+                "SocksPort auto IPv6Traffic PreferIPv6 KeepAliveIsolateSOCKSAuth",
+                "ControlPort auto",
+                "CookieAuthentication 1",
+                "CircuitBuildTimeout 10",
+                "KeepalivePeriod 60",
+                "NumEntryGuards 8",
+                "SocksPort 9050",
+                "Log notice stdout"
+            };
+
+            try
+            {
+                using (StreamWriter outputFile = new StreamWriter(torrcPath))
+                {
+                    foreach (string content in torrcContent)
+                        outputFile.WriteLine(content);
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogInformation(ex.Message);
+                throw new Exception(ex.Message);
+            }
+
+            logger.LogInformation($"Created torrc file: {torrcPath}");
         }
 
         public void Dispose()
