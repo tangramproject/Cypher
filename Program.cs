@@ -36,6 +36,11 @@ namespace TangramCypher
 
             locator.Add<IServiceProvider, ServiceProvider>(serviceProvider);
 
+            var onionService = serviceProvider.GetService<IOnionService>();
+
+            // Testing onion...
+            // onionService.StartOnion(onionService.GenerateHashPassword("ILoveTangram"));
+
             var commandService = serviceProvider.GetService<ICommandService>();
             var vaultService = serviceProvider.GetService<IVaultService>();
 

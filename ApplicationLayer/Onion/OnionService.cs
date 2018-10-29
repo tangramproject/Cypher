@@ -5,8 +5,8 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
-using System.Reflection;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Web;
 using DotNetTor.SocksPort;
@@ -35,11 +35,15 @@ namespace Cypher.ApplicationLayer.Onion
         readonly int socksPort;
         readonly string controlHost;
         readonly int controlPort;
-        readonly string hashedPassword;
         readonly string onionDirectory;
         readonly string torrcPath;
+        readonly string controlPortPath;
+
+        string hashedPassword;
 
         Process TorProcess { get; set; }
+
+        public bool OnionStarted { get; private set; }
 
         public OnionService(ICryptography cryptography, IConfiguration configuration, ILogger logger)
         {
@@ -52,17 +56,17 @@ namespace Cypher.ApplicationLayer.Onion
             socksPort = onionSection.GetValue<int>(SOCKS_PORT);
             controlHost = onionSection.GetValue<string>(CONTROL_HOST);
             controlPort = onionSection.GetValue<int>(CONTROL_PORT);
-            hashedPassword = onionSection.GetValue<string>(HASHED_CONTROL_PASSWORD);
 
             onionDirectory = Path.Combine(Util.EntryAssemblyPath(), ONION);
             torrcPath = Path.Combine(Util.EntryAssemblyPath(), ONION_TORRC);
+            controlPortPath = Path.Combine(Util.EntryAssemblyPath(), string.Format("{0}/{1}", ONION, "control-port"));
         }
 
         public async Task<string> GetAsync(string url, object data)
         {
             if (string.IsNullOrEmpty(url))
             {
-                throw new ArgumentException("message", nameof(url));
+                throw new ArgumentException("Url cannot be null or empty!", nameof(url));
             }
 
             if (data == null)
@@ -102,7 +106,7 @@ namespace Cypher.ApplicationLayer.Onion
         {
             if (string.IsNullOrEmpty(password))
             {
-                throw new ArgumentException("message", nameof(password));
+                throw new ArgumentException("Password cannot be null or empty!", nameof(password));
             }
 
             try
@@ -129,7 +133,7 @@ namespace Cypher.ApplicationLayer.Onion
             TorProcess = Process.Start(torProcessStartInfo);
 
             var sOut = TorProcess.StandardOutput;
-            var result = sOut.ReadToEnd();
+            var result = Regex.Replace(sOut.ReadToEnd(), "\n", String.Empty);
 
             if (!TorProcess.HasExited)
             {
@@ -138,20 +142,23 @@ namespace Cypher.ApplicationLayer.Onion
 
             sOut.Close();
             TorProcess.Close();
+            TorProcess = null;
 
-            return result;
+            hashedPassword = result.Contains("16:") ? result : String.Empty;
+
+            return password;
         }
 
         void SendCommands(string command, string password)
         {
             if (string.IsNullOrEmpty(command))
             {
-                throw new ArgumentException("message", nameof(command));
+                throw new ArgumentException("Command cannot be null or empty!", nameof(command));
             }
 
             if (string.IsNullOrEmpty(password))
             {
-                throw new ArgumentException("message", nameof(password));
+                throw new ArgumentException("Password cannot be null or empty!", nameof(password));
             }
 
             try
@@ -169,7 +176,7 @@ namespace Cypher.ApplicationLayer.Onion
         {
             if (string.IsNullOrEmpty(url))
             {
-                throw new ArgumentException("message", nameof(url));
+                throw new ArgumentException("Url cannot be null or empty!", nameof(url));
             }
 
             try
@@ -209,34 +216,27 @@ namespace Cypher.ApplicationLayer.Onion
 
         public void StartOnion(string password)
         {
+            OnionStarted = false;
+
             if (string.IsNullOrEmpty(password))
             {
-                throw new ArgumentException("message", nameof(password));
+                throw new ArgumentException("Password cannot be null or empty!", nameof(password));
             }
 
             CreateTorrc();
+            StartTorProcess();
 
-            TorProcess = null;
-            var controlPortClient = new DotNetTor.ControlPort.Client(controlHost, controlPort, password);
+            Task.Delay(3000).GetAwaiter().GetResult();
+
+            var controlPortClient = new DotNetTor.ControlPort.Client(controlHost, ReadControlPort(), password);
 
             try
             {
                 controlPortClient.IsCircuitEstablishedAsync().GetAwaiter().GetResult();
+                OnionStarted = true;
             }
             catch
             {
-                var torProcessStartInfo = new ProcessStartInfo("tor")
-                {
-                    Arguments = $"-f { onionDirectory }",
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    RedirectStandardOutput = true
-                };
-
-                TorProcess = Process.Start(torProcessStartInfo);
-
-                Task.Delay(3000).GetAwaiter().GetResult();
-
                 var established = false;
                 var count = 0;
 
@@ -244,11 +244,25 @@ namespace Cypher.ApplicationLayer.Onion
                 {
                     if (count >= 21) throw new Exception("Couldn't establish circuit in time.");
 
-                    established = controlPortClient.IsCircuitEstablishedAsync().GetAwaiter().GetResult();
+                    try
+                    {
+                        established = controlPortClient.IsCircuitEstablishedAsync().GetAwaiter().GetResult();
+                        OnionStarted = true;
 
-                    Task.Delay(1000).GetAwaiter().GetResult();
+                        Task.Delay(1000).GetAwaiter().GetResult();
+                    }
+                    catch (DotNetTor.TorException ex)
+                    {
+                        logger.LogWarning(string.Format("Trying to establish circuit: {0}", ex.Message));
+                    }
+
                     count++;
                 }
+            }
+
+            if (OnionStarted)
+            {
+                logger.LogInformation("Tor is running...... ;)");
             }
         }
 
@@ -300,7 +314,9 @@ namespace Cypher.ApplicationLayer.Onion
                 "KeepalivePeriod 60",
                 "NumEntryGuards 8",
                 "SocksPort 9050",
-                "Log notice stdout"
+                "Log notice stdout",
+                string.Format("DataDirectory {0}", onionDirectory),
+                string.Format("ControlPortWriteToFile {0}/{1}", onionDirectory, "control-port")
             };
 
             try
@@ -320,10 +336,45 @@ namespace Cypher.ApplicationLayer.Onion
             logger.LogInformation($"Created torrc file: {torrcPath}");
         }
 
+        int ReadControlPort()
+        {
+            int port = 0;
+
+            if (File.Exists(controlPortPath))
+            {
+                try
+                {
+                    int.TryParse(Util.Pop(File.ReadAllText(controlPortPath, Encoding.UTF8), ":"), out port);
+                }
+                catch { }
+            }
+
+            return port == 0 ? controlPort : port;
+        }
+
+        void StartTorProcess()
+        {
+            TorProcess = new Process();
+            TorProcess.StartInfo.Arguments = $"-f { torrcPath }";
+            TorProcess.StartInfo.UseShellExecute = false;
+            TorProcess.StartInfo.FileName = "tor";
+            TorProcess.StartInfo.CreateNoWindow = true;
+            TorProcess.StartInfo.RedirectStandardOutput = true;
+            TorProcess.OutputDataReceived += (sender, e) =>
+            {
+                if (!String.IsNullOrEmpty(e.Data))
+                {
+                    logger.LogInformation(e.Data);
+                }
+            };
+
+            TorProcess.Start();
+            TorProcess.BeginOutputReadLine();
+        }
+
         public void Dispose()
         {
             TorProcess?.Kill();
         }
-
     }
 }
