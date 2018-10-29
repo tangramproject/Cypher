@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -122,7 +123,7 @@ namespace Cypher.ApplicationLayer.Onion
 
         public string GenerateHashPassword(string password)
         {
-            var torProcessStartInfo = new ProcessStartInfo("tor")
+            var torProcessStartInfo = new ProcessStartInfo(GetTorFileName())
             {
                 Arguments = $"--hash-password {password}",
                 UseShellExecute = false,
@@ -280,6 +281,15 @@ namespace Cypher.ApplicationLayer.Onion
             return String.Join("&", properties.ToArray());
         }
 
+        static string GetTorFileName()
+        {
+            var sTor = "tor";
+
+            if (Util.GetOSPlatform() == OSPlatform.Windows)
+                sTor = "tor.exe";
+
+            return sTor;
+        }
 
         void CreateTorrc()
         {
@@ -357,7 +367,7 @@ namespace Cypher.ApplicationLayer.Onion
             TorProcess = new Process();
             TorProcess.StartInfo.Arguments = $"-f { torrcPath }";
             TorProcess.StartInfo.UseShellExecute = false;
-            TorProcess.StartInfo.FileName = "tor";
+            TorProcess.StartInfo.FileName = GetTorFileName();
             TorProcess.StartInfo.CreateNoWindow = true;
             TorProcess.StartInfo.RedirectStandardOutput = true;
             TorProcess.OutputDataReceived += (sender, e) =>
