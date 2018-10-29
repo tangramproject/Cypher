@@ -4,17 +4,24 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using McMaster.Extensions.CommandLineUtils;
+using Microsoft.Extensions.Logging;
 using TangramCypher.ApplicationLayer.Commands.Vault;
+using TangramCypher.ApplicationLayer.Commands.Wallet;
 
 namespace TangramCypher.ApplicationLayer.Commands
 {
     public class CommandService : ICommandService
     {
+        private readonly IConsole console;
+        private readonly ILogger logger;
         readonly IDictionary<string[], Type> commands;
         private bool prompt = true;
     
-        public CommandService()
+        public CommandService(IConsole cnsl, ILogger lgr)
         {
+            console = cnsl;
+            logger = lgr;
+
             commands = new Dictionary<string[], Type>(new CommandEqualityComparer());
 
             RegisterCommands();
@@ -29,6 +36,8 @@ namespace TangramCypher.ApplicationLayer.Commands
         {
             RegisterCommand<VaultDownloadCommand>(new string[] { "vault", "update" });
             RegisterCommand<VaultUnsealCommand>(new string[] { "vault", "unseal" });
+            RegisterCommand<WalletCreateCommand>(new string[] { "wallet", "create" });
+            RegisterCommand<WalletGetCommand>(new string[] { "wallet", "get" });
             RegisterCommand<ExitCommand>(new string[] { "exit" });
             RegisterCommand<HelpCommand>(new string[] { "help" });
         }
@@ -69,7 +78,18 @@ namespace TangramCypher.ApplicationLayer.Commands
                 if (args == null)
                     continue;
 
-                await Execute(args);
+                try
+                {
+                    await Execute(args);
+                }
+                catch(Exception e)
+                {
+                    console.BackgroundColor = ConsoleColor.Red;
+                    console.ForegroundColor = ConsoleColor.White;
+                    console.WriteLine(e.ToString());
+                    logger.LogError(e, Environment.NewLine);
+                    console.ResetColor();
+                }
             }
         }
     }

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
+using VaultSharp.V1.Commons;
 
 namespace TangramCypher.ApplicationLayer.Vault
 {
@@ -9,5 +10,8 @@ namespace TangramCypher.ApplicationLayer.Vault
     {
         Task StartVaultServiceAsync();
         Task Unseal(string shard);
+        Task CreateUserAsync(string username, string password);
+        Task SaveDataAsync(string username, string password, string path, IDictionary<string, object> data);
+        Task<Secret<SecretData>> GetDataAsync(string username, string password, string path);
     }
 }

@@ -11,6 +11,9 @@ using System.Threading.Tasks;
 using Cypher.ApplicationLayer.Onion;
 using Microsoft.Extensions.Configuration;
 using System.IO;
+using McMaster.Extensions.CommandLineUtils;
+using Microsoft.Extensions.Logging.Console;
+using System.Reflection;
 
 namespace TangramCypher
 {
@@ -27,11 +30,11 @@ namespace TangramCypher
                 .AddLogging()
                 .BuildServiceProvider();
 
-            var logger = serviceProvider.GetService<ILoggerFactory>().CreateLogger<Program>();
+            var logger = serviceProvider.GetService<ILogger>();
+
+            logger.LogInformation("Starting Application");
 
             locator.Add<IServiceProvider, ServiceProvider>(serviceProvider);
-
-            logger.LogDebug("Starting application");
 
             var commandService = serviceProvider.GetService<ICommandService>();
             var vaultService = serviceProvider.GetService<IVaultService>();
@@ -59,6 +62,15 @@ namespace TangramCypher
                                     .Build(),
                      ServiceLifetime.Singleton));
 
+            var logger = new LoggerFactory()
+                                        .AddDebug()
+                                        .AddFile("cypher.log")
+                                        .CreateLogger("cypher");
+
+            serviceCollection.Add(new ServiceDescriptor(typeof(ILogger),
+                                                        provider => logger,
+                                                        ServiceLifetime.Singleton));
+            serviceCollection.Add(new ServiceDescriptor(typeof(IConsole), PhysicalConsole.Singleton));
         }
     }
 }

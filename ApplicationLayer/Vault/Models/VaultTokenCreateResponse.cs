@@ -4,7 +4,7 @@ using System.Text;
 
 namespace TangramCypher.ApplicationLayer.Vault.Models
 {
-    public class Auth
+    public class VaultTokenCreateResponseAuth
     {
         public string client_token { get; set; }
         public string accessor { get; set; }
@@ -25,6 +25,6 @@ namespace TangramCypher.ApplicationLayer.Vault.Models
         public object data { get; set; }
         public object wrap_info { get; set; }
         public object warnings { get; set; }
-        public Auth auth { get; set; }
+        public VaultTokenCreateResponseAuth auth { get; set; }
     }
 }
