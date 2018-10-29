@@ -21,14 +21,24 @@ namespace TangramCypher.Helpers.LibSodium
             return encrypted;
         }
 
-        public byte[] GenericHash(string message, int bytes = 32)
+        public byte[] GenericHashNoKey(string message, int bytes = 32)
         {
             if (string.IsNullOrEmpty(message))
             {
                 throw new System.ArgumentException("Message cannot be null or empty!", nameof(message));
             }
 
-            return Sodium.GenericHash.Hash(Encoding.UTF8.GetBytes(message), null, bytes);
+            return GenericHash.Hash(Encoding.UTF8.GetBytes(message), null, bytes);
+        }
+
+        public byte[] GenericHashWithKey(string message, byte[] key, int bytes = 32)
+        {
+            if (string.IsNullOrEmpty(message))
+            {
+                throw new System.ArgumentException("Message cannot be null or empty!", nameof(message));
+            }
+
+            return GenericHash.Hash(Encoding.UTF8.GetBytes(message), key, bytes);
         }
 
         public byte[] HashPwd(string pwd)
@@ -68,9 +78,19 @@ namespace TangramCypher.Helpers.LibSodium
             return Encoding.UTF8.GetString(decrypted);
         }
 
+        public byte[] RandomBytes(int bytes = 32)
+        {
+            return SodiumCore.GetRandomBytes(bytes);
+        }
+
         public byte[] RandomKey()
         {
-            return Sodium.GenericHash.GenerateKey();
+            return GenericHash.GenerateKey();
+        }
+
+        public int RandomNumbers(int n)
+        {
+            return SodiumCore.GetRandomNumber(n);
         }
 
         public byte[] ScalarMultBase(byte[] sk)
@@ -98,6 +118,11 @@ namespace TangramCypher.Helpers.LibSodium
             return Sodium.ScalarMult.Mult(bobSk, alicePk);
         }
 
+        public byte[] ShortHash(string message, byte[] key)
+        {
+            return Sodium.ShortHash.Hash(message, key);
+        }
+
         public bool VerifiyPwd(byte[] hash, byte[] pwd)
         {
             if (hash == null)
@@ -112,5 +137,6 @@ namespace TangramCypher.Helpers.LibSodium
 
             return PasswordHash.ArgonHashStringVerify(hash, pwd);
         }
+
     }
 }
