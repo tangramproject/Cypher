@@ -24,6 +24,7 @@ namespace Cypher.ApplicationLayer.Onion
         const string SOCKS_PORT = "onion_socks_port";
         const string CONTROL_HOST = "onion_control_host";
         const string CONTROL_PORT = "onion_control_port";
+        const string HASHED_CONTROL_PASSWORD = "onion_hashed_control_password";
 
         readonly ICryptography cryptography;
         readonly IConfigurationSection onionSection;
@@ -32,6 +33,7 @@ namespace Cypher.ApplicationLayer.Onion
         readonly int socksPort;
         readonly string controlHost;
         readonly int controlPort;
+        readonly string hashedPassword;
 
         Process TorProcess { get; set; }
 
@@ -46,6 +48,7 @@ namespace Cypher.ApplicationLayer.Onion
             socksPort = onionSection.GetValue<int>(SOCKS_PORT);
             controlHost = onionSection.GetValue<string>(CONTROL_HOST);
             controlPort = onionSection.GetValue<int>(CONTROL_PORT);
+            hashedPassword = onionSection.GetValue<string>(HASHED_CONTROL_PASSWORD);
 
             var os = Util.GetOSPlatform().ToString();
         }
@@ -216,7 +219,7 @@ namespace Cypher.ApplicationLayer.Onion
             {
                 var torProcessStartInfo = new ProcessStartInfo("tor")
                 {
-                    Arguments = $"SOCKSPort {socksPort} ControlPort {controlPort} HashedControlPassword 16:{ cryptography.GenericHash(password).ToHex() }",
+                    Arguments = $"SOCKSPort {socksPort} ControlPort {controlPort} HashedControlPassword 16:{ hashedPassword }",
                     UseShellExecute = false,
                     CreateNoWindow = true,
                     RedirectStandardOutput = true
