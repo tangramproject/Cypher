@@ -42,7 +42,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                 throw new ArgumentException("Proof cannot be null or empty!", nameof(proof));
             }
 
-            return _Cryptography.GenericHash(string.Format("{0} {1} {2}", n, proof, masterKey), bytes).ToHex();
+            return _Cryptography.GenericHashNoKey(string.Format("{0} {1} {2}", n, proof, masterKey), bytes).ToHex();
         }
 
         public ChronicleDto DeriveToken(string masterKey, int n, ProofTokenDto proofTokenDto)
@@ -57,7 +57,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                 throw new ArgumentNullException(nameof(proofTokenDto));
             }
 
-            var proof = _Cryptography.GenericHash(string.Format("{0}{1}", proofTokenDto.Amount.ToString(), proofTokenDto.Serial)).ToHex();             var n0 = +n;             var n1 = +n + 1;             var n2 = +n + 2;              var chronicle = new ChronicleDto()             {                 Keeper = DeriveKey(n1, proof, DeriveKey(n2, proof, DeriveKey(n2, proof, masterKey))),                 N = n0,                 Principal = DeriveKey(n0, proof, masterKey),                 Proof = proof,                 ProofToken = proofTokenDto,                 Spark = DeriveKey(n1, proof, DeriveKey(n1, proof, masterKey))             };              return chronicle;
+            var proof = _Cryptography.GenericHashNoKey(string.Format("{0}{1}", proofTokenDto.Amount.ToString(), proofTokenDto.Serial)).ToHex();             var n0 = +n;             var n1 = +n + 1;             var n2 = +n + 2;              var chronicle = new ChronicleDto()             {                 Keeper = DeriveKey(n1, proof, DeriveKey(n2, proof, DeriveKey(n2, proof, masterKey))),                 N = n0,                 Principal = DeriveKey(n0, proof, masterKey),                 Proof = proof,                 ProofToken = proofTokenDto,                 Spark = DeriveKey(n1, proof, DeriveKey(n1, proof, masterKey))             };              return chronicle;
         }
 
         public string From()
@@ -156,7 +156,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                 throw new ArgumentNullException(nameof(proofTokenDto));
             }
 
-            var proof = _Cryptography.GenericHash(string.Format("{0}{1}", proofTokenDto.Amount.ToString(), proofTokenDto.Serial)).ToHex();             var n1 = n + 1;             var n2 = n + 2;             var n3 = n + 3;             var n4 = n + 4;
+            var proof = _Cryptography.GenericHashNoKey(string.Format("{0}{1}", proofTokenDto.Amount.ToString(), proofTokenDto.Serial)).ToHex();             var n1 = n + 1;             var n2 = n + 2;             var n3 = n + 3;             var n4 = n + 4;
 
             var chronicle1 = new ChronicleDto()             {                 Keeper = DeriveKey(n2, proof, DeriveKey(n3, proof, DeriveKey(n3, proof, masterKey))),                 N = n1,                 Principal = key1,                 Proof = proof,                 ProofToken = proofTokenDto,                 Spark = DeriveKey(n2, proof, key2)             };              var chronicle2 = new ChronicleDto()             {                 Keeper = DeriveKey(n3, proof, DeriveKey(n4, proof, DeriveKey(n4, proof, masterKey))),                 N = n2,                 Principal = key2,                 Proof = proof,                 ProofToken = proofTokenDto,                 Spark = DeriveKey(n3, proof, DeriveKey(n3, proof, masterKey))             };
              return Tuple.Create(chronicle1, chronicle2);

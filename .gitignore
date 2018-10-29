@@ -8,3 +8,5 @@
 /obj
 
 /ApplicationLayer/.DS_Store
+
+*.log

@@ -1,3 +1,4 @@
+using System;
 using System.Text;
 using Sodium;
 
@@ -9,12 +10,12 @@ namespace TangramCypher.Helpers.LibSodium
         {
             if (string.IsNullOrEmpty(message))
             {
-                throw new System.ArgumentException("message", nameof(message));
+                throw new ArgumentException("message", nameof(message));
             }
 
             if (pk == null)
             {
-                throw new System.ArgumentNullException(nameof(pk));
+                throw new ArgumentNullException(nameof(pk));
             }
 
             var encrypted = SealedPublicKeyBox.Create(Encoding.UTF8.GetBytes(message), pk);
@@ -25,7 +26,7 @@ namespace TangramCypher.Helpers.LibSodium
         {
             if (string.IsNullOrEmpty(message))
             {
-                throw new System.ArgumentException("Message cannot be null or empty!", nameof(message));
+                throw new ArgumentException("Message cannot be null or empty!", nameof(message));
             }
 
             return GenericHash.Hash(Encoding.UTF8.GetBytes(message), null, bytes);
@@ -35,7 +36,7 @@ namespace TangramCypher.Helpers.LibSodium
         {
             if (string.IsNullOrEmpty(message))
             {
-                throw new System.ArgumentException("Message cannot be null or empty!", nameof(message));
+                throw new ArgumentException("Message cannot be null or empty!", nameof(message));
             }
 
             return GenericHash.Hash(Encoding.UTF8.GetBytes(message), key, bytes);
@@ -45,7 +46,7 @@ namespace TangramCypher.Helpers.LibSodium
         {
             if (string.IsNullOrEmpty(pwd))
             {
-                throw new System.ArgumentException("Password cannot be null or empty!", nameof(pwd));
+                throw new ArgumentException("Password cannot be null or empty!", nameof(pwd));
             }
 
             const long OPS_LIMIT = 4;
@@ -66,12 +67,12 @@ namespace TangramCypher.Helpers.LibSodium
         {
             if (cipher == null)
             {
-                throw new System.ArgumentNullException(nameof(cipher));
+                throw new ArgumentNullException(nameof(cipher));
             }
 
             if (keyPair == null)
             {
-                throw new System.ArgumentNullException(nameof(keyPair));
+                throw new ArgumentNullException(nameof(keyPair));
             }
 
             var decrypted = SealedPublicKeyBox.Open(cipher, keyPair);
@@ -97,7 +98,7 @@ namespace TangramCypher.Helpers.LibSodium
         {
             if (sk == null)
             {
-                throw new System.ArgumentNullException(nameof(sk));
+                throw new ArgumentNullException(nameof(sk));
             }
 
             return Sodium.ScalarMult.Base(sk);
@@ -107,12 +108,12 @@ namespace TangramCypher.Helpers.LibSodium
         {
             if (bobSk == null)
             {
-                throw new System.ArgumentNullException(nameof(bobSk));
+                throw new ArgumentNullException(nameof(bobSk));
             }
 
             if (alicePk == null)
             {
-                throw new System.ArgumentNullException(nameof(alicePk));
+                throw new ArgumentNullException(nameof(alicePk));
             }
 
             return Sodium.ScalarMult.Mult(bobSk, alicePk);
@@ -127,12 +128,12 @@ namespace TangramCypher.Helpers.LibSodium
         {
             if (hash == null)
             {
-                throw new System.ArgumentNullException(nameof(hash));
+                throw new ArgumentNullException(nameof(hash));
             }
 
             if (pwd == null)
             {
-                throw new System.ArgumentNullException(nameof(pwd));
+                throw new ArgumentNullException(nameof(pwd));
             }
 
             return PasswordHash.ArgonHashStringVerify(hash, pwd);

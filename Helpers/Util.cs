@@ -5,6 +5,8 @@ using TangramCypher.ApplicationLayer.Actor;
 using System.Text;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.IO;
+using System.Reflection;
 
 namespace TangramCypher.Helpers
 {
@@ -64,6 +66,10 @@ namespace TangramCypher.Helpers
             osPlatform = isLinux ? OSPlatform.Linux : osPlatform;
 
             return osPlatform;
+        }
+
+        public static string EntryAssemblyPath() {
+            return Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
         }
     }
 }
