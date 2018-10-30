@@ -22,12 +22,12 @@ namespace Cypher.ApplicationLayer.Onion
     public class OnionService : IOnionService, IDisposable
     {
         const string ONION = "onion";
+        const string TORRC = "torrc";
         const string SOCKS_HOST = "onion_socks_host";
         const string SOCKS_PORT = "onion_socks_port";
         const string CONTROL_HOST = "onion_control_host";
         const string CONTROL_PORT = "onion_control_port";
         const string HASHED_CONTROL_PASSWORD = "onion_hashed_control_password";
-        const string ONION_TORRC = "onion/torrc";
 
         readonly ICryptography cryptography;
         readonly IConfigurationSection onionSection;
@@ -59,8 +59,8 @@ namespace Cypher.ApplicationLayer.Onion
             controlPort = onionSection.GetValue<int>(CONTROL_PORT);
 
             onionDirectory = Path.Combine(Util.EntryAssemblyPath(), ONION);
-            torrcPath = Path.Combine(Util.EntryAssemblyPath(), ONION_TORRC);
-            controlPortPath = Path.Combine(Util.EntryAssemblyPath(), string.Format("{0}/{1}", ONION, "control-port"));
+            torrcPath = Path.Combine(onionDirectory, TORRC);
+            controlPortPath = Path.Combine(onionDirectory, "control-port");
         }
 
         public async Task<string> GetAsync(string url, object data)
@@ -134,7 +134,7 @@ namespace Cypher.ApplicationLayer.Onion
             TorProcess = Process.Start(torProcessStartInfo);
 
             var sOut = TorProcess.StandardOutput;
-            var result = Regex.Replace(sOut.ReadToEnd(), "\n", String.Empty);
+            var result = Regex.Replace(sOut.ReadToEnd(), Environment.NewLine, string.Empty);
 
             if (!TorProcess.HasExited)
             {
@@ -145,7 +145,7 @@ namespace Cypher.ApplicationLayer.Onion
             TorProcess.Close();
             TorProcess = null;
 
-            hashedPassword = result.Contains("16:") ? result : String.Empty;
+            hashedPassword = Regex.Match(result, "16:[0-9A-F]+")?.Value ?? string.Empty;
 
             return password;
         }
@@ -325,8 +325,8 @@ namespace Cypher.ApplicationLayer.Onion
                 "NumEntryGuards 8",
                 "SocksPort 9050",
                 "Log notice stdout",
-                string.Format("DataDirectory {0}", onionDirectory),
-                string.Format("ControlPortWriteToFile {0}/{1}", onionDirectory, "control-port")
+                $"DataDirectory {onionDirectory}",
+                $"ControlPortWriteToFile {controlPortPath}"
             };
 
             try
@@ -365,9 +365,9 @@ namespace Cypher.ApplicationLayer.Onion
         void StartTorProcess()
         {
             TorProcess = new Process();
-            TorProcess.StartInfo.Arguments = $"-f { torrcPath }";
-            TorProcess.StartInfo.UseShellExecute = false;
             TorProcess.StartInfo.FileName = GetTorFileName();
+            TorProcess.StartInfo.Arguments = $"-f \"{torrcPath}\"";
+            TorProcess.StartInfo.UseShellExecute = false;
             TorProcess.StartInfo.CreateNoWindow = true;
             TorProcess.StartInfo.RedirectStandardOutput = true;
             TorProcess.OutputDataReceived += (sender, e) =>
