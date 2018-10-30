@@ -1,6 +1,5 @@
 ﻿using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -15,7 +14,6 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 using TangramCypher.ApplicationLayer.Vault.Models;
-using TangramCypher.Helpers.ServiceLocator;
 using VaultSharp;
 using VaultSharp.V1.AuthMethods.Token;
 using VaultSharp.V1.AuthMethods.UserPass;
@@ -105,32 +103,7 @@ namespace TangramCypher.ApplicationLayer.Vault
             }
             else
             {
-                vaultProcess = Process.Start(new ProcessStartInfo
-                {
-                    FileName = vaultExecutable.FullName,
-                    Arguments = "server -config vault.json",
-                    WorkingDirectory = tangramDirectory.FullName,
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    CreateNoWindow = true
-                });
-
-                Stopwatch sw = new Stopwatch();
-                sw.Start();
-                while (!vaultProcess.StandardOutput.EndOfStream)
-                {
-                    if (sw.ElapsedMilliseconds > startTimeout) throw new TimeoutException("Timed out waiting for Vault Server to start.");
-
-                    string line = vaultProcess.StandardOutput.ReadLine();
-
-                    if (line.Contains("Vault server started!"))
-                    {
-                        console.ResetColor();
-                        console.WriteLine("Vault Server Started!");
-                        logger.LogInformation("Vault Server Started!");
-                        break;
-                    }
-                }
+                StartVaultProcess();
             }
 
             if (!await vaultClient.V1.System.GetInitStatusAsync())
@@ -163,13 +136,43 @@ namespace TangramCypher.ApplicationLayer.Vault
             }
         }
 
-        public async Task Unseal(string shard)
+        private void StartVaultProcess()
+        {
+            vaultProcess = Process.Start(new ProcessStartInfo
+            {
+                FileName = vaultExecutable.FullName,
+                Arguments = "server -config vault.json",
+                WorkingDirectory = tangramDirectory.FullName,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                CreateNoWindow = true
+            });
+
+            Stopwatch sw = new Stopwatch();
+            sw.Start();
+            while (!vaultProcess.StandardOutput.EndOfStream)
+            {
+                if (sw.ElapsedMilliseconds > startTimeout) throw new TimeoutException("Timed out waiting for Vault Server to start.");
+
+                string line = vaultProcess.StandardOutput.ReadLine();
+
+                if (line.Contains("Vault server started!"))
+                {
+                    console.ResetColor();
+                    console.WriteLine("Vault Server Started!");
+                    logger.LogInformation("Vault Server Started!");
+                    break;
+                }
+            }
+        }
+
+        public async Task Unseal(string shard, bool skipPrint = false)
         {
             var unsealTask = await vaultClient.V1.System.UnsealAsync(shard);
 
             var response = unsealTask;
 
-            if (!response.Sealed)
+            if (!response.Sealed && !skipPrint)
             {
                 console.ResetColor();
                 console.ForegroundColor = ConsoleColor.DarkGreen;
@@ -198,22 +201,24 @@ namespace TangramCypher.ApplicationLayer.Vault
 
             var userKeys = initResponse.MasterKeys.OfType<string>().ToList().Skip(1).ToArray();
 
-            File.WriteAllText(shardFile.FullName, initResponse.MasterKeys.First());
+            var serviceShard = initResponse.MasterKeys.First();
+
+            File.WriteAllText(shardFile.FullName, serviceShard);
 
             WriteKeys(userKeys);
 
             //  Unseal Vault so we can create the policy.
             for (int i = 0; i < secretThreshold; ++i)
             {
-                await Unseal(initResponse.MasterKeys[i]);
+                await Unseal(initResponse.MasterKeys[i], true);
             }
 
             Login(initResponse.RootToken);
 
             await CreateVaultServicePolicyAsync();
 
-            var vaultServiceToken = await CreateVaultServiceToken(initResponse.RootToken);
-            var vaultServiceSerialized = JsonConvert.SerializeObject(vaultServiceToken);
+            serviceToken = await CreateVaultServiceToken(initResponse.RootToken);
+            var vaultServiceSerialized = JsonConvert.SerializeObject(serviceToken);
 
             File.WriteAllText(serviceTokenFile.FullName, vaultServiceSerialized);
 
@@ -223,6 +228,9 @@ namespace TangramCypher.ApplicationLayer.Vault
 
             //  Reseal the Vault.
             await Seal();
+
+            //  Partially unseal using the stored shard
+            await Unseal(serviceShard);
         }
 
         private async Task EnableUserpassAuth()
@@ -457,6 +465,11 @@ namespace TangramCypher.ApplicationLayer.Vault
             var secret = await vaultWalletClient.V1.Secrets.KeyValue.V2.ReadSecretAsync(path);
 
             return secret;
+        }
+
+        public async Task<Secret<ListInfo>> GetListAsync(string path)
+        {
+            return await vaultClient.V1.Secrets.KeyValue.V2.ReadSecretPathsAsync(path);
         }
     }
 }

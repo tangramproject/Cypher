@@ -38,6 +38,7 @@ namespace TangramCypher.ApplicationLayer.Commands
             RegisterCommand<VaultUnsealCommand>(new string[] { "vault", "unseal" });
             RegisterCommand<WalletCreateCommand>(new string[] { "wallet", "create" });
             RegisterCommand<WalletGetCommand>(new string[] { "wallet", "get" });
+            RegisterCommand<WalletListCommand>(new string[] { "wallet", "list" });
             RegisterCommand<ExitCommand>(new string[] { "exit" });
             RegisterCommand<HelpCommand>(new string[] { "help" });
         }
