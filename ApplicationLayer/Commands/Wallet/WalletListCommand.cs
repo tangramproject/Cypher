@@ -26,6 +26,18 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
         public override async Task Execute()
         {
             var data = await vaultService.GetListAsync($"wallets/");
+
+            var keys = data.Data?.Keys;
+
+            if (keys != null)
+            {
+                foreach (var key in data.Data?.Keys)
+                {
+                    var k = key.TrimEnd('/');
+
+                    console.WriteLine(k);
+                }
+            }
         }
     }
 }

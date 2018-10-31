@@ -12,7 +12,7 @@ namespace TangramCypher.ApplicationLayer.Vault
         Task Unseal(string shard, bool skipPrint = false);
         Task CreateUserAsync(string username, string password);
         Task SaveDataAsync(string username, string password, string path, IDictionary<string, object> data);
-        Task<Secret<SecretData>> GetDataAsync(string username, string password, string path);
+        Task<Secret<Dictionary<string, object>>> GetDataAsync(string username, string password, string path);
         Task<Secret<ListInfo>> GetListAsync(string path);
     }
 }

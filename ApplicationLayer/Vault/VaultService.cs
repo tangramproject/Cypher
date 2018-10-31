@@ -453,23 +453,23 @@ namespace TangramCypher.ApplicationLayer.Vault
                                                                                                    password));
             var vaultWalletClient = new VaultClient(vaultClientSettings);
 
-            await vaultWalletClient.V1.Secrets.KeyValue.V2.WriteSecretAsync(path, data);
+            await vaultWalletClient.V1.Secrets.KeyValue.V1.WriteSecretAsync(path, data);
         }
 
-        public async Task<Secret<SecretData>> GetDataAsync(string username, string password, string path)
+        public async Task<Secret<Dictionary<string, object>>> GetDataAsync(string username, string password, string path)
         {
             var vaultClientSettings = new VaultClientSettings(endpoint, new UserPassAuthMethodInfo(username,
                                                                                                    password));
             var vaultWalletClient = new VaultClient(vaultClientSettings);
 
-            var secret = await vaultWalletClient.V1.Secrets.KeyValue.V2.ReadSecretAsync(path);
+            var secret = await vaultWalletClient.V1.Secrets.KeyValue.V1.ReadSecretAsync(path);
 
             return secret;
         }
 
         public async Task<Secret<ListInfo>> GetListAsync(string path)
         {
-            return await vaultClient.V1.Secrets.KeyValue.V2.ReadSecretPathsAsync(path);
+            return await vaultClient.V1.Secrets.KeyValue.V1.ReadSecretPathsAsync(path);
         }
     }
 }
