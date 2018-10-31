@@ -9,6 +9,7 @@ using McMaster.Extensions.CommandLineUtils;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
 {
+    [CommandDescriptor(new string[] { "wallet", "create" }, "Creates a new wallet")]
     class WalletCreateCommand : Command
     {
         private IVaultService vaultService;

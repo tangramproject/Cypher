@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 
 namespace TangramCypher.ApplicationLayer.Commands.Vault
 {
+    [CommandDescriptor(new string[] { "vault", "download"}, "Downloads the latest version of the Vault")]
     public class VaultDownloadCommand : Command
     {
         public override async Task Execute() => throw new NotImplementedException();

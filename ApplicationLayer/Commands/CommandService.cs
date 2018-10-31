@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using McMaster.Extensions.CommandLineUtils;
@@ -16,7 +17,7 @@ namespace TangramCypher.ApplicationLayer.Commands
         private readonly ILogger logger;
         readonly IDictionary<string[], Type> commands;
         private bool prompt = true;
-    
+
         public CommandService(IConsole cnsl, ILogger lgr)
         {
             console = cnsl;
@@ -32,15 +33,30 @@ namespace TangramCypher.ApplicationLayer.Commands
             commands.Add(name, typeof(T));
         }
 
+        public void RegisterCommand(string[] name, Type t)
+        {
+            if (typeof(ICommand).IsAssignableFrom(t))
+            {
+                commands.Add(name, t);
+                return;
+            }
+
+            throw new ArgumentException("Command must implement ICommand interface", nameof(t));
+        }
+
         public void RegisterCommands()
         {
-            RegisterCommand<VaultDownloadCommand>(new string[] { "vault", "update" });
-            RegisterCommand<VaultUnsealCommand>(new string[] { "vault", "unseal" });
-            RegisterCommand<WalletCreateCommand>(new string[] { "wallet", "create" });
-            RegisterCommand<WalletGetCommand>(new string[] { "wallet", "get" });
-            RegisterCommand<WalletListCommand>(new string[] { "wallet", "list" });
-            RegisterCommand<ExitCommand>(new string[] { "exit" });
-            RegisterCommand<HelpCommand>(new string[] { "help" });
+            var commands = Assembly.GetExecutingAssembly().GetTypes().Where(x => x.IsClass
+                                                                               && typeof(Command).IsAssignableFrom(x)
+                                                                               && x.GetCustomAttribute<CommandDescriptorAttribute>() != null
+                                                                               ).OrderBy(x => string.Join(' ', x.GetCustomAttribute<CommandDescriptorAttribute>().Name));
+
+            foreach (var command in commands)
+            {
+                var attribute = command.GetCustomAttribute<CommandDescriptorAttribute>() as CommandDescriptorAttribute;
+
+                RegisterCommand(attribute.Name, command);
+            }
         }
 
         private ICommand GetCommand(string[] args)
@@ -62,9 +78,20 @@ namespace TangramCypher.ApplicationLayer.Commands
         {
             var command = GetCommand(args);
 
-            if(command == null)
+            if (command == null)
             {
-                command = GetCommand(new string[] { "help" });
+                console.WriteLine();
+                console.WriteLine("  Commands");
+
+                foreach (var cmd in commands)
+                {
+                    var commandDescriptor = cmd.Value.GetCustomAttribute<CommandDescriptorAttribute>();
+                    var name = string.Join(' ', commandDescriptor.Name);
+                    command = Activator.CreateInstance(cmd.Value) as ICommand;
+                    console.WriteLine($"    {name}".PadRight(25) + $"{commandDescriptor.Description}");
+                }
+
+                return;
             }
 
             await command.Execute();
@@ -83,7 +110,7 @@ namespace TangramCypher.ApplicationLayer.Commands
                 {
                     await Execute(args);
                 }
-                catch(Exception e)
+                catch (Exception e)
                 {
                     console.BackgroundColor = ConsoleColor.Red;
                     console.ForegroundColor = ConsoleColor.White;

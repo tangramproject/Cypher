@@ -7,6 +7,7 @@ using TangramCypher.Helpers.ServiceLocator;
 
 namespace TangramCypher.ApplicationLayer.Commands.Vault
 {
+    [CommandDescriptor(new string[] { "vault", "unseal" }, "Begins the Vault unseal process")]
     public class VaultUnsealCommand : Command
     {
         private readonly IVaultService vaultService;

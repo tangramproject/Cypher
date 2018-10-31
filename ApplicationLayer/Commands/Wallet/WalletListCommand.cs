@@ -10,6 +10,7 @@ using Newtonsoft.Json;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
 {
+    [CommandDescriptor(new string[] { "wallet", "list" }, "Lists the wallets available")]
     class WalletListCommand : Command
     {
         private IVaultService vaultService;
