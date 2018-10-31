@@ -10,5 +10,6 @@ namespace TangramCypher.ApplicationLayer.Commands
         void RegisterCommand<T>(string[] name) where T : ICommand;
         Task Execute(string[] args);
         Task InteractiveCliLoop();
+        void Exit();
     }
 }

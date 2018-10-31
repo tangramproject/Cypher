@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Logging;
+using TangramCypher.ApplicationLayer.Commands.Exceptions;
 using TangramCypher.ApplicationLayer.Commands.Vault;
 using TangramCypher.ApplicationLayer.Commands.Wallet;
 
@@ -25,7 +26,19 @@ namespace TangramCypher.ApplicationLayer.Commands
 
             commands = new Dictionary<string[], Type>(new CommandEqualityComparer());
 
+            console.CancelKeyPress += Console_CancelKeyPress;
+
             RegisterCommands();
+        }
+
+        private void Console_CancelKeyPress(object sender, ConsoleCancelEventArgs e)
+        {
+            throw new CancelKeyPressException();
+        }
+
+        public void Exit()
+        {
+            prompt = false;
         }
 
         public void RegisterCommand<T>(string[] name) where T : ICommand
@@ -101,9 +114,9 @@ namespace TangramCypher.ApplicationLayer.Commands
         {
             while (prompt)
             {
-                var args = Prompt.GetString("tangram$", promptColor: ConsoleColor.Cyan)?.Split(' ');
+                var args = Prompt.GetString("tangram$", promptColor: ConsoleColor.Cyan)?.TrimEnd()?.Split(' ');
 
-                if (args == null)
+                if (args == null || (args.Length == 1 && string.IsNullOrEmpty(args[0])))
                     continue;
 
                 try
