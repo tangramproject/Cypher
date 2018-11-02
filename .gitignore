@@ -10,3 +10,5 @@
 /ApplicationLayer/.DS_Store
 
 *.log
+
+*.user

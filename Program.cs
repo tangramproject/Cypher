@@ -14,6 +14,7 @@ using System.IO;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Logging.Console;
 using System.Reflection;
+using TangramCypher.ApplicationLayer.Commands.Exceptions;
 
 namespace TangramCypher
 {
@@ -21,32 +22,38 @@ namespace TangramCypher
     {
         static async Task Main(string[] args)
         {
-            IServiceLocator locator = new Locator();
+            try
+            {
+                IServiceLocator locator = new Locator();
 
-            var serviceCollection = new ServiceCollection();
-            ConfigureServices(serviceCollection);
+                var serviceCollection = new ServiceCollection();
+                ConfigureServices(serviceCollection);
 
-            var serviceProvider = serviceCollection
-                .AddLogging()
-                .BuildServiceProvider();
+                var serviceProvider = serviceCollection
+                    .AddLogging()
+                    .BuildServiceProvider();
 
-            var logger = serviceProvider.GetService<ILogger>();
+                var logger = serviceProvider.GetService<ILogger>();
 
-            logger.LogInformation("Starting Application");
+                logger.LogInformation("Starting Application");
 
-            locator.Add<IServiceProvider, ServiceProvider>(serviceProvider);
+                locator.Add<IServiceProvider, ServiceProvider>(serviceProvider);
 
-            var onionService = serviceProvider.GetService<IOnionService>();
+                var onionService = serviceProvider.GetService<IOnionService>();
 
-            // Testing onion...
-            // onionService.StartOnion(onionService.GenerateHashPassword("ILoveTangram"));
+                // Testing onion...
+                onionService.StartOnion(onionService.GenerateHashPassword("ILoveTangram"));
 
-            var commandService = serviceProvider.GetService<ICommandService>();
-            var vaultService = serviceProvider.GetService<IVaultService>();
+                var commandService = serviceProvider.GetService<ICommandService>();
+                var vaultService = serviceProvider.GetService<IVaultService>();
 
-            await vaultService.StartVaultServiceAsync();
-
-            await commandService.InteractiveCliLoop();
+                await vaultService.StartVaultServiceAsync();
+                await commandService.InteractiveCliLoop();
+            }
+            catch(Exception e)
+            {
+                Console.WriteLine(e);
+            }
         }
 
         static void ConfigureServices(IServiceCollection serviceCollection)

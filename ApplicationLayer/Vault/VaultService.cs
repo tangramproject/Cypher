@@ -10,6 +10,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
@@ -25,7 +26,7 @@ namespace TangramCypher.ApplicationLayer.Vault
     public class VaultService : IVaultService
     {
         private static readonly DirectoryInfo userDirectory = new DirectoryInfo(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
-        private static readonly DirectoryInfo tangramDirectory = new DirectoryInfo(Path.Combine(userDirectory.FullName, ".tangramcli"));
+        private static readonly DirectoryInfo tangramDirectory = new DirectoryInfo(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location));
         private static readonly FileInfo shardFile = new FileInfo(Path.Combine(tangramDirectory.FullName, "shard"));
         private static readonly FileInfo serviceTokenFile = new FileInfo(Path.Combine(tangramDirectory.FullName, "servicetoken"));
 
@@ -82,6 +83,10 @@ namespace TangramCypher.ApplicationLayer.Vault
             if (fileInfo != null && fileInfo.Length == 1)
             {
                 vaultExecutable = fileInfo[0];
+            }
+            else
+            {
+                throw new Exception("Unable to find Vault executable.");
             }
 
             //  Launch service
