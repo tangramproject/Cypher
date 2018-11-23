@@ -7,6 +7,8 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.IO;
 using System.Reflection;
+using System.Net;
+using System.Security;
 
 namespace TangramCypher.Helpers
 {
@@ -70,6 +72,11 @@ namespace TangramCypher.Helpers
 
         public static string EntryAssemblyPath() {
             return Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
+        }
+
+        public static string ToPlainString(SecureString secure)
+        {
+            return new NetworkCredential(string.Empty, secure).Password;
         }
     }
 }
