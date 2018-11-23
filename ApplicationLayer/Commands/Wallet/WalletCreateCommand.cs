@@ -15,7 +15,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
     {
         private IVaultService vaultService;
         private IConsole console;
-        private IWalletService walletService;
+        readonly IWalletService walletService;
 
         public WalletCreateCommand()
         {
