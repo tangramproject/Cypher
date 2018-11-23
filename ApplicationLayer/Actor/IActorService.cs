@@ -10,8 +10,8 @@ namespace TangramCypher.ApplicationLayer.Actor
 
         double? Amount();
         ActorService Amount(double? value);
-        string DeriveKey(int n, string proof, string masterKey, int bytes = 32);
-        ChronicleDto DeriveToken(string masterKey, int n, ProofTokenDto proofTokenDto);
+        string DeriveKey(int version, string proof, string masterKey, int bytes = 32);
+        ChronicleDto DeriveToken(string masterKey, int version, ProofTokenDto proofTokenDto);
         string From();
         ActorService From(string masterKey);
         string HotRelease(ChronicleDto chronicleDto);
@@ -20,7 +20,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         string OpenBoxSeal(string cipher, PkSkDto pkSkDto);
         void ReceivePayment(string commitmentKey);
         void SendPayment();
-        Tuple<ChronicleDto, ChronicleDto> Swap(string masterKey, int n, string key1, string key2, ProofTokenDto proofTokenDto);
+        Tuple<ChronicleDto, ChronicleDto> Swap(string masterKey, int version, string key1, string key2, ProofTokenDto proofTokenDto);
         string To();
         ActorService To(string address);
         int VerifyToken(ChronicleDto terminal, ChronicleDto current);

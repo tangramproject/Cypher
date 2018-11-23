@@ -36,17 +36,17 @@ namespace TangramCypher.ApplicationLayer.Actor
             return this;
         }
 
-        public string DeriveKey(int n, string proof, string masterKey, int bytes = 32)
+        public string DeriveKey(int version, string proof, string masterKey, int bytes = 32)
         {
             if (string.IsNullOrEmpty(proof))
             {
                 throw new ArgumentException("Proof cannot be null or empty!", nameof(proof));
             }
 
-            return _Cryptography.GenericHashNoKey(string.Format("{0} {1} {2}", n, proof, masterKey), bytes).ToHex();
+            return _Cryptography.GenericHashNoKey(string.Format("{0} {1} {2}", version, proof, masterKey), bytes).ToHex();
         }
 
-        public ChronicleDto DeriveToken(string masterKey, int n, ProofTokenDto proofTokenDto)
+        public ChronicleDto DeriveToken(string masterKey, int version, ProofTokenDto proofTokenDto)
         {
             if (string.IsNullOrEmpty(masterKey))
             {
@@ -58,7 +58,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                 throw new ArgumentNullException(nameof(proofTokenDto));
             }
 
-            var proof = _Cryptography.GenericHashNoKey(string.Format("{0}{1}", proofTokenDto.Amount.ToString(), proofTokenDto.Serial)).ToHex();             var n0 = +n;             var n1 = +n + 1;             var n2 = +n + 2;              var chronicle = new ChronicleDto()             {                 Keeper = DeriveKey(n1, proof, DeriveKey(n2, proof, DeriveKey(n2, proof, masterKey))),                 N = n0,                 Principal = DeriveKey(n0, proof, masterKey),                 Proof = proof,                 ProofToken = proofTokenDto,                 Spark = DeriveKey(n1, proof, DeriveKey(n1, proof, masterKey))             };              return chronicle;
+            var proof = _Cryptography.GenericHashNoKey(string.Format("{0}{1}", proofTokenDto.Amount.ToString(), proofTokenDto.Serial)).ToHex();             var v0 = +version;             var v1 = +version + 1;             var v2 = +version + 2;              var chronicle = new ChronicleDto()             {                 Keeper = DeriveKey(v1, proof, DeriveKey(v2, proof, DeriveKey(v2, proof, masterKey))),                 Version = v0,                 Principal = DeriveKey(v0, proof, masterKey),                 Proof = proof,                 ProofToken = proofTokenDto,                 Spark = DeriveKey(v1, proof, DeriveKey(v1, proof, masterKey))             };              return chronicle;
         }
 
         public string From()
@@ -78,7 +78,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                 throw new ArgumentNullException(nameof(chronicleDto));
             }
 
-            var subKey1 = DeriveKey(chronicleDto.N + 1, chronicleDto.Proof, From());             var subKey2 = DeriveKey(chronicleDto.N + 2, chronicleDto.Proof, From());
+            var subKey1 = DeriveKey(chronicleDto.Version + 1, chronicleDto.Proof, From());             var subKey2 = DeriveKey(chronicleDto.Version + 2, chronicleDto.Proof, From());
             var redemption = new RedemptionKeyDto() { Key1 = subKey1, Key2 = subKey2, Memo = Memo(), Proof = chronicleDto.Proof };
 
             return JsonConvert.SerializeObject(redemption);
@@ -124,7 +124,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             var freeRedemptionKey = JsonConvert.DeserializeObject<RedemptionKeyDto>(redemptionKey);
 
-            var swap = Swap(From(), 1, freeRedemptionKey.Key1, freeRedemptionKey.Key2, _ChronicleDto.ProofToken);              var token1 = DeriveToken(From(), swap.Item1.N, swap.Item1.ProofToken);             var status1 = VerifyToken(swap.Item1, token1);              var token2 = DeriveToken(From(), swap.Item2.N, swap.Item2.ProofToken);             var status2 = VerifyToken(swap.Item2, token2);
+            var swap = Swap(From(), 1, freeRedemptionKey.Key1, freeRedemptionKey.Key2, _ChronicleDto.ProofToken);              var token1 = DeriveToken(From(), swap.Item1.Version, swap.Item1.ProofToken);             var status1 = VerifyToken(swap.Item1, token1);              var token2 = DeriveToken(From(), swap.Item2.Version, swap.Item2.ProofToken);             var status2 = VerifyToken(swap.Item2, token2);
         }
 
         public void SendPayment()
@@ -135,7 +135,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             ReceivePayment(redemptionKey);
         }
 
-        public Tuple<ChronicleDto, ChronicleDto> Swap(string masterKey, int n, string key1, string key2, ProofTokenDto proofTokenDto)
+        public Tuple<ChronicleDto, ChronicleDto> Swap(string masterKey, int version, string key1, string key2, ProofTokenDto proofTokenDto)
         {
             if (string.IsNullOrEmpty(masterKey))
             {
@@ -157,9 +157,9 @@ namespace TangramCypher.ApplicationLayer.Actor
                 throw new ArgumentNullException(nameof(proofTokenDto));
             }
 
-            var proof = _Cryptography.GenericHashNoKey(string.Format("{0}{1}", proofTokenDto.Amount.ToString(), proofTokenDto.Serial)).ToHex();             var n1 = n + 1;             var n2 = n + 2;             var n3 = n + 3;             var n4 = n + 4;
+            var proof = _Cryptography.GenericHashNoKey(string.Format("{0}{1}", proofTokenDto.Amount.ToString(), proofTokenDto.Serial)).ToHex();             var v1 = version + 1;             var v2 = version + 2;             var v3 = version + 3;             var v4 = version + 4;
 
-            var chronicle1 = new ChronicleDto()             {                 Keeper = DeriveKey(n2, proof, DeriveKey(n3, proof, DeriveKey(n3, proof, masterKey))),                 N = n1,                 Principal = key1,                 Proof = proof,                 ProofToken = proofTokenDto,                 Spark = DeriveKey(n2, proof, key2)             };              var chronicle2 = new ChronicleDto()             {                 Keeper = DeriveKey(n3, proof, DeriveKey(n4, proof, DeriveKey(n4, proof, masterKey))),                 N = n2,                 Principal = key2,                 Proof = proof,                 ProofToken = proofTokenDto,                 Spark = DeriveKey(n3, proof, DeriveKey(n3, proof, masterKey))             };
+            var chronicle1 = new ChronicleDto()             {                 Keeper = DeriveKey(v2, proof, DeriveKey(v3, proof, DeriveKey(v3, proof, masterKey))),                 Version = v1,                 Principal = key1,                 Proof = proof,                 ProofToken = proofTokenDto,                 Spark = DeriveKey(v2, proof, key2)             };              var chronicle2 = new ChronicleDto()             {                 Keeper = DeriveKey(v3, proof, DeriveKey(v4, proof, DeriveKey(v4, proof, masterKey))),                 Version = v2,                 Principal = key2,                 Proof = proof,                 ProofToken = proofTokenDto,                 Spark = DeriveKey(v3, proof, DeriveKey(v3, proof, masterKey))             };
              return Tuple.Create(chronicle1, chronicle2);
         }
 
