@@ -11,6 +11,6 @@ namespace TangramCypher.ApplicationLayer.Wallet
         PkSkDto CreatePkSk();
         string NewID();
         string MasterKey();
-        string Passphrase(int listOfWords);
+        string Passphrase();
     }
 }

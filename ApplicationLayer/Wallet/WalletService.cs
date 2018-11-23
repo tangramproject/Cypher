@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using MurrayGrant.ReadablePassphrase;
 using TangramCypher.Helpers;
 using TangramCypher.Helpers.LibSodium;
 
@@ -38,12 +39,14 @@ namespace TangramCypher.ApplicationLayer.Wallet
             return String.Format("id_{0}", _Cryptography.RandomKey().ToHex());
         }
 
-        public string Passphrase(int listOfWords)
+        public string Passphrase()
         {
             var defaultDict = MurrayGrant.ReadablePassphrase.Dictionaries.Default.Load();
-            var easyCreatedGenerator = MurrayGrant.ReadablePassphrase.Generator.Create();
+            var easyCreatedGenerator = Generator.Create();
+            var secureString = easyCreatedGenerator.GenerateAsSecure(PhraseStrength.RandomForever);
 
-            return easyCreatedGenerator.ToString();
+            return Util.ToPlainString(secureString);
         }
+
     }
 }
