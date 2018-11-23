@@ -9,10 +9,11 @@ namespace TangramCypher.ApplicationLayer.Actor
 {
     public class ActorService : IActorService
     {
-        protected string _MasterKey;
-        protected string _ToAdress;
-        protected double? _Amount;
-        protected string _Memo;
+        //redemption
+        protected string _masterKey;
+        protected string _toAdress;
+        protected double? _amount;
+        protected string _memo;
 
         ChronicleDto _ChronicleDto;
 
@@ -25,12 +26,12 @@ namespace TangramCypher.ApplicationLayer.Actor
 
         public double? Amount()
         {
-            return _Amount;
+            return _amount;
         }
 
         public ActorService Amount(double? value)
         {
-            if (value == null)             {                 throw new Exception("Value can not be null!");             }             if (Math.Abs(value.GetValueOrDefault()) <= 0)             {                 throw new Exception("Value can not be zero!");             }              _Amount = value;
+            if (value == null)             {                 throw new Exception("Value can not be null!");             }             if (Math.Abs(value.GetValueOrDefault()) <= 0)             {                 throw new Exception("Value can not be zero!");             }              _amount = value;
 
             return this;
         }
@@ -62,12 +63,12 @@ namespace TangramCypher.ApplicationLayer.Actor
 
         public string From()
         {
-            return _MasterKey;
+            return _masterKey;
         }
 
         public ActorService From(string masterKey)
         {
-            if (string.IsNullOrEmpty(masterKey))             {                 throw new Exception("Master Key is missing!");             }              _MasterKey = masterKey;              return this;
+            if (string.IsNullOrEmpty(masterKey))             {                 throw new Exception("Master Key is missing!");             }              _masterKey = masterKey;              return this;
         }
 
         public string HotRelease(ChronicleDto chronicleDto)
@@ -78,19 +79,19 @@ namespace TangramCypher.ApplicationLayer.Actor
             }
 
             var subKey1 = DeriveKey(chronicleDto.N + 1, chronicleDto.Proof, From());             var subKey2 = DeriveKey(chronicleDto.N + 2, chronicleDto.Proof, From());
-            var commitment = new CommitmentKeyDto() { Key1 = subKey1, Key2 = subKey2, Memo = Memo(), Proof = chronicleDto.Proof };
+            var redemption = new RedemptionKeyDto() { Key1 = subKey1, Key2 = subKey2, Memo = Memo(), Proof = chronicleDto.Proof };
 
-            return JsonConvert.SerializeObject(commitment);
+            return JsonConvert.SerializeObject(redemption);
         }
 
         public string Memo()
         {
-            return _Memo;
+            return _memo;
         }
 
         public ActorService Memo(string text)
         {
-            if (string.IsNullOrEmpty(text))             {                 _Memo = String.Empty;             }              if (text.Length > 64)             {                 throw new Exception("Memo field cannot be more than 64 characters long!");             }              _Memo = text;              return this;
+            if (string.IsNullOrEmpty(text))             {                 _memo = String.Empty;             }              if (text.Length > 64)             {                 throw new Exception("Memo field cannot be more than 64 characters long!");             }              _memo = text;              return this;
         }
 
         public string OpenBoxSeal(string cipher, PkSkDto pkSkDto)
@@ -112,26 +113,26 @@ namespace TangramCypher.ApplicationLayer.Actor
             
         }
 
-        public void ReceivePayment(string commitmentKey)
+        public void ReceivePayment(string redemptionKey)
         {
-            if (string.IsNullOrEmpty(commitmentKey))
+            if (string.IsNullOrEmpty(redemptionKey))
             {
-                throw new ArgumentException("Commitment Key cannot be null or empty!", nameof(commitmentKey));
+                throw new ArgumentException("Redemption Key cannot be null or empty!", nameof(redemptionKey));
             }
 
             From("Nine inch nails...");
 
-            var freeCommitmentKey = JsonConvert.DeserializeObject<CommitmentKeyDto>(commitmentKey);
+            var freeRedemptionKey = JsonConvert.DeserializeObject<RedemptionKeyDto>(redemptionKey);
 
-            var swap = Swap(From(), 1, freeCommitmentKey.Key1, freeCommitmentKey.Key2, _ChronicleDto.ProofToken);              var token1 = DeriveToken(From(), swap.Item1.N, swap.Item1.ProofToken);             var status1 = VerifyToken(swap.Item1, token1);              var token2 = DeriveToken(From(), swap.Item2.N, swap.Item2.ProofToken);             var status2 = VerifyToken(swap.Item2, token2);
+            var swap = Swap(From(), 1, freeRedemptionKey.Key1, freeRedemptionKey.Key2, _ChronicleDto.ProofToken);              var token1 = DeriveToken(From(), swap.Item1.N, swap.Item1.ProofToken);             var status1 = VerifyToken(swap.Item1, token1);              var token2 = DeriveToken(From(), swap.Item2.N, swap.Item2.ProofToken);             var status2 = VerifyToken(swap.Item2, token2);
         }
 
         public void SendPayment()
         {
-            _ChronicleDto = DeriveToken(From(), 0, new ProofTokenDto() { Amount = Amount().Value, Serial = _Cryptography.RandomKey().ToHex() });             _ChronicleDto = DeriveToken(From(), 1, _ChronicleDto.ProofToken);              var commitmentKey = HotRelease(_ChronicleDto);             // var base58 = Base58.Bitcoin.Decode(Util.Pop(To(), "_"));             // var cipher = _Cryptography.BoxSeal(commitmentKey, Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(base58).Substring(150)));
+            _ChronicleDto = DeriveToken(From(), 0, new ProofTokenDto() { Amount = Amount().Value, Serial = _Cryptography.RandomKey().ToHex() });             _ChronicleDto = DeriveToken(From(), 1, _ChronicleDto.ProofToken);              var redemptionKey = HotRelease(_ChronicleDto);             // var base58 = Base58.Bitcoin.Decode(Util.Pop(To(), "_"));             // var cipher = _Cryptography.BoxSeal(redemptionKey, Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(base58).Substring(150)));
 
 
-            ReceivePayment(commitmentKey);
+            ReceivePayment(redemptionKey);
         }
 
         public Tuple<ChronicleDto, ChronicleDto> Swap(string masterKey, int n, string key1, string key2, ProofTokenDto proofTokenDto)
@@ -164,12 +165,12 @@ namespace TangramCypher.ApplicationLayer.Actor
 
         public string To()
         {
-            return _ToAdress;
+            return _toAdress;
         }
 
         public ActorService To(string address)
         {
-            if (string.IsNullOrEmpty(address))             {                 throw new Exception("To address is missing!");             }              _ToAdress = address;              return this;
+            if (string.IsNullOrEmpty(address))             {                 throw new Exception("To address is missing!");             }              _toAdress = address;              return this;
         }
 
         public int VerifyToken(ChronicleDto terminal, ChronicleDto current)
