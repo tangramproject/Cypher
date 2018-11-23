@@ -6,6 +6,7 @@ using TangramCypher.ApplicationLayer.Vault;
 using TangramCypher.Helpers.ServiceLocator;
 using Microsoft.Extensions.DependencyInjection;
 using McMaster.Extensions.CommandLineUtils;
+using TangramCypher.ApplicationLayer.Wallet;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
 {
@@ -14,12 +15,14 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
     {
         private IVaultService vaultService;
         private IConsole console;
+        private IWalletService walletService;
 
         public WalletCreateCommand()
         {
             var serviceProvider = Locator.Instance.GetService<IServiceProvider>();
             vaultService = serviceProvider.GetService<IVaultService>();
             console = serviceProvider.GetService<IConsole>();
+            walletService = serviceProvider.GetService<IWalletService>();
         }
 
         public override async Task Execute()

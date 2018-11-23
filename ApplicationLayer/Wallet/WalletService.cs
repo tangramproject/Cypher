@@ -40,7 +40,10 @@ namespace TangramCypher.ApplicationLayer.Wallet
 
         public string Passphrase(int listOfWords)
         {
-            throw new NotImplementedException();
+            var defaultDict = MurrayGrant.ReadablePassphrase.Dictionaries.Default.Load();
+            var easyCreatedGenerator = MurrayGrant.ReadablePassphrase.Generator.Create();
+
+            return easyCreatedGenerator.ToString();
         }
     }
 }
