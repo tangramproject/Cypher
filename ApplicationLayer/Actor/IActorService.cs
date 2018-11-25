@@ -1,4 +1,7 @@
 using System;
+using System.Threading;
+using System.Threading.Tasks;
+using Cypher.ApplicationLayer.Onion;
 using TangramCypher.ApplicationLayer.Wallet;
 using TangramCypher.Helpers.LibSodium;
 
@@ -6,12 +9,14 @@ namespace TangramCypher.ApplicationLayer.Actor
 {
     public interface IActorService
     {
-        ICryptography _Cryptography { get; }
+        IOnionService _onionService { get; }
+        ICryptography _cryptography { get; }
 
         double? Amount();
         ActorService Amount(double? value);
         string DeriveKey(int version, string proof, string masterKey, int bytes = 32);
         ChronicleDto DeriveToken(string masterKey, int version, ProofTokenDto proofTokenDto);
+        Task<ChronicleDto> FetchToken(string stamp, CancellationToken cancellationToken);
         string From();
         ActorService From(string masterKey);
         string HotRelease(ChronicleDto chronicleDto);

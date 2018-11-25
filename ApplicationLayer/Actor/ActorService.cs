@@ -1,5 +1,13 @@
 using System;
+using System.Net;
+using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using Cypher.ApplicationLayer.Onion;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using TangramCypher.ApplicationLayer.Wallet;
 using TangramCypher.Helpers;
@@ -9,19 +17,28 @@ namespace TangramCypher.ApplicationLayer.Actor
 {
     public class ActorService : IActorService
     {
-        //redemption
+        const string NODEAPI = "nodeAPI";
+        const string ENDPOINT = "endpoint";
+        const string TOKEN = "token";
+
         protected string _masterKey;
         protected string _toAdress;
         protected double? _amount;
         protected string _memo;
 
         ChronicleDto _ChronicleDto;
+        readonly IConfigurationSection _nodeSection;
+        readonly ILogger _logger;
 
-        public ICryptography _Cryptography { get; }
+        public ICryptography _cryptography { get; }
+        public IOnionService _onionService { get; }
 
-        public ActorService(ICryptography cryptography)
+        public ActorService(ICryptography cryptography, IOnionService onionService, IConfiguration configuration, ILogger logger)
         {
-            _Cryptography = cryptography;
+            _cryptography = cryptography;
+            _onionService = onionService;
+            _nodeSection = configuration.GetSection(NODEAPI);
+            _logger = logger;
         }
 
         public double? Amount()
@@ -43,7 +60,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                 throw new ArgumentException("Proof cannot be null or empty!", nameof(proof));
             }
 
-            return _Cryptography.GenericHashNoKey(string.Format("{0} {1} {2}", version, proof, masterKey), bytes).ToHex();
+            return _cryptography.GenericHashNoKey(string.Format("{0} {1} {2}", version, proof, masterKey), bytes).ToHex();
         }
 
         public ChronicleDto DeriveToken(string masterKey, int version, ProofTokenDto proofTokenDto)
@@ -58,7 +75,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                 throw new ArgumentNullException(nameof(proofTokenDto));
             }
 
-            var proof = _Cryptography.GenericHashNoKey(string.Format("{0}{1}", proofTokenDto.Amount.ToString(), proofTokenDto.Serial)).ToHex();             var v0 = +version;             var v1 = +version + 1;             var v2 = +version + 2;              var chronicle = new ChronicleDto()             {                 Keeper = DeriveKey(v1, proof, DeriveKey(v2, proof, DeriveKey(v2, proof, masterKey))),                 Version = v0,                 Principal = DeriveKey(v0, proof, masterKey),                 Proof = proof,                 ProofToken = proofTokenDto,                 Spark = DeriveKey(v1, proof, DeriveKey(v1, proof, masterKey))             };              return chronicle;
+            var proof = _cryptography.GenericHashNoKey(string.Format("{0}{1}", proofTokenDto.Amount.ToString(), proofTokenDto.Serial)).ToHex();             var v0 = +version;             var v1 = +version + 1;             var v2 = +version + 2;              var chronicle = new ChronicleDto()             {                 Keeper = DeriveKey(v1, proof, DeriveKey(v2, proof, DeriveKey(v2, proof, masterKey))),                 Version = v0,                 Principal = DeriveKey(v0, proof, masterKey),                 Proof = proof,                 ProofToken = proofTokenDto,                 Spark = DeriveKey(v1, proof, DeriveKey(v1, proof, masterKey))             };              return chronicle;
         }
 
         public string From()
@@ -106,11 +123,12 @@ namespace TangramCypher.ApplicationLayer.Actor
                 throw new ArgumentNullException(nameof(pkSkDto));
             }
 
-            var publicKey = Encoding.UTF8.GetBytes(pkSkDto.PublicKey);             var privateKey = Encoding.UTF8.GetBytes(pkSkDto.SecretKey);             var cypher = Encoding.UTF8.GetBytes(cipher);             var message = _Cryptography.OpenBoxSeal(cypher, new Sodium.KeyPair(publicKey, privateKey));              return message;
+            var publicKey = Encoding.UTF8.GetBytes(pkSkDto.PublicKey);             var privateKey = Encoding.UTF8.GetBytes(pkSkDto.SecretKey);             var cypher = Encoding.UTF8.GetBytes(cipher);             var message = _cryptography.OpenBoxSeal(cypher, new Sodium.KeyPair(publicKey, privateKey));              return message;
         }
 
-        void PaymentAddress(string key, int n, string proof) {
-            
+        void PaymentAddress(string key, int n, string proof)
+        {
+
         }
 
         public void ReceivePayment(string redemptionKey)
@@ -129,7 +147,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
         public void SendPayment()
         {
-            _ChronicleDto = DeriveToken(From(), 0, new ProofTokenDto() { Amount = Amount().Value, Serial = _Cryptography.RandomKey().ToHex() });             _ChronicleDto = DeriveToken(From(), 1, _ChronicleDto.ProofToken);              var redemptionKey = HotRelease(_ChronicleDto);             // var base58 = Base58.Bitcoin.Decode(Util.Pop(To(), "_"));             // var cipher = _Cryptography.BoxSeal(redemptionKey, Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(base58).Substring(150)));
+            _ChronicleDto = DeriveToken(From(), 0, new ProofTokenDto() { Amount = Amount().Value, Serial = _cryptography.RandomKey().ToHex() });             _ChronicleDto = DeriveToken(From(), 1, _ChronicleDto.ProofToken);              var redemptionKey = HotRelease(_ChronicleDto);             // var base58 = Base58.Bitcoin.Decode(Util.Pop(To(), "_"));             // var cipher = _Cryptography.BoxSeal(redemptionKey, Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(base58).Substring(150)));
 
 
             ReceivePayment(redemptionKey);
@@ -157,7 +175,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                 throw new ArgumentNullException(nameof(proofTokenDto));
             }
 
-            var proof = _Cryptography.GenericHashNoKey(string.Format("{0}{1}", proofTokenDto.Amount.ToString(), proofTokenDto.Serial)).ToHex();             var v1 = version + 1;             var v2 = version + 2;             var v3 = version + 3;             var v4 = version + 4;
+            var proof = _cryptography.GenericHashNoKey(string.Format("{0}{1}", proofTokenDto.Amount.ToString(), proofTokenDto.Serial)).ToHex();             var v1 = version + 1;             var v2 = version + 2;             var v3 = version + 3;             var v4 = version + 4;
 
             var chronicle1 = new ChronicleDto()             {                 Keeper = DeriveKey(v2, proof, DeriveKey(v3, proof, DeriveKey(v3, proof, masterKey))),                 Version = v1,                 Principal = key1,                 Proof = proof,                 ProofToken = proofTokenDto,                 Spark = DeriveKey(v2, proof, key2)             };              var chronicle2 = new ChronicleDto()             {                 Keeper = DeriveKey(v3, proof, DeriveKey(v4, proof, DeriveKey(v4, proof, masterKey))),                 Version = v2,                 Principal = key2,                 Proof = proof,                 ProofToken = proofTokenDto,                 Spark = DeriveKey(v3, proof, DeriveKey(v3, proof, masterKey))             };
              return Tuple.Create(chronicle1, chronicle2);
@@ -193,5 +211,36 @@ namespace TangramCypher.ApplicationLayer.Actor
                ? 3
                : 4;
         }
+
+        public async Task<ChronicleDto> FetchToken(string stamp, CancellationToken cancellationToken)
+        {
+            var url = String.Format("{0}{1}", _nodeSection.GetValue<string>(TOKEN), stamp);
+
+            using (var client = new HttpClient())
+            {
+                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
+
+                client.BaseAddress = new Uri(_nodeSection.GetValue<string>(ENDPOINT));
+                client.DefaultRequestHeaders.Accept.Clear();
+                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+                using (var request = new HttpRequestMessage(HttpMethod.Get, url))
+                using (var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
+                {
+                    var stream = await response.Content.ReadAsStreamAsync();
+
+                    if (response.IsSuccessStatusCode)
+                        return Util.DeserializeJsonFromStream<ChronicleDto>(stream);
+
+                    var content = await Util.StreamToStringAsync(stream);
+                    throw new ApiException
+                    {
+                        StatusCode = (int)response.StatusCode,
+                        Content = content
+                    };
+                }
+            }
+        }
+
     }
 }
