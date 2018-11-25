@@ -62,10 +62,10 @@ namespace TangramCypher.ApplicationLayer.Actor
 
                 using (var request = new HttpRequestMessage(HttpMethod.Post, url))
                 {
-                    var content = JsonConvert.SerializeObject(token);
+                    var content = JsonConvert.SerializeObject(token, Formatting.None);
                     var buffer = Encoding.UTF8.GetBytes(content);
 
-                    request.Content = new ByteArrayContent(buffer);
+                    request.Content = new StringContent(content, Encoding.UTF8, "application/json");
 
                     using (var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
                     {
