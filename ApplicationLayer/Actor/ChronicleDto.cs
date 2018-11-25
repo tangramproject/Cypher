@@ -5,8 +5,8 @@ namespace TangramCypher.ApplicationLayer.Actor
         public int Version;
         public string Keeper;
         public string Principal;
-        public string Proof;
-        public ProofTokenDto ProofToken;
+        public string Stamp;
+        public EnvelopeDto Envelope;
         public string Spark;
     }
 }
