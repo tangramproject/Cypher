@@ -9,6 +9,7 @@ using Cypher.ApplicationLayer.Onion;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using TangramCypher.ApplicationLayer.Wallet;
 using TangramCypher.Helpers;
 using TangramCypher.Helpers.LibSodium;
@@ -20,6 +21,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         const string NODEAPI = "nodeAPI";
         const string ENDPOINT = "endpoint";
         const string TOKEN = "token";
+        const string ADDTOKEN = "add";
 
         protected string _masterKey;
         protected string _toAdress;
@@ -39,6 +41,48 @@ namespace TangramCypher.ApplicationLayer.Actor
             _onionService = onionService;
             _nodeSection = configuration.GetSection(NODEAPI);
             _logger = logger;
+        }
+
+        public async Task<JObject> AddToken(TokenDto token, CancellationToken cancellationToken)
+        {
+            if (token == null)
+            {
+                throw new ArgumentNullException(nameof(token));
+            }
+
+            var url = _nodeSection.GetValue<string>(ADDTOKEN);
+
+            using (var client = new HttpClient())
+            {
+                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
+
+                client.BaseAddress = new Uri(_nodeSection.GetValue<string>(ENDPOINT));
+                client.DefaultRequestHeaders.Accept.Clear();
+                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+                using (var request = new HttpRequestMessage(HttpMethod.Post, url))
+                {
+                    var content = JsonConvert.SerializeObject(token);
+                    var buffer = Encoding.UTF8.GetBytes(content);
+
+                    request.Content = new ByteArrayContent(buffer);
+
+                    using (var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
+                    {
+                        var stream = await response.Content.ReadAsStreamAsync();
+
+                        if (response.IsSuccessStatusCode)
+                            return Util.DeserializeJsonFromStream<JObject>(stream);
+
+                        var contentResult = await Util.StreamToStringAsync(stream);
+                        throw new ApiException
+                        {
+                            StatusCode = (int)response.StatusCode,
+                            Content = contentResult
+                        };
+                    }
+                }
+            }
         }
 
         public double? Amount()

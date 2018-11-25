@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Cypher.ApplicationLayer.Onion;
+using Newtonsoft.Json.Linq;
 using TangramCypher.ApplicationLayer.Wallet;
 using TangramCypher.Helpers.LibSodium;
 
@@ -12,6 +13,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         IOnionService _onionService { get; }
         ICryptography _cryptography { get; }
 
+        Task<JObject> AddToken(TokenDto token, CancellationToken cancellationToken);
         double? Amount();
         ActorService Amount(double? value);
         string DeriveKey(int version, string proof, string masterKey, int bytes = 32);
