@@ -63,19 +63,54 @@ namespace TangramCypher.ApplicationLayer.Actor
             return _cryptography.GenericHashNoKey(string.Format("{0} {1} {2}", version, proof, masterKey), bytes).ToHex();
         }
 
-        public ChronicleDto DeriveToken(string masterKey, int version, ProofTokenDto proofTokenDto)
+        public ChronicleDto DeriveToken(string masterKey, int version, EnvelopeDto envelope)
         {
             if (string.IsNullOrEmpty(masterKey))
             {
                 throw new ArgumentException("Master key cannot be null or empty!", nameof(masterKey));
             }
 
-            if (proofTokenDto == null)
+            if (envelope == null)
             {
-                throw new ArgumentNullException(nameof(proofTokenDto));
+                throw new ArgumentNullException(nameof(envelope));
             }
 
-            var proof = _cryptography.GenericHashNoKey(string.Format("{0}{1}", proofTokenDto.Amount.ToString(), proofTokenDto.Serial)).ToHex();             var v0 = +version;             var v1 = +version + 1;             var v2 = +version + 2;              var chronicle = new ChronicleDto()             {                 Keeper = DeriveKey(v1, proof, DeriveKey(v2, proof, DeriveKey(v2, proof, masterKey))),                 Version = v0,                 Principal = DeriveKey(v0, proof, masterKey),                 Proof = proof,                 ProofToken = proofTokenDto,                 Spark = DeriveKey(v1, proof, DeriveKey(v1, proof, masterKey))             };              return chronicle;
+            var proof = _cryptography.GenericHashNoKey(string.Format("{0}{1}", envelope.Amount.ToString(), envelope.Serial)).ToHex();             var v0 = +version;             var v1 = +version + 1;             var v2 = +version + 2;              var chronicle = new ChronicleDto()             {                 Keeper = DeriveKey(v1, proof, DeriveKey(v2, proof, DeriveKey(v2, proof, masterKey))),                 Version = v0,                 Principal = DeriveKey(v0, proof, masterKey),                 Stamp = proof,                 Envelope = envelope,                 Spark = DeriveKey(v1, proof, DeriveKey(v1, proof, masterKey))             };              return chronicle;
+        }
+
+        public async Task<ChronicleDto> FetchToken(string stamp, CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrEmpty(stamp))
+            {
+                throw new ArgumentException("Stamp is missing!", nameof(stamp));
+            }
+
+            var url = String.Format("{0}{1}", _nodeSection.GetValue<string>(TOKEN), stamp);
+
+            using (var client = new HttpClient())
+            {
+                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
+
+                client.BaseAddress = new Uri(_nodeSection.GetValue<string>(ENDPOINT));
+                client.DefaultRequestHeaders.Accept.Clear();
+                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+                using (var request = new HttpRequestMessage(HttpMethod.Get, url))
+                using (var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
+                {
+                    var stream = await response.Content.ReadAsStreamAsync();
+
+                    if (response.IsSuccessStatusCode)
+                        return Util.DeserializeJsonFromStream<ChronicleDto>(stream);
+
+                    var content = await Util.StreamToStringAsync(stream);
+                    throw new ApiException
+                    {
+                        StatusCode = (int)response.StatusCode,
+                        Content = content
+                    };
+                }
+            }
         }
 
         public string From()
@@ -95,8 +130,8 @@ namespace TangramCypher.ApplicationLayer.Actor
                 throw new ArgumentNullException(nameof(chronicleDto));
             }
 
-            var subKey1 = DeriveKey(chronicleDto.Version + 1, chronicleDto.Proof, From());             var subKey2 = DeriveKey(chronicleDto.Version + 2, chronicleDto.Proof, From());
-            var redemption = new RedemptionKeyDto() { Key1 = subKey1, Key2 = subKey2, Memo = Memo(), Proof = chronicleDto.Proof };
+            var subKey1 = DeriveKey(chronicleDto.Version + 1, chronicleDto.Stamp, From());             var subKey2 = DeriveKey(chronicleDto.Version + 2, chronicleDto.Stamp, From());
+            var redemption = new RedemptionKeyDto() { Key1 = subKey1, Key2 = subKey2, Memo = Memo(), Proof = chronicleDto.Stamp };
 
             return JsonConvert.SerializeObject(redemption);
         }
@@ -142,18 +177,18 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             var freeRedemptionKey = JsonConvert.DeserializeObject<RedemptionKeyDto>(redemptionKey);
 
-            var swap = Swap(From(), 1, freeRedemptionKey.Key1, freeRedemptionKey.Key2, _ChronicleDto.ProofToken);              var token1 = DeriveToken(From(), swap.Item1.Version, swap.Item1.ProofToken);             var status1 = VerifyToken(swap.Item1, token1);              var token2 = DeriveToken(From(), swap.Item2.Version, swap.Item2.ProofToken);             var status2 = VerifyToken(swap.Item2, token2);
+            var swap = Swap(From(), 1, freeRedemptionKey.Key1, freeRedemptionKey.Key2, _ChronicleDto.Envelope);              var token1 = DeriveToken(From(), swap.Item1.Version, swap.Item1.Envelope);             var status1 = VerifyToken(swap.Item1, token1);              var token2 = DeriveToken(From(), swap.Item2.Version, swap.Item2.Envelope);             var status2 = VerifyToken(swap.Item2, token2);
         }
 
         public void SendPayment()
         {
-            _ChronicleDto = DeriveToken(From(), 0, new ProofTokenDto() { Amount = Amount().Value, Serial = _cryptography.RandomKey().ToHex() });             _ChronicleDto = DeriveToken(From(), 1, _ChronicleDto.ProofToken);              var redemptionKey = HotRelease(_ChronicleDto);             // var base58 = Base58.Bitcoin.Decode(Util.Pop(To(), "_"));             // var cipher = _Cryptography.BoxSeal(redemptionKey, Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(base58).Substring(150)));
+            _ChronicleDto = DeriveToken(From(), 0, new EnvelopeDto() { Amount = Amount().Value, Serial = _cryptography.RandomKey().ToHex() });             _ChronicleDto = DeriveToken(From(), 1, _ChronicleDto.Envelope);              var redemptionKey = HotRelease(_ChronicleDto);             // var base58 = Base58.Bitcoin.Decode(Util.Pop(To(), "_"));             // var cipher = _Cryptography.BoxSeal(redemptionKey, Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(base58).Substring(150)));
 
 
             ReceivePayment(redemptionKey);
         }
 
-        public Tuple<ChronicleDto, ChronicleDto> Swap(string masterKey, int version, string key1, string key2, ProofTokenDto proofTokenDto)
+        public Tuple<ChronicleDto, ChronicleDto> Swap(string masterKey, int version, string key1, string key2, EnvelopeDto envelope)
         {
             if (string.IsNullOrEmpty(masterKey))
             {
@@ -170,14 +205,14 @@ namespace TangramCypher.ApplicationLayer.Actor
                 throw new ArgumentException("Sub Key2 cannot be null or empty", nameof(key2));
             }
 
-            if (proofTokenDto == null)
+            if (envelope == null)
             {
-                throw new ArgumentNullException(nameof(proofTokenDto));
+                throw new ArgumentNullException(nameof(envelope));
             }
 
-            var proof = _cryptography.GenericHashNoKey(string.Format("{0}{1}", proofTokenDto.Amount.ToString(), proofTokenDto.Serial)).ToHex();             var v1 = version + 1;             var v2 = version + 2;             var v3 = version + 3;             var v4 = version + 4;
+            var proof = _cryptography.GenericHashNoKey(string.Format("{0}{1}", envelope.Amount.ToString(), envelope.Serial)).ToHex();             var v1 = version + 1;             var v2 = version + 2;             var v3 = version + 3;             var v4 = version + 4;
 
-            var chronicle1 = new ChronicleDto()             {                 Keeper = DeriveKey(v2, proof, DeriveKey(v3, proof, DeriveKey(v3, proof, masterKey))),                 Version = v1,                 Principal = key1,                 Proof = proof,                 ProofToken = proofTokenDto,                 Spark = DeriveKey(v2, proof, key2)             };              var chronicle2 = new ChronicleDto()             {                 Keeper = DeriveKey(v3, proof, DeriveKey(v4, proof, DeriveKey(v4, proof, masterKey))),                 Version = v2,                 Principal = key2,                 Proof = proof,                 ProofToken = proofTokenDto,                 Spark = DeriveKey(v3, proof, DeriveKey(v3, proof, masterKey))             };
+            var chronicle1 = new ChronicleDto()             {                 Keeper = DeriveKey(v2, proof, DeriveKey(v3, proof, DeriveKey(v3, proof, masterKey))),                 Version = v1,                 Principal = key1,                 Stamp = proof,                 Envelope = envelope,                 Spark = DeriveKey(v2, proof, key2)             };              var chronicle2 = new ChronicleDto()             {                 Keeper = DeriveKey(v3, proof, DeriveKey(v4, proof, DeriveKey(v4, proof, masterKey))),                 Version = v2,                 Principal = key2,                 Stamp = proof,                 Envelope = envelope,                 Spark = DeriveKey(v3, proof, DeriveKey(v3, proof, masterKey))             };
              return Tuple.Create(chronicle1, chronicle2);
         }
 
@@ -210,36 +245,6 @@ namespace TangramCypher.ApplicationLayer.Actor
                : terminal.Keeper.Equals(current.Keeper)
                ? 3
                : 4;
-        }
-
-        public async Task<ChronicleDto> FetchToken(string stamp, CancellationToken cancellationToken)
-        {
-            var url = String.Format("{0}{1}", _nodeSection.GetValue<string>(TOKEN), stamp);
-
-            using (var client = new HttpClient())
-            {
-                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
-
-                client.BaseAddress = new Uri(_nodeSection.GetValue<string>(ENDPOINT));
-                client.DefaultRequestHeaders.Accept.Clear();
-                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-
-                using (var request = new HttpRequestMessage(HttpMethod.Get, url))
-                using (var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
-                {
-                    var stream = await response.Content.ReadAsStreamAsync();
-
-                    if (response.IsSuccessStatusCode)
-                        return Util.DeserializeJsonFromStream<ChronicleDto>(stream);
-
-                    var content = await Util.StreamToStringAsync(stream);
-                    throw new ApiException
-                    {
-                        StatusCode = (int)response.StatusCode,
-                        Content = content
-                    };
-                }
-            }
         }
 
     }
