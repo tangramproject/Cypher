@@ -16,6 +16,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         Task<JObject> AddToken(TokenDto token, CancellationToken cancellationToken);
         double? Amount();
         ActorService Amount(double? value);
+        string PartialRelease(TokenDto token);
         string DeriveKey(int version, string proof, string masterKey, int bytes = 32);
         TokenDto DeriveToken(string masterKey, int version, EnvelopeDto envelope);
         Task<TokenDto> FetchToken(string stamp, CancellationToken cancellationToken);

@@ -97,8 +97,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             return this;
         }
 
-
-        string PartialRelease(string masterKey, TokenDto token)
+        public string PartialRelease(TokenDto token)
         {
             var subKey1 = DeriveKey(token.Version + 1, token.Stamp, From());
             var subKey2 = DeriveKey(token.Version + 2, token.Stamp, From());
