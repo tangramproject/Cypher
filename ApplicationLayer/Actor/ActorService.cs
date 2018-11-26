@@ -97,6 +97,17 @@ namespace TangramCypher.ApplicationLayer.Actor
             return this;
         }
 
+
+        string PartialRelease(string masterKey, TokenDto token)
+        {
+            var subKey1 = DeriveKey(token.Version + 1, token.Stamp, From());
+            var subKey2 = DeriveKey(token.Version + 2, token.Stamp, From());
+            var mix = DeriveKey(token.Version + 2, token.Stamp, subKey2);
+            var redemption = new RedemptionKeyDto() { Key1 = subKey1, Key2 = mix, Memo = Memo(), Proof = token.Stamp };
+
+            return JsonConvert.SerializeObject(redemption);
+        }
+
         public string DeriveKey(int version, string proof, string masterKey, int bytes = 32)
         {
             if (string.IsNullOrEmpty(proof))

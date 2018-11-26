@@ -27,7 +27,6 @@
   <ItemGroup>
     <Folder Include="ApplicationLayer\Onion\" />
   </ItemGroup>
-
   <ItemGroup>
     <None Update="appsettings.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
