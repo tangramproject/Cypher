@@ -72,7 +72,10 @@ namespace TangramCypher.ApplicationLayer.Actor
                         var stream = await response.Content.ReadAsStreamAsync();
 
                         if (response.IsSuccessStatusCode)
-                            return Util.DeserializeJsonFromStream<JObject>(stream);
+                        {
+                            var result = Util.DeserializeJsonFromStream<JObject>(stream);
+                            return Task.FromResult(result).Result;
+                        }
 
                         var contentResult = await Util.StreamToStringAsync(stream);
                         throw new ApiException
@@ -268,6 +271,44 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             var token1 = new TokenDto()             {                 Keeper = DeriveKey(v2, proof, DeriveKey(v3, proof, DeriveKey(v3, proof, masterKey))),                 Version = v1,                 Principle = key1,                 Stamp = proof,                 Envelope = envelope,                 Hint = DeriveKey(v2, proof, key2)             };              var token2 = new TokenDto()             {                 Keeper = DeriveKey(v3, proof, DeriveKey(v4, proof, DeriveKey(v4, proof, masterKey))),                 Version = v2,                 Principle = key2,                 Stamp = proof,                 Envelope = envelope,                 Hint = DeriveKey(v3, proof, DeriveKey(v3, proof, masterKey))             };
              return Tuple.Create(token1, token2);
+        }
+
+        public TokenDto SwapPartialOne(string masterKey, RedemptionKeyDto redemptionKey)
+        {
+            if (string.IsNullOrEmpty(masterKey))
+            {
+                throw new ArgumentException("Master Key cannot be null or empty!", nameof(masterKey));
+            }
+
+            if (redemptionKey == null)
+            {
+                throw new ArgumentNullException(nameof(redemptionKey));
+            }
+
+            var token = FetchToken(redemptionKey.Proof, new CancellationToken()).GetAwaiter().GetResult();
+
+            if (token != null)
+            {
+                var proof = _cryptography.GenericHashNoKey(string.Format("{0}{1}", token.Envelope.Amount.ToString(), token.Envelope.Serial)).ToHex();
+
+                if (proof.Equals(token.Stamp))
+                {
+                    var v1 = token.Version + 1;
+                    var v2 = token.Version + 2;
+                    var v3 = token.Version + 3;
+
+                    token.Keeper = DeriveKey(v2, proof, DeriveKey(v3, proof, DeriveKey(v3, proof, masterKey)));
+                    token.Version = v1;
+                    token.Principle = redemptionKey.Key1;
+                    token.Stamp = proof;
+                    token.Envelope = token.Envelope;
+                    token.Hint = redemptionKey.Key2;
+
+                    return token;
+                }
+            }
+
+            return null;
         }
 
         public string To()
