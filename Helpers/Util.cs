@@ -7,6 +7,10 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.IO;
 using System.Reflection;
+using System.Net;
+using System.Security;
+using Newtonsoft.Json;
+using System.Threading.Tasks;
 
 namespace TangramCypher.Helpers
 {
@@ -25,14 +29,14 @@ namespace TangramCypher.Helpers
             return stack.Pop();
         }
 
-        public static CommitmentKeyDto FreeCommitmentKey(string base58Key)
+        public static RedemptionKeyDto FreeCommitmentKey(string base58Key)
         {
             var base58 = Base58.Bitcoin.Decode(base58Key);
             var proof = Encoding.UTF8.GetString(base58).Substring(0, 64);
             var key1 = Encoding.UTF8.GetString(base58).Substring(64, 128);
             var key2 = Encoding.UTF8.GetString(base58).Substring(128, 192);
 
-            return new CommitmentKeyDto() { Key1 = key1, Key2 = key1, Proof = proof }; ;
+            return new RedemptionKeyDto() { Key1 = key1, Key2 = key1, Proof = proof }; ;
         }
 
         public static IEnumerable<string> Split(string str, int chunkSize)
@@ -68,8 +72,39 @@ namespace TangramCypher.Helpers
             return osPlatform;
         }
 
-        public static string EntryAssemblyPath() {
+        public static string EntryAssemblyPath()
+        {
             return Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
+        }
+
+        public static string ToPlainString(SecureString secure)
+        {
+            return new NetworkCredential(string.Empty, secure).Password;
+        }
+
+        public static T DeserializeJsonFromStream<T>(Stream stream)
+        {
+            if (stream == null || stream.CanRead == false)
+                return default;
+
+            using (var sr = new StreamReader(stream))
+            using (var jtr = new JsonTextReader(sr))
+            {
+                var js = new JsonSerializer();
+                var searchResult = js.Deserialize<T>(jtr);
+                return searchResult;
+            }
+        }
+
+        public static async Task<string> StreamToStringAsync(Stream stream)
+        {
+            string content = null;
+
+            if (stream != null)
+                using (var sr = new StreamReader(stream))
+                    content = await sr.ReadToEndAsync();
+
+            return content;
         }
     }
 }

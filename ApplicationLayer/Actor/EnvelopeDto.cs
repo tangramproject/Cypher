@@ -1,6 +1,6 @@
 namespace TangramCypher.ApplicationLayer.Actor
 {
-    public class ProofTokenDto
+    public class EnvelopeDto
     {
         public double Amount;
         public string Serial;
