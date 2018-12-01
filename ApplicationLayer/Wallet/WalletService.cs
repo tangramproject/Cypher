@@ -9,18 +9,18 @@ namespace TangramCypher.ApplicationLayer.Wallet
 {
     public class WalletService : IWalletService
     {
-        public ICryptography _Cryptography { get; }
-        public string Id { get; set; }
-        public ICollection<PkSkDto> Store { get; set; }
+        public ICryptography _cryptography { get; }
+        public string _id { get; set; }
+        public ICollection<PkSkDto> _store { get; set; }
 
         public WalletService(ICryptography cryptography)
         {
-            _Cryptography = cryptography;
+            _cryptography = cryptography;
         }
 
         public PkSkDto CreatePkSk()
         {
-            var kp = _Cryptography.KeyPair();
+            var kp = _cryptography.KeyPair();
 
             return new PkSkDto()
             {
@@ -31,12 +31,12 @@ namespace TangramCypher.ApplicationLayer.Wallet
 
         public string MasterKey()
         {
-            return _Cryptography.RandomKey().ToHex();
+            return _cryptography.RandomKey().ToHex();
         }
 
         public string NewID(int bytes = 32)
         {
-            return String.Format("id_{0}", _Cryptography.RandomBytes(bytes).ToHex());
+            return string.Format("id_{0}", _cryptography.RandomBytes(bytes).ToHex());
         }
 
         public string Passphrase()

@@ -5,9 +5,9 @@ namespace TangramCypher.ApplicationLayer.Wallet
 {
     public interface IWalletService
     {
-        ICryptography _Cryptography { get; }
-        string Id { get; set; }
-        ICollection<PkSkDto> Store { get; set; }
+        ICryptography _cryptography { get; }
+        string _id { get; set; }
+        ICollection<PkSkDto> _store { get; set; }
         PkSkDto CreatePkSk();
         string NewID(int bytes = 32);
         string MasterKey();
