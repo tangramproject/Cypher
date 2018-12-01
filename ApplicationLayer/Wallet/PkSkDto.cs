@@ -4,5 +4,6 @@ namespace TangramCypher.ApplicationLayer.Wallet
     {
         public string PublicKey;
         public string SecretKey;
+        public string Address;
     }
 }

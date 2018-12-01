@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using MurrayGrant.ReadablePassphrase;
+using SimpleBase;
 using TangramCypher.Helpers;
 using TangramCypher.Helpers.LibSodium;
 
@@ -24,7 +25,8 @@ namespace TangramCypher.ApplicationLayer.Wallet
             return new PkSkDto()
             {
                 PublicKey = kp.PublicKey.ToHex(),
-                SecretKey = kp.SecretKey.ToHex()
+                SecretKey = kp.SecretKey.ToHex(),
+                Address = Base58.Bitcoin.Encode(kp.PublicKey)
             };
         }
 
