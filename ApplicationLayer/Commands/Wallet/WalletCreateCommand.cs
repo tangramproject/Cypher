@@ -53,17 +53,18 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
 
             var walletId = walletService.NewID(16);
             var passphrase = walletService.Passphrase();
+            var pkSk = walletService.CreatePkSk();
 
             await vaultService.CreateUserAsync(walletId, passphrase);
 
             var dic = new Dictionary<string, object>
             {
-                { "somedata", new { a = 1, b = 2 } }
+                { "storeKeys", pkSk }
             };
 
             await vaultService.SaveDataAsync(walletId, passphrase, $"wallets/{walletId}/wallet", dic);
 
-            console.WriteLine($"Created Wallet {walletId} with password {passphrase}");
+            console.WriteLine($"Created Wallet {walletId} with password: {passphrase}");
         }
     }
 }
