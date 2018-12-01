@@ -34,9 +34,9 @@ namespace TangramCypher.ApplicationLayer.Wallet
             return _Cryptography.RandomKey().ToHex();
         }
 
-        public string NewID()
+        public string NewID(int bytes = 32)
         {
-            return String.Format("id_{0}", _Cryptography.RandomKey().ToHex());
+            return String.Format("id_{0}", _Cryptography.RandomBytes(bytes).ToHex());
         }
 
         public string Passphrase()

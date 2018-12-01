@@ -28,28 +28,42 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
         public override async Task Execute()
         {
             //  TODO: Call WalletService instead
-            using (var rng = System.Security.Cryptography.RandomNumberGenerator.Create())
+            //using (var rng = System.Security.Cryptography.RandomNumberGenerator.Create())
+            //{
+            //    var bytes = new byte[8];
+
+            //    rng.GetBytes(bytes);
+
+            //    var username = BitConverter.ToUInt64(bytes, 0).ToString();
+
+            //    rng.GetBytes(bytes);
+
+            //    var password = BitConverter.ToUInt64(bytes, 0).ToString();
+
+            //    await vaultService.CreateUserAsync(username, password);
+
+            //    IDictionary<string, object> dic = new Dictionary<string, object>();
+
+            //    dic.Add("somedata", new { a = 1, b = 2 });
+
+            //    await vaultService.SaveDataAsync(username, password, $"wallets/{username}/wallet", dic);
+
+            //    console.WriteLine($"Created Wallet {username} with password {password}");
+            //}
+
+            var walletId = walletService.NewID(16);
+            var passphrase = walletService.Passphrase();
+
+            await vaultService.CreateUserAsync(walletId, passphrase);
+
+            var dic = new Dictionary<string, object>
             {
-                var bytes = new byte[8];
+                { "somedata", new { a = 1, b = 2 } }
+            };
 
-                rng.GetBytes(bytes);
+            await vaultService.SaveDataAsync(walletId, passphrase, $"wallets/{walletId}/wallet", dic);
 
-                var username = BitConverter.ToUInt64(bytes, 0).ToString();
-
-                rng.GetBytes(bytes);
-
-                var password = BitConverter.ToUInt64(bytes, 0).ToString();
-
-                await vaultService.CreateUserAsync(username, password);
-
-                IDictionary<string, object> dic = new Dictionary<string, object>();
-
-                dic.Add("somedata", new { a = 1, b = 2 });
-
-                await vaultService.SaveDataAsync(username, password, $"wallets/{username}/wallet", dic);
-
-                console.WriteLine($"Created Wallet {username} with password {password}");
-            }
+            console.WriteLine($"Created Wallet {walletId} with password {passphrase}");
         }
     }
 }

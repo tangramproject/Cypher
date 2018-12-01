@@ -12,7 +12,7 @@ namespace TangramCypher.Helpers.LibSodium
         byte[] RandomKey();
         byte[] ShortHash(string message, byte[] key);
         int RandomNumbers(int n);
-        byte[] RandomBytes(int bytes = 64);
+        byte[] RandomBytes(int bytes = 32);
         byte[] ScalarMultBase(byte[] sk);
         byte[] ScalarMult(byte[] bobSk, byte[] alicePk);
     }
