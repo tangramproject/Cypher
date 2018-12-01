@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using MurrayGrant.ReadablePassphrase;
 using TangramCypher.Helpers;
 using TangramCypher.Helpers.LibSodium;
@@ -27,11 +26,6 @@ namespace TangramCypher.ApplicationLayer.Wallet
                 PublicKey = kp.PublicKey.ToHex(),
                 SecretKey = kp.SecretKey.ToHex()
             };
-        }
-
-        public string MasterKey()
-        {
-            return _cryptography.RandomKey().ToHex();
         }
 
         public string NewID(int bytes = 32)

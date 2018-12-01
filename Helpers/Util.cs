@@ -18,11 +18,6 @@ namespace TangramCypher.Helpers
     {
         internal static Random _Random = new Random();
 
-        public static string ToHex(this byte[] data)
-        {
-            return BitConverter.ToString(data).Replace("-", string.Empty);
-        }
-
         public static string Pop(string value, string delimiter)
         {
             var stack = new Stack<string>(value.Split(new string[] { delimiter }, StringSplitOptions.None));
@@ -106,5 +101,7 @@ namespace TangramCypher.Helpers
 
             return content;
         }
+
+
     }
 }

@@ -10,7 +10,6 @@ namespace TangramCypher.ApplicationLayer.Wallet
         ICollection<PkSkDto> _store { get; set; }
         PkSkDto CreatePkSk();
         string NewID(int bytes = 32);
-        string MasterKey();
         string Passphrase();
     }
 }
