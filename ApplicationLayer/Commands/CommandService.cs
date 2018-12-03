@@ -3,26 +3,31 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using McMaster.Extensions.CommandLineUtils;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using TangramCypher.ApplicationLayer.Commands.Exceptions;
 using TangramCypher.ApplicationLayer.Commands.Vault;
 using TangramCypher.ApplicationLayer.Commands.Wallet;
+using TangramCypher.ApplicationLayer.Vault;
 
 namespace TangramCypher.ApplicationLayer.Commands
 {
-    public class CommandService : ICommandService
+    public class CommandService : HostedService, ICommandService
     {
         private readonly IConsole console;
         private readonly ILogger logger;
+        private readonly IServiceProvider serviceProvider;
         readonly IDictionary<string[], Type> commands;
         private bool prompt = true;
 
-        public CommandService(IConsole cnsl, ILogger lgr)
+        public CommandService(IConsole cnsl, IServiceProvider provider)
         {
             console = cnsl;
-            logger = lgr;
+            //logger = lgr;
+            serviceProvider = provider;
 
             commands = new Dictionary<string[], Type>(new CommandEqualityComparer());
 
@@ -33,7 +38,7 @@ namespace TangramCypher.ApplicationLayer.Commands
 
         private void Console_CancelKeyPress(object sender, ConsoleCancelEventArgs e)
         {
-            throw new CancelKeyPressException();
+            //throw new CancelKeyPressException();
         }
 
         public void Exit()
@@ -81,7 +86,7 @@ namespace TangramCypher.ApplicationLayer.Commands
             if (commands.ContainsKey(cmd))
             {
                 var commandType = commands[cmd];
-                command = Activator.CreateInstance(commandType) as ICommand;
+                command = Activator.CreateInstance(commandType, serviceProvider) as ICommand;
             }
 
             return command;
@@ -100,7 +105,18 @@ namespace TangramCypher.ApplicationLayer.Commands
                 {
                     var commandDescriptor = cmd.Value.GetCustomAttribute<CommandDescriptorAttribute>();
                     var name = string.Join(' ', commandDescriptor.Name);
-                    command = Activator.CreateInstance(cmd.Value) as ICommand;
+
+                    var cstr = cmd.Value.GetConstructor(new Type[] { typeof(IServiceProvider) });
+
+                    if (cstr != null)
+                    {
+                        command = Activator.CreateInstance(cmd.Value, serviceProvider) as ICommand;
+                    }
+                    else
+                    {
+                        command = Activator.CreateInstance(cmd.Value) as ICommand;
+                    }
+
                     console.WriteLine($"    {name}".PadRight(25) + $"{commandDescriptor.Description}");
                 }
 
@@ -132,6 +148,11 @@ namespace TangramCypher.ApplicationLayer.Commands
                     console.ResetColor();
                 }
             }
+        }
+
+        protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+        {
+            await InteractiveCliLoop();
         }
     }
 

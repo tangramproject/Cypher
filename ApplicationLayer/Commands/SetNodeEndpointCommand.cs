@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
-using TangramCypher.Helpers.ServiceLocator;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace TangramCypher.ApplicationLayer.Commands.Vault

@@ -1,10 +1,9 @@
-﻿using System;
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using TangramCypher.ApplicationLayer.Actor;
 using TangramCypher.ApplicationLayer.Commands;
 using TangramCypher.ApplicationLayer.Vault;
 using TangramCypher.ApplicationLayer.Wallet;
-using TangramCypher.Helpers.ServiceLocator;
 using TangramCypher.Helpers.LibSodium;
 using Microsoft.Extensions.Logging;
 using System.Threading.Tasks;
@@ -15,6 +14,7 @@ using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Logging.Console;
 using System.Reflection;
 using TangramCypher.ApplicationLayer.Commands.Exceptions;
+using Microsoft.Extensions.Hosting;
 
 namespace TangramCypher
 {
@@ -22,67 +22,57 @@ namespace TangramCypher
     {
         static async Task Main(string[] args)
         {
-            try
-            {
-                IServiceLocator locator = new Locator();
+            var builder = new HostBuilder()
+                .ConfigureAppConfiguration((hostingContext, config) =>
+                {
+                    config.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
+                    config.SetBasePath(Directory.GetCurrentDirectory());
 
-                var serviceCollection = new ServiceCollection();
-                ConfigureServices(serviceCollection);
+                    if (args != null)
+                    {
+                        config.AddCommandLine(args);
+                    }
+                })
+                .ConfigureServices((hostContext, services) =>
+                {
+                    services.AddOptions();
 
-                var serviceProvider = serviceCollection
-                    .AddLogging()
-                    .BuildServiceProvider();
+                    services
+                        .AddSingleton<IActorService, ActorService>()
+                        .AddSingleton<IWalletService, WalletService>()
+                        .AddTransient<ICryptography, Cryptography>()
+                        .AddSingleton<IVaultService, VaultService>()
+                        .AddSingleton<IOnionService, OnionService>()
+                        .AddSingleton<IVaultService, VaultService>()
+                        .AddSingleton<ICommandService, CommandService>()
+                        .AddSingleton<IHostedService, OnionService>(sp =>
+                        {
+                            return sp.GetService<IOnionService>() as OnionService;
+                        })
+                        .AddSingleton<IHostedService, VaultService>(sp =>
+                        {
+                            return sp.GetService<IVaultService>() as VaultService;
+                        })
+                        .AddSingleton<IHostedService, CommandService>(sp =>
+                        {
+                            return sp.GetService<ICommandService>() as CommandService;
+                        });
 
-                var logger = serviceProvider.GetService<ILogger>();
+                    services.Add(new ServiceDescriptor(typeof(IConsole), PhysicalConsole.Singleton));
 
-                logger.LogInformation("Starting Application");
 
-                locator.Add<IServiceProvider, ServiceProvider>(serviceProvider);
+                    var logger = new LoggerFactory()
+                                                .AddDebug()
+                                                .AddFile("cypher.log")
+                                                .CreateLogger("cypher");
 
-                var onionService = serviceProvider.GetService<IOnionService>();
+                    services.Add(new ServiceDescriptor(typeof(ILogger),
+                                                                provider => logger,
+                                                                ServiceLifetime.Singleton));
+                })
+                .UseConsoleLifetime();
 
-                // Testing onion...
-                onionService.StartOnion(onionService.GenerateHashPassword("ILoveTangram"));
-
-                var commandService = serviceProvider.GetService<ICommandService>();
-                var vaultService = serviceProvider.GetService<IVaultService>();
-
-                await vaultService.StartVaultServiceAsync();
-                await commandService.InteractiveCliLoop();
-            }
-            catch(Exception e)
-            {
-                Console.WriteLine(e);
-            }
-        }
-
-        static void ConfigureServices(IServiceCollection serviceCollection)
-        {
-            serviceCollection
-                .AddSingleton<IActorService, ActorService>()
-                .AddSingleton<IWalletService, WalletService>()
-                .AddTransient<ICryptography, Cryptography>()
-                .AddSingleton<IVaultService, VaultService>()
-                .AddSingleton<ICommandService, CommandService>()
-                .AddSingleton<IOnionService, OnionService>()
-                .Add(new ServiceDescriptor(typeof(IConfiguration),
-                     provider => new ConfigurationBuilder()
-                                    .SetBasePath(Directory.GetCurrentDirectory())
-                                    .AddJsonFile("appsettings.json",
-                                                 optional: false,
-                                                 reloadOnChange: true)
-                                    .Build(),
-                     ServiceLifetime.Singleton));
-
-            var logger = new LoggerFactory()
-                                        .AddDebug()
-                                        .AddFile("cypher.log")
-                                        .CreateLogger("cypher");
-
-            serviceCollection.Add(new ServiceDescriptor(typeof(ILogger),
-                                                        provider => logger,
-                                                        ServiceLifetime.Singleton));
-            serviceCollection.Add(new ServiceDescriptor(typeof(IConsole), PhysicalConsole.Singleton));
+            await builder.RunConsoleAsync();
         }
     }
 }

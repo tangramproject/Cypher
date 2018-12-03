@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -8,18 +8,20 @@ using System.Net.Http.Headers;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
 using DotNetTor.SocksPort;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using TangramCypher.ApplicationLayer;
 using TangramCypher.Helpers;
 using TangramCypher.Helpers.LibSodium;
 
 namespace Cypher.ApplicationLayer.Onion
 {
-    public class OnionService : IOnionService, IDisposable
+    public class OnionService : HostedService, IOnionService, IDisposable
     {
         const string ONION = "onion";
         const string TORRC = "torrc";
@@ -385,6 +387,15 @@ namespace Cypher.ApplicationLayer.Onion
         public void Dispose()
         {
             TorProcess?.Kill();
+        }
+
+        protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+        {
+            logger.LogInformation("Starting Onion Service");
+
+            StartOnion(GenerateHashPassword("ILoveTangram"));
+
+            return;
         }
     }
 }

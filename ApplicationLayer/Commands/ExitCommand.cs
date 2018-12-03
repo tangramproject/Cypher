@@ -2,8 +2,8 @@
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
-using TangramCypher.Helpers.ServiceLocator;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace TangramCypher.ApplicationLayer.Commands.Vault
 {
@@ -12,10 +12,9 @@ namespace TangramCypher.ApplicationLayer.Commands.Vault
     {
         ICommandService commandService;
 
-        public ExitCommand()
+        public ExitCommand(IServiceProvider provider)
         {
-            var serviceProvider = Locator.Instance.GetService<IServiceProvider>();
-            commandService = serviceProvider.GetService<ICommandService>();
+            commandService = provider.GetService<ICommandService>();
         }
 
         public override async Task Execute()

@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
 using TangramCypher.ApplicationLayer.Vault;
-using TangramCypher.Helpers.ServiceLocator;
 using Microsoft.Extensions.DependencyInjection;
 using McMaster.Extensions.CommandLineUtils;
 using Newtonsoft.Json;
@@ -16,9 +15,8 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
         private IVaultService vaultService;
         private IConsole console;
 
-        public WalletListCommand()
+        public WalletListCommand(IServiceProvider serviceProvider)
         {
-            var serviceProvider = Locator.Instance.GetService<IServiceProvider>();
             vaultService = serviceProvider.GetService<IVaultService>();
             console = serviceProvider.GetService<IConsole>();
         }

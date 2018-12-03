@@ -1,0 +1,32 @@
+﻿<Directives xmlns="http://schemas.microsoft.com/netfx/2013/01/metadata">
+  <Application>
+    <Assembly Name="McMaster.Extensions.CommandLineUtils" Dynamic="Required All" />
+    <Assembly Name="Microsoft.Extensions.Configuration.CommandLine" Dynamic="Required All" />
+    <Assembly Name="Microsoft.Extensions.Configuration.FileExtensions" Dynamic="Required All" />
+    <Assembly Name="Microsoft.Extensions.Configuration.Json" Dynamic="Required All" />
+    <Assembly Name="Microsoft.Extensions.DependencyInjection" Dynamic="Required All" />
+    <Assembly Name="Microsoft.Extensions.Hosting" Dynamic="Required All">
+      <Type Name="Microsoft.Extensions.Hosting.Internal.ApplicationLifetime" Dynamic="Required All" />
+    </Assembly>
+    <Assembly Name="Microsoft.Extensions.Logging">
+      <Type Name="Microsoft.Extensions.Logging.LoggerFactory" Dynamic="Required All" />
+    </Assembly>
+    <Assembly Name="Microsoft.Extensions.Logging.Abstractions">
+      <Type Name="Microsoft.Extensions.Logging.Logger`1[[Microsoft.Extensions.Hosting.Internal.ApplicationLifetime,Microsoft.Extensions.Hosting]]" Dynamic="Required All" />
+    </Assembly>
+    <Assembly Name="Microsoft.Extensions.Logging.Configuration">
+      <Type Name="Microsoft.Extensions.Logging.Configuration.LoggerProviderConfigurationFactory" Dynamic="Required All" />
+      <Type Name="Microsoft.Extensions.Logging.Configuration.LoggerProviderConfiguration`1[[Microsoft.Extensions.Logging.Console.ConsoleLoggerProvider,Microsoft.Extensions.Logging.Console]]" Dynamic="Required All" />
+      <Type Name="Microsoft.Extensions.Logging.Configuration.LoggerProviderOptionsChangeTokenSource`2[[Microsoft.Extensions.Logging.Console.ConsoleLoggerOptions,Microsoft.Extensions.Logging.Console],[Microsoft.Extensions.Logging.Console.ConsoleLoggerProvider,Microsoft.Extensions.Logging.Console]]"  Dynamic="Required All" />
+    </Assembly>
+    <Assembly Name="Microsoft.Extensions.Logging.Console" Dynamic="Required All" />
+    <Assembly Name="Microsoft.Extensions.Logging.Debug" Dynamic="Required All" />
+    <Assembly Name="Newtonsoft.Json" Dynamic="Required All" />
+    <Assembly Name="Serilog.Extensions.Logging.File" Dynamic="Required All" />
+    <Assembly Name="Sodium.Core" Dynamic="Required All" />
+    <Assembly Name="SimpleBase" Dynamic="Required All" />
+    <Assembly Name="VaultSharp" Dynamic="Required All" />
+    <Assembly Name="DotNetTor" Dynamic="Required All" />
+    <Assembly Name="ReadablePassphrase" Dynamic="Required All" />
+  </Application>
+</Directives>

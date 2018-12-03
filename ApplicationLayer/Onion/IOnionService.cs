@@ -1,9 +1,10 @@
-﻿using System;
+﻿using Microsoft.Extensions.Hosting;
+using System;
 using System.Threading.Tasks;
 
 namespace Cypher.ApplicationLayer.Onion
 {
-    public interface IOnionService
+    public interface IOnionService : IHostedService
     {
         Task<string> GetAsync(string url, object data);
         void ChangeCircuit(string password);

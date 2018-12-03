@@ -3,7 +3,6 @@ using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Threading.Tasks;
 using TangramCypher.ApplicationLayer.Vault;
-using TangramCypher.Helpers.ServiceLocator;
 
 namespace TangramCypher.ApplicationLayer.Commands.Vault
 {
@@ -12,9 +11,8 @@ namespace TangramCypher.ApplicationLayer.Commands.Vault
     {
         private readonly IVaultService vaultService;
  
-        public VaultUnsealCommand()
+        public VaultUnsealCommand(IServiceProvider serviceProvider)
         {
-            var serviceProvider = Locator.Instance.GetService<IServiceProvider>();
             vaultService = serviceProvider.GetService<IVaultService>();
         }
 

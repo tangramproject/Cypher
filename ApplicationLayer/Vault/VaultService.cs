@@ -1,4 +1,4 @@
-﻿using McMaster.Extensions.CommandLineUtils;
+using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
@@ -13,6 +13,7 @@ using System.Net.Http.Headers;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using TangramCypher.ApplicationLayer.Vault.Models;
 using VaultSharp;
@@ -23,7 +24,7 @@ using VaultSharp.V1.SystemBackend;
 
 namespace TangramCypher.ApplicationLayer.Vault
 {
-    public class VaultService : IVaultService
+    public class VaultService : HostedService, IVaultService
     {
         private static readonly DirectoryInfo userDirectory = new DirectoryInfo(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
         private static readonly DirectoryInfo tangramDirectory = new DirectoryInfo(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location));
@@ -475,6 +476,11 @@ namespace TangramCypher.ApplicationLayer.Vault
         public async Task<Secret<ListInfo>> GetListAsync(string path)
         {
             return await vaultClient.V1.Secrets.KeyValue.V1.ReadSecretPathsAsync(path);
+        }
+
+        protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+        {
+            await StartVaultServiceAsync();
         }
     }
 }
