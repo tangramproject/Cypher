@@ -27,6 +27,8 @@ namespace TangramCypher.ApplicationLayer.Actor
         ActorService Memo(string text);
         string OpenBoxSeal(string cipher, PkSkDto pkSkDto);
         void ReceivePayment(string commitmentKey);
+        string Secret();
+        ActorService Secret(string sk);
         void SendPayment();
         Tuple<TokenDto, TokenDto> Swap(string masterKey, int version, string key1, string key2, EnvelopeDto envelope);
         string To();
