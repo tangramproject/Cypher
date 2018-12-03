@@ -234,7 +234,19 @@ namespace TangramCypher.ApplicationLayer.Actor
 
         public ActorService Memo(string text)
         {
-            if (string.IsNullOrEmpty(text))             {                 _memo = string.Empty;             }              if (text.Length > 64)             {                 throw new Exception("Memo field cannot be more than 64 characters long!");             }              _memo = text;              return this;
+            if (string.IsNullOrEmpty(text))
+            {
+                _memo = string.Empty;
+            }
+
+            if (text.Length > 64)
+            {
+                throw new Exception("Memo field cannot be more than 64 characters long!");
+            }
+
+            _memo = text;
+
+            return this;
         }
 
         public string OpenBoxSeal(string cipher, PkSkDto pkSkDto)
@@ -269,7 +281,13 @@ namespace TangramCypher.ApplicationLayer.Actor
             var freeRedemptionKey = JsonConvert.DeserializeObject<RedemptionKeyDto>(redemptionKey);
 
             // var swap = Swap(From(), 1, freeRedemptionKey.Key1, freeRedemptionKey.Key2, _tokenDto.Envelope);
-            var swap = Swap(From(), 1, freeRedemptionKey.Key1, freeRedemptionKey.Key2, null);              var token1 = DeriveToken(From(), swap.Item1.Version, swap.Item1.Envelope);             var status1 = VerifyToken(swap.Item1, token1);              var token2 = DeriveToken(From(), swap.Item2.Version, swap.Item2.Envelope);             var status2 = VerifyToken(swap.Item2, token2);
+            var swap = Swap(From(), 1, freeRedemptionKey.Key1, freeRedemptionKey.Key2, null);
+
+            var token1 = DeriveToken(From(), swap.Item1.Version, swap.Item1.Envelope);
+            var status1 = VerifyToken(swap.Item1, token1);
+
+            var token2 = DeriveToken(From(), swap.Item2.Version, swap.Item2.Envelope);
+            var status2 = VerifyToken(swap.Item2, token2);
         }
 
         public string Secret()
@@ -291,7 +309,12 @@ namespace TangramCypher.ApplicationLayer.Actor
 
         public void SendPayment()
         {
-            var token = DeriveToken(From(), 0, new EnvelopeDto() { Amount = Amount().Value, Serial = _cryptography.RandomBytes(16).ToHex() });             token = DeriveToken(From(), 1, token.Envelope);              var redemptionKey = HotRelease(token);             var bobPk = Base58.Bitcoin.Decode(To());             var cipher = _cryptography.BoxSeal(redemptionKey, bobPk.ToArray());
+            var token = DeriveToken(From(), 0, new EnvelopeDto() { Amount = Amount().Value, Serial = _cryptography.RandomBytes(16).ToHex() });
+            token = DeriveToken(From(), 1, token.Envelope);
+
+            var redemptionKey = HotRelease(token);
+            var bobPk = Base58.Bitcoin.Decode(To());
+            var cipher = _cryptography.BoxSeal(redemptionKey, bobPk.ToArray());
             var sharedKey = _cryptography.ScalarMult(Utilities.HexToBinary(Secret()), bobPk.ToArray());
             var notificationAddress = _cryptography.GenericHashWithKey(Utilities.BinaryToHex(bobPk.ToArray()), sharedKey);
         }

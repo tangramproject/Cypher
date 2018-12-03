@@ -4,7 +4,6 @@ using System.Text;
 using System.Threading.Tasks;
 using McMaster.Extensions.CommandLineUtils;
 using TangramCypher.ApplicationLayer.Vault;
-using TangramCypher.Helpers.ServiceLocator;
 using Microsoft.Extensions.DependencyInjection;
 using TangramCypher.ApplicationLayer.Actor;
 using Newtonsoft.Json;
@@ -19,10 +18,8 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
         readonly IVaultService vaultService;
         readonly IConsole console;
 
-        public WalletTransferCommand()
+        public WalletTransferCommand(IServiceProvider serviceProvider)
         {
-            var serviceProvider = Locator.Instance.GetService<IServiceProvider>();
-
             actorService = serviceProvider.GetService<IActorService>();
             vaultService = serviceProvider.GetService<IVaultService>();
             console = serviceProvider.GetService<IConsole>();
