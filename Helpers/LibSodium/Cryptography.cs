@@ -104,19 +104,19 @@ namespace TangramCypher.Helpers.LibSodium
             return Sodium.ScalarMult.Base(sk);
         }
 
-        public byte[] ScalarMult(byte[] bobSk, byte[] alicePk)
+        public byte[] ScalarMult(byte[] aliceSk, byte[] bobPk)
         {
-            if (bobSk == null)
+            if (aliceSk == null)
             {
-                throw new ArgumentNullException(nameof(bobSk));
+                throw new ArgumentNullException(nameof(aliceSk));
             }
 
-            if (alicePk == null)
+            if (bobPk == null)
             {
-                throw new ArgumentNullException(nameof(alicePk));
+                throw new ArgumentNullException(nameof(bobPk));
             }
 
-            return Sodium.ScalarMult.Mult(bobSk, alicePk);
+            return Sodium.ScalarMult.Mult(aliceSk, bobPk);
         }
 
         public byte[] ShortHash(string message, byte[] key)

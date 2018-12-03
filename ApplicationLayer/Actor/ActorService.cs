@@ -10,6 +10,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using SimpleBase;
+using Sodium;
 using TangramCypher.ApplicationLayer.Wallet;
 using TangramCypher.Helpers;
 using TangramCypher.Helpers.LibSodium;
@@ -27,8 +29,8 @@ namespace TangramCypher.ApplicationLayer.Actor
         protected string _toAdress;
         protected double? _amount;
         protected string _memo;
+        protected string _secret;
 
-        TokenDto _tokenDto;
         readonly IConfigurationSection _nodeSection;
         readonly ILogger _logger;
 
@@ -166,7 +168,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                 throw new ArgumentException("Stamp is missing!", nameof(stamp));
             }
 
-            var url = String.Format("{0}{1}", _nodeSection.GetValue<string>(TOKEN), stamp);
+            var url = string.Format("{0}{1}", _nodeSection.GetValue<string>(TOKEN), stamp);
 
             using (var client = new HttpClient())
             {
@@ -232,19 +234,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
         public ActorService Memo(string text)
         {
-            if (string.IsNullOrEmpty(text))
-            {
-                _memo = String.Empty;
-            }
-
-            if (text.Length > 64)
-            {
-                throw new Exception("Memo field cannot be more than 64 characters long!");
-            }
-
-            _memo = text;
-
-            return this;
+            if (string.IsNullOrEmpty(text))             {                 _memo = string.Empty;             }              if (text.Length > 64)             {                 throw new Exception("Memo field cannot be more than 64 characters long!");             }              _memo = text;              return this;
         }
 
         public string OpenBoxSeal(string cipher, PkSkDto pkSkDto)
@@ -267,11 +257,6 @@ namespace TangramCypher.ApplicationLayer.Actor
             return message;
         }
 
-        void PaymentAddress(string key, int n, string proof)
-        {
-
-        }
-
         public void ReceivePayment(string redemptionKey)
         {
             if (string.IsNullOrEmpty(redemptionKey))
@@ -283,26 +268,32 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             var freeRedemptionKey = JsonConvert.DeserializeObject<RedemptionKeyDto>(redemptionKey);
 
-            var swap = Swap(From(), 1, freeRedemptionKey.Key1, freeRedemptionKey.Key2, _tokenDto.Envelope);
+            // var swap = Swap(From(), 1, freeRedemptionKey.Key1, freeRedemptionKey.Key2, _tokenDto.Envelope);
+            var swap = Swap(From(), 1, freeRedemptionKey.Key1, freeRedemptionKey.Key2, null);              var token1 = DeriveToken(From(), swap.Item1.Version, swap.Item1.Envelope);             var status1 = VerifyToken(swap.Item1, token1);              var token2 = DeriveToken(From(), swap.Item2.Version, swap.Item2.Envelope);             var status2 = VerifyToken(swap.Item2, token2);
+        }
 
-            var token1 = DeriveToken(From(), swap.Item1.Version, swap.Item1.Envelope);
-            var status1 = VerifyToken(swap.Item1, token1);
+        public string Secret()
+        {
+            return _secret;
+        }
 
-            var token2 = DeriveToken(From(), swap.Item2.Version, swap.Item2.Envelope);
-            var status2 = VerifyToken(swap.Item2, token2);
+        public ActorService Secret(string sk)
+        {
+            if (string.IsNullOrEmpty(sk))
+            {
+                _secret = string.Empty;
+            }
+
+            _secret = sk;
+
+            return this;
         }
 
         public void SendPayment()
         {
-            _tokenDto = DeriveToken(From(), 0, new EnvelopeDto() { Amount = Amount().Value, Serial = _cryptography.RandomKey().ToHex() });
-            _tokenDto = DeriveToken(From(), 1, _tokenDto.Envelope);
-
-            var redemptionKey = HotRelease(_tokenDto);
-            // var base58 = Base58.Bitcoin.Decode(Util.Pop(To(), "_"));
-            // var cipher = _Cryptography.BoxSeal(redemptionKey, Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(base58).Substring(150)));
-
-
-            ReceivePayment(redemptionKey);
+            var token = DeriveToken(From(), 0, new EnvelopeDto() { Amount = Amount().Value, Serial = _cryptography.RandomBytes(16).ToHex() });             token = DeriveToken(From(), 1, token.Envelope);              var redemptionKey = HotRelease(token);             var bobPk = Base58.Bitcoin.Decode(To());             var cipher = _cryptography.BoxSeal(redemptionKey, bobPk.ToArray());
+            var sharedKey = _cryptography.ScalarMult(Utilities.HexToBinary(Secret()), bobPk.ToArray());
+            var notificationAddress = _cryptography.GenericHashWithKey(Utilities.BinaryToHex(bobPk.ToArray()), sharedKey);
         }
 
         public Tuple<TokenDto, TokenDto> Swap(string masterKey, int version, string key1, string key2, EnvelopeDto envelope)
@@ -431,6 +422,5 @@ namespace TangramCypher.ApplicationLayer.Actor
                ? 3
                : 4;
         }
-
     }
 }
