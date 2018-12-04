@@ -14,11 +14,26 @@
     <Assembly Name="Microsoft.Extensions.Logging.Abstractions">
       <Type Name="Microsoft.Extensions.Logging.Logger`1[[Microsoft.Extensions.Hosting.Internal.ApplicationLifetime,Microsoft.Extensions.Hosting]]" Dynamic="Required All" />
     </Assembly>
+    
     <Assembly Name="Microsoft.Extensions.Logging.Configuration">
       <Type Name="Microsoft.Extensions.Logging.Configuration.LoggerProviderConfigurationFactory" Dynamic="Required All" />
       <Type Name="Microsoft.Extensions.Logging.Configuration.LoggerProviderConfiguration`1[[Microsoft.Extensions.Logging.Console.ConsoleLoggerProvider,Microsoft.Extensions.Logging.Console]]" Dynamic="Required All" />
       <Type Name="Microsoft.Extensions.Logging.Configuration.LoggerProviderOptionsChangeTokenSource`2[[Microsoft.Extensions.Logging.Console.ConsoleLoggerOptions,Microsoft.Extensions.Logging.Console],[Microsoft.Extensions.Logging.Console.ConsoleLoggerProvider,Microsoft.Extensions.Logging.Console]]"  Dynamic="Required All" />
     </Assembly>
+
+    <Assembly Name="Microsoft.Extensions.Options">
+      <Type Name="Microsoft.Extensions.Options.OptionsMonitor`1[[Microsoft.Extensions.Logging.LoggerFilterOptions,Microsoft.Extensions.Logging]]" Dynamic="Required All" />
+      <Type Name="Microsoft.Extensions.Options.OptionsFactory`1[[Microsoft.Extensions.Logging.LoggerFilterOptions,Microsoft.Extensions.Logging]]" Dynamic="Required All" />
+      <Type Name="Microsoft.Extensions.Options.OptionsCache`1[[Microsoft.Extensions.Logging.LoggerFilterOptions,Microsoft.Extensions.Logging]]" Dynamic="Required All" />
+      <Type Name="Microsoft.Extensions.Options.OptionsManager`1[[Microsoft.Extensions.Hosting.ConsoleLifetimeOptions,Microsoft.Extensions.Hosting]]" Dynamic="Required All" />
+    </Assembly>
+
+    <Assembly Name="System.IO" Dynamic="Required All" />
+
+    <Assembly Name="System.Reflection" Dynamic="Required All">
+      <Type Name="System.Reflection.Assembly" Dynamic="Required All" />
+    </Assembly>
+    
     <Assembly Name="Microsoft.Extensions.Logging.Console" Dynamic="Required All" />
     <Assembly Name="Microsoft.Extensions.Logging.Debug" Dynamic="Required All" />
     <Assembly Name="Newtonsoft.Json" Dynamic="Required All" />
@@ -28,5 +43,10 @@
     <Assembly Name="VaultSharp" Dynamic="Required All" />
     <Assembly Name="DotNetTor" Dynamic="Required All" />
     <Assembly Name="ReadablePassphrase" Dynamic="Required All" />
+
+    <Assembly Name="Cypher" Dynamic="Required All">
+      <Type Name="TangramCypher.Helpers.Util" Dynamic="Required All" />
+      <Type Name="Cypher.ApplicationLayer.Onion.OnionService" Dynamic="Required All" />
+    </Assembly>
   </Application>
 </Directives>
