@@ -25,7 +25,7 @@ namespace TangramCypher
             var builder = new HostBuilder()
                 .ConfigureAppConfiguration((hostingContext, config) =>
                 {
-                    config.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
+                    config.AddJsonFile("appsettings.json", optional: true, reloadOnChange: true);
                     config.SetBasePath(Directory.GetCurrentDirectory());
 
                     if (args != null)
@@ -53,10 +53,10 @@ namespace TangramCypher
                         {
                             return sp.GetService<IVaultService>() as VaultService;
                         })
-                        .AddSingleton<IHostedService, CommandService>(sp =>
-                        {
-                            return sp.GetService<ICommandService>() as CommandService;
-                        });
+                    .AddSingleton<IHostedService, CommandService>(sp =>
+                    {
+                        return sp.GetService<ICommandService>() as CommandService;
+                    });
 
                     services.Add(new ServiceDescriptor(typeof(IConsole), PhysicalConsole.Singleton));
 

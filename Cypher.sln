@@ -1,7 +1,10 @@
-
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cypher", "Cypher.csproj", "{12B2A7B7-6EFE-4CED-A4AB-1355F68074D1}"
+VisualStudioVersion = 15.0.28307.136
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Cypher", "Cypher.csproj", "{12B2A7B7-6EFE-4CED-A4AB-1355F68074D1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CypherWallet", "..\CypherWallet\CypherWallet.csproj", "{12F8B12B-E409-40C1-82B8-86206FA878A1}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -13,5 +16,15 @@ Global
 		{12B2A7B7-6EFE-4CED-A4AB-1355F68074D1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{12B2A7B7-6EFE-4CED-A4AB-1355F68074D1}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{12B2A7B7-6EFE-4CED-A4AB-1355F68074D1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{12F8B12B-E409-40C1-82B8-86206FA878A1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{12F8B12B-E409-40C1-82B8-86206FA878A1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{12F8B12B-E409-40C1-82B8-86206FA878A1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{12F8B12B-E409-40C1-82B8-86206FA878A1}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {4A229E3A-76A7-482E-869D-9BB09111EEBB}
 	EndGlobalSection
 EndGlobal
