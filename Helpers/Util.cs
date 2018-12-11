@@ -67,9 +67,9 @@ namespace TangramCypher.Helpers
             return osPlatform;
         }
 
-        public static string EntryAssemblyPath()
+        public static string AppDomainDirectory()
         {
-            return Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
+            return AppDomain.CurrentDomain.BaseDirectory;
         }
 
         public static string ToPlainString(SecureString secure)

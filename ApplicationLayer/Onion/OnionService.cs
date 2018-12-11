@@ -60,7 +60,7 @@ namespace Cypher.ApplicationLayer.Onion
             controlHost = onionSection.GetValue<string>(CONTROL_HOST);
             controlPort = onionSection.GetValue<int>(CONTROL_PORT);
 
-            onionDirectory = Path.Combine(Util.EntryAssemblyPath(), ONION);
+            onionDirectory = Path.Combine(Path.GetDirectoryName(AppDomain.CurrentDomain.BaseDirectory), ONION);
             torrcPath = Path.Combine(onionDirectory, TORRC);
             controlPortPath = Path.Combine(onionDirectory, "control-port");
         }
@@ -391,6 +391,7 @@ namespace Cypher.ApplicationLayer.Onion
 
         protected override async Task ExecuteAsync(CancellationToken cancellationToken)
         {
+            Console.WriteLine("Starting Onion Service");
             logger.LogInformation("Starting Onion Service");
 
             StartOnion(GenerateHashPassword("ILoveTangram"));

@@ -7,32 +7,55 @@ using System.Threading.Tasks;
 
 namespace TangramCypher.ApplicationLayer
 {
-    public abstract class HostedService : IHostedService
+    public abstract class HostedService : IHostedService, IDisposable
     {
         private Task _executingTask;
-        private CancellationTokenSource _cts;
+        private readonly CancellationTokenSource _stoppingCts =
+                                                       new CancellationTokenSource();
 
-        public Task StartAsync(CancellationToken cancellationToken)
+        protected abstract Task ExecuteAsync(CancellationToken stoppingToken);
+
+        public virtual Task StartAsync(CancellationToken cancellationToken)
         {
-            _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            _executingTask = ExecuteAsync(_cts.Token);
-            return _executingTask.IsCompleted ? _executingTask : Task.CompletedTask;
+            // Store the task we're executing
+            _executingTask = ExecuteAsync(_stoppingCts.Token);
+
+            // If the task is completed then return it, 
+            // this will bubble cancellation and failure to the caller
+            if (_executingTask.IsCompleted)
+            {
+                return _executingTask;
+            }
+
+            // Otherwise it's running
+            return Task.CompletedTask;
         }
 
-        public async Task StopAsync(CancellationToken cancellationToken)
+        public virtual async Task StopAsync(CancellationToken cancellationToken)
         {
+            // Stop called without start
             if (_executingTask == null)
             {
                 return;
             }
 
-            _cts.Cancel();
+            try
+            {
+                // Signal cancellation to the executing method
+                _stoppingCts.Cancel();
+            }
+            finally
+            {
+                // Wait until the task completes or the stop token triggers
+                await Task.WhenAny(_executingTask, Task.Delay(Timeout.Infinite,
+                                                              cancellationToken));
+            }
 
-            await Task.WhenAny(_executingTask, Task.Delay(-1, cancellationToken));
-
-            cancellationToken.ThrowIfCancellationRequested();
         }
 
-        protected abstract Task ExecuteAsync(CancellationToken cancellationToken);
+        public virtual void Dispose()
+        {
+            _stoppingCts.Cancel();
+        }
     }
 }
