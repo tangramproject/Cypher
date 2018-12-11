@@ -2,6 +2,7 @@ using System;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Security;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -20,74 +21,74 @@ namespace TangramCypher.ApplicationLayer.Actor
 {
     public class ActorService : IActorService
     {
-        const string NODEAPI = "nodeAPI";
         const string ENDPOINT = "endpoint";
+        const string TOKEN_API = "tokenAPI";
         const string TOKEN = "token";
-        const string ADDTOKEN = "add";
+        const string MESSAGEPOOL_API = "messagePoolAPI";
+        const string MESSAGEPOOL = "message";
 
-        protected string _masterKey;
+        protected SecureString masterKey;
         protected string _toAdress;
         protected double? _amount;
         protected string _memo;
-        protected string _secret;
+        protected SecureString secretKey;
+        protected SecureString publicKey;
+        protected SecureString identifier;
 
-        readonly IConfigurationSection _nodeSection;
-        readonly ILogger _logger;
+        readonly IConfigurationSection nodeTokenSection;
+        readonly IConfigurationSection nodeMessagePoolSection;
+        readonly ILogger logger;
+        readonly ICryptography cryptography;
+        readonly IOnionService onionService;
+        readonly IWalletService walletService;
 
-        public ICryptography _cryptography { get; }
-        public IOnionService _onionService { get; }
 
-        public ActorService(ICryptography cryptography, IOnionService onionService, IConfiguration configuration, ILogger logger)
+        public event ReceivedMessageEventHandler ReceivedMessage;
+
+        protected virtual void OnReceivedMessage(ReceivedMessageEventArgs e)
         {
-            _cryptography = cryptography;
-            _onionService = onionService;
-            _nodeSection = configuration.GetSection(NODEAPI);
-            _logger = logger;
+            ReceivedMessage?.Invoke(this, e);
         }
 
-        public async Task<JObject> AddToken(TokenDto token, CancellationToken cancellationToken)
+        public ActorService(ICryptography cryptography, IOnionService onionService, IWalletService walletService, IConfiguration configuration, ILogger logger)
+        {
+            this.cryptography = cryptography;
+            this.onionService = onionService;
+            this.walletService = walletService;
+            this.logger = logger;
+
+            nodeTokenSection = configuration.GetSection(TOKEN_API);
+            nodeMessagePoolSection = configuration.GetSection(MESSAGEPOOL_API);
+        }
+
+        // TODO: Temp fix until we get the onion client working.
+        public async Task<JObject> AddMessageAsync(NotificationDto notification, CancellationToken cancellationToken)
+        {
+            if (notification == null)
+            {
+                throw new ArgumentNullException(nameof(notification));
+            }
+
+            var baseAddress = new Uri(nodeMessagePoolSection.GetValue<string>(ENDPOINT));
+            var path = nodeMessagePoolSection.GetValue<string>(MESSAGEPOOL);
+            var result = await ClientPostAsync(notification, baseAddress, path, cancellationToken);
+
+            return result;
+        }
+
+        // TODO: Temp fix until we get the onion client working.
+        public async Task<JObject> AddTokenAsync(TokenDto token, CancellationToken cancellationToken)
         {
             if (token == null)
             {
                 throw new ArgumentNullException(nameof(token));
             }
 
-            var url = _nodeSection.GetValue<string>(ADDTOKEN);
+            var baseAddress = new Uri(nodeTokenSection.GetValue<string>(ENDPOINT));
+            var path = nodeTokenSection.GetValue<string>(TOKEN);
+            var result = await ClientPostAsync(token, baseAddress, path, cancellationToken);
 
-            using (var client = new HttpClient())
-            {
-                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
-
-                client.BaseAddress = new Uri(_nodeSection.GetValue<string>(ENDPOINT));
-                client.DefaultRequestHeaders.Accept.Clear();
-                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-
-                using (var request = new HttpRequestMessage(HttpMethod.Post, url))
-                {
-                    var content = JsonConvert.SerializeObject(token, Formatting.None);
-                    var buffer = Encoding.UTF8.GetBytes(content);
-
-                    request.Content = new StringContent(content, Encoding.UTF8, "application/json");
-
-                    using (var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
-                    {
-                        var stream = await response.Content.ReadAsStreamAsync();
-
-                        if (response.IsSuccessStatusCode)
-                        {
-                            var result = Util.DeserializeJsonFromStream<JObject>(stream);
-                            return Task.FromResult(result).Result;
-                        }
-
-                        var contentResult = await Util.StreamToStringAsync(stream);
-                        throw new ApiException
-                        {
-                            StatusCode = (int)response.StatusCode,
-                            Content = contentResult
-                        };
-                    }
-                }
-            }
+            return result;
         }
 
         public double? Amount()
@@ -111,31 +112,52 @@ namespace TangramCypher.ApplicationLayer.Actor
             return this;
         }
 
-        public string PartialRelease(TokenDto token)
+        public Span<byte> DecodeAddress(string key)
         {
-            var subKey1 = DeriveKey(token.Version + 1, token.Stamp, From());
-            var subKey2 = DeriveKey(token.Version + 2, token.Stamp, From());
-            var mix = DeriveKey(token.Version + 2, token.Stamp, subKey2);
-            var redemption = new RedemptionKeyDto() { Key1 = subKey1, Key2 = mix, Memo = Memo(), Proof = token.Stamp };
-
-            return JsonConvert.SerializeObject(redemption);
+            return Base58.Bitcoin.Decode(key);
         }
 
-        public string DeriveKey(int version, string proof, string masterKey, int bytes = 32)
+        public string DeriveKey(int version, string stamp, SecureString password, int bytes = 32)
         {
-            if (string.IsNullOrEmpty(proof))
+            if (string.IsNullOrEmpty(stamp))
             {
-                throw new ArgumentException("Proof cannot be null or empty!", nameof(proof));
+                throw new ArgumentException("Stamp cannot be null or empty!", nameof(stamp));
             }
 
-            return _cryptography.GenericHashNoKey(string.Format("{0} {1} {2}", version, proof, masterKey), bytes).ToHex();
+            return cryptography.GenericHashNoKey(string.Format("{0} {1} {2}", version, stamp, password), bytes).ToHex();
         }
 
-        public TokenDto DeriveToken(string masterKey, int version, EnvelopeDto envelope)
+        public string DeriveSerialKey(int version, double? amount, SecureString password, int bytes = 32)
         {
-            if (string.IsNullOrEmpty(masterKey))
+            if (password == null)
             {
-                throw new ArgumentException("Master key cannot be null or empty!", nameof(masterKey));
+                throw new ArgumentNullException(nameof(password));
+            }
+
+            return
+            cryptography.GenericHashNoKey(string.Format("{0} {1} {2}", version, amount.Value.ToString(), masterKey), bytes).ToHex();
+        }
+
+        public EnvelopeDto DeriveEnvelope(SecureString password, int version, double? amount)
+        {
+            if (password == null)
+            {
+                throw new ArgumentNullException(nameof(password));
+            }
+
+            var v0 = +version;
+            return new EnvelopeDto()
+            {
+                Amount = amount.Value,
+                Serial = DeriveSerialKey(v0, amount, password)
+            };
+        }
+
+        public TokenDto DeriveToken(SecureString password, int version, EnvelopeDto envelope)
+        {
+            if (password == null)
+            {
+                throw new ArgumentNullException(nameof(password));
             }
 
             if (envelope == null)
@@ -143,74 +165,79 @@ namespace TangramCypher.ApplicationLayer.Actor
                 throw new ArgumentNullException(nameof(envelope));
             }
 
-            var proof = _cryptography.GenericHashNoKey(string.Format("{0}{1}", envelope.Amount.ToString(), envelope.Serial)).ToHex();
+            var stamp = cryptography.GenericHashNoKey(string.Format("{0}{1}", envelope.Amount.ToString(), envelope.Serial)).ToHex();
             var v0 = +version;
             var v1 = +version + 1;
             var v2 = +version + 2;
 
             var chronicle = new TokenDto()
             {
-                Keeper = DeriveKey(v1, proof, DeriveKey(v2, proof, DeriveKey(v2, proof, masterKey))),
+                Keeper = DeriveKey(v1, stamp, DeriveKey(v2, stamp, DeriveKey(v2, stamp, password).ToSecureString()).ToSecureString()),
                 Version = v0,
-                Principle = DeriveKey(v0, proof, masterKey),
-                Stamp = proof,
+                Principle = DeriveKey(v0, stamp, masterKey),
+                Stamp = stamp,
                 Envelope = envelope,
-                Hint = DeriveKey(v1, proof, DeriveKey(v1, proof, masterKey))
+                Hint = DeriveKey(v1, stamp, DeriveKey(v1, stamp, password).ToSecureString())
             };
 
             return chronicle;
         }
 
-        public async Task<TokenDto> FetchToken(string stamp, CancellationToken cancellationToken)
+        public SecureString From()
+        {
+            return masterKey;
+        }
+        
+        public ActorService From(SecureString password)
+        {
+            masterKey = password ?? throw new ArgumentNullException(nameof(masterKey));
+            return this;
+        }
+
+        public byte[] GetChiper(string redemptionKey, Span<byte> bobPk)
+        {
+            return cryptography.BoxSeal(redemptionKey, bobPk.ToArray());
+        }
+
+        // TODO: Temp fix until we get the onion client working.
+        public async Task<NotificationDto> GetMessageAsync(string address, CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrEmpty(address))
+            {
+                throw new ArgumentException("Address is missing!", nameof(address));
+            }
+
+            var baseAddress = new Uri(nodeMessagePoolSection.GetValue<string>(ENDPOINT));
+            var path = string.Format("{0}/{1}", nodeMessagePoolSection.GetValue<string>(TOKEN), address);
+            var result = await ClientGetAsync<NotificationDto>(baseAddress, path, cancellationToken);
+
+            return result;
+        }
+
+        public byte[] GetSharedKey(Span<byte> bobPk)
+        {
+            SetSecretKey().GetAwaiter();
+
+            using (var insecure = SecretKey().Insecure())
+            {
+                return cryptography.ScalarMult(Utilities.HexToBinary(insecure.Value), bobPk.ToArray());
+            }
+        }
+
+        // TODO: Temp fix until we get the onion client working.
+        public async Task<TokenDto> GetTokenAsync(string stamp, CancellationToken cancellationToken)
         {
             if (string.IsNullOrEmpty(stamp))
             {
                 throw new ArgumentException("Stamp is missing!", nameof(stamp));
             }
 
-            var url = string.Format("{0}{1}", _nodeSection.GetValue<string>(TOKEN), stamp);
+            var baseAddress = new Uri(nodeTokenSection.GetValue<string>(ENDPOINT));
+            var path = string.Format("{0}/{1}", nodeTokenSection.GetValue<string>(TOKEN), stamp);
+            var result = await ClientGetAsync<TokenDto>(baseAddress, path, cancellationToken);
 
-            using (var client = new HttpClient())
-            {
-                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
+            return result;
 
-                client.BaseAddress = new Uri(_nodeSection.GetValue<string>(ENDPOINT));
-                client.DefaultRequestHeaders.Accept.Clear();
-                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-
-                using (var request = new HttpRequestMessage(HttpMethod.Get, url))
-                using (var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
-                {
-                    var stream = await response.Content.ReadAsStreamAsync();
-
-                    if (response.IsSuccessStatusCode)
-                        return Util.DeserializeJsonFromStream<TokenDto>(stream);
-
-                    var content = await Util.StreamToStringAsync(stream);
-                    throw new ApiException
-                    {
-                        StatusCode = (int)response.StatusCode,
-                        Content = content
-                    };
-                }
-            }
-        }
-
-        public string From()
-        {
-            return _masterKey;
-        }
-
-        public ActorService From(string masterKey)
-        {
-            if (string.IsNullOrEmpty(masterKey))
-            {
-                throw new Exception("Master Key is missing!");
-            }
-
-            _masterKey = masterKey;
-
-            return this;
         }
 
         public string HotRelease(TokenDto token)
@@ -220,11 +247,23 @@ namespace TangramCypher.ApplicationLayer.Actor
                 throw new ArgumentNullException(nameof(TokenDto));
             }
 
+
             var subKey1 = DeriveKey(token.Version + 1, token.Stamp, From());
             var subKey2 = DeriveKey(token.Version + 2, token.Stamp, From());
-            var redemption = new RedemptionKeyDto() { Key1 = subKey1, Key2 = subKey2, Memo = Memo(), Proof = token.Stamp };
+            var redemption = new RedemptionKeyDto() { Key1 = subKey1, Key2 = subKey2, Memo = Memo(), Stamp = token.Stamp };
 
             return JsonConvert.SerializeObject(redemption);
+        }
+
+        public SecureString Identifier()
+        {
+            return identifier;
+        }
+
+        public ActorService Identifier(SecureString walletId)
+        {
+            identifier = walletId ?? throw new ArgumentNullException(nameof(walletId));
+            return this;
         }
 
         public string Memo()
@@ -261,12 +300,38 @@ namespace TangramCypher.ApplicationLayer.Actor
                 throw new ArgumentNullException(nameof(pkSkDto));
             }
 
-            var publicKey = Encoding.UTF8.GetBytes(pkSkDto.PublicKey);
-            var privateKey = Encoding.UTF8.GetBytes(pkSkDto.SecretKey);
+            var pk = Encoding.UTF8.GetBytes(pkSkDto.PublicKey);
+            var sk = Encoding.UTF8.GetBytes(pkSkDto.SecretKey.ToUnSecureString());
             var cypher = Encoding.UTF8.GetBytes(cipher);
-            var message = _cryptography.OpenBoxSeal(cypher, new Sodium.KeyPair(publicKey, privateKey));
+            var message = cryptography.OpenBoxSeal(cypher, new KeyPair(pk, sk));
 
             return message;
+        }
+
+        public string PartialRelease(TokenDto token)
+        {
+            if (token == null)
+            {
+                throw new ArgumentNullException(nameof(token));
+            }
+
+            var subKey1 = DeriveKey(token.Version + 1, token.Stamp, From());
+            var subKey2 = DeriveKey(token.Version + 2, token.Stamp, From()).ToSecureString();
+            var mix = DeriveKey(token.Version + 2, token.Stamp, subKey2);
+            var redemption = new RedemptionKeyDto() { Key1 = subKey1, Key2 = mix, Memo = Memo(), Stamp = token.Stamp };
+
+            return JsonConvert.SerializeObject(redemption);
+        }
+
+        public SecureString PublicKey()
+        {
+            return publicKey;
+        }
+
+        public ActorService PublicKey(SecureString pk)
+        {
+            publicKey = pk ?? throw new ArgumentNullException(nameof(pk));
+            return this;
         }
 
         public void ReceivePayment(string redemptionKey)
@@ -276,54 +341,69 @@ namespace TangramCypher.ApplicationLayer.Actor
                 throw new ArgumentException("Redemption Key cannot be null or empty!", nameof(redemptionKey));
             }
 
-            From("Nine inch nails...");
+            SetSecretKey().GetAwaiter();
+            SetPublicKey().GetAwaiter();
 
-            var freeRedemptionKey = JsonConvert.DeserializeObject<RedemptionKeyDto>(redemptionKey);
-
-            // var swap = Swap(From(), 1, freeRedemptionKey.Key1, freeRedemptionKey.Key2, _tokenDto.Envelope);
-            var swap = Swap(From(), 1, freeRedemptionKey.Key1, freeRedemptionKey.Key2, null);
-
-            var token1 = DeriveToken(From(), swap.Item1.Version, swap.Item1.Envelope);
-            var status1 = VerifyToken(swap.Item1, token1);
-
-            var token2 = DeriveToken(From(), swap.Item2.Version, swap.Item2.Envelope);
-            var status2 = VerifyToken(swap.Item2, token2);
-        }
-
-        public string Secret()
-        {
-            return _secret;
-        }
-
-        public ActorService Secret(string sk)
-        {
-            if (string.IsNullOrEmpty(sk))
+            using (var insecurePk = PublicKey().Insecure())
             {
-                _secret = string.Empty;
+                using (var insecureSk = SecretKey().Insecure())
+                {
+                    var openMessage = cryptography.OpenBoxSeal(Convert.FromBase64String(redemptionKey), new KeyPair(Utilities.HexToBinary(insecurePk.Value), Utilities.HexToBinary(insecureSk.Value)));
+                    var freeRedemptionKey = JsonConvert.DeserializeObject<RedemptionKeyDto>(openMessage);
+                    var token = GetTokenAsync(freeRedemptionKey.Stamp, new CancellationToken()).GetAwaiter().GetResult();
+
+                    if (token == null)
+                        return;
+
+                    var swap = Swap(From(), 1, freeRedemptionKey.Key1, freeRedemptionKey.Key2, token.Envelope);
+                    var token1 = DeriveToken(From(), swap.Item1.Version, swap.Item1.Envelope);
+                    var status1 = VerifyToken(swap.Item1, token1);
+                    var token2 = DeriveToken(From(), swap.Item2.Version, swap.Item2.Envelope);
+                    var status2 = VerifyToken(swap.Item2, token2);
+
+                    if (status2 == 1)
+                        walletService.AddEnvelope(Identifier(), From(), token2.Envelope).GetAwaiter();
+                }
             }
+        }
 
-            _secret = sk;
+        public SecureString SecretKey()
+        {
+            return secretKey;
+        }
 
+        public ActorService SecretKey(SecureString sk)
+        {
+            secretKey = sk ?? throw new ArgumentNullException(nameof(sk));
             return this;
         }
 
-        public void SendPayment()
+        public void SendPayment(bool answer)
         {
-            var token = DeriveToken(From(), 0, new EnvelopeDto() { Amount = Amount().Value, Serial = _cryptography.RandomBytes(16).ToHex() });
+            SetSecretKey().GetAwaiter();
+
+            var token = DeriveToken(From(), 0, DeriveEnvelope(From(), 1, Amount()));
             token = DeriveToken(From(), 1, token.Envelope);
 
             var redemptionKey = HotRelease(token);
-            var bobPk = Base58.Bitcoin.Decode(To());
-            var cipher = _cryptography.BoxSeal(redemptionKey, bobPk.ToArray());
-            var sharedKey = _cryptography.ScalarMult(Utilities.HexToBinary(Secret()), bobPk.ToArray());
-            var notificationAddress = _cryptography.GenericHashWithKey(Utilities.BinaryToHex(bobPk.ToArray()), sharedKey);
+            var bobPk = DecodeAddress(To());
+            var cipher = GetChiper(redemptionKey, bobPk);
+            var sharedKey = GetSharedKey(bobPk);
+            var notificationAddress = cryptography.GenericHashWithKey(Utilities.BinaryToHex(bobPk.ToArray()), sharedKey);
+            var notification = new NotificationDto() { Address = Utilities.BinaryToHex(notificationAddress), Chiper = Convert.ToBase64String(cipher) };
+            var delivered = false;
+
+            if (answer)
+                delivered = (bool)AddMessageAsync(notification, new CancellationToken()).GetAwaiter().GetResult();
+
+            OnReceivedMessage(new ReceivedMessageEventArgs() { Message = delivered ? (object)true : notification.Chiper, ThroughSystem = answer });
         }
 
-        public Tuple<TokenDto, TokenDto> Swap(string masterKey, int version, string key1, string key2, EnvelopeDto envelope)
+        public Tuple<TokenDto, TokenDto> Swap(SecureString password, int version, string key1, string key2, EnvelopeDto envelope)
         {
-            if (string.IsNullOrEmpty(masterKey))
+            if (password == null)
             {
-                throw new ArgumentException("Master Key cannot be null or empty!", nameof(masterKey));
+                throw new ArgumentNullException(nameof(password));
             }
 
             if (string.IsNullOrEmpty(key1))
@@ -341,7 +421,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                 throw new ArgumentNullException(nameof(envelope));
             }
 
-            var proof = _cryptography.GenericHashNoKey(string.Format("{0}{1}", envelope.Amount.ToString(), envelope.Serial)).ToHex();
+            var stamp = cryptography.GenericHashNoKey(string.Format("{0}{1}", envelope.Amount.ToString(), envelope.Serial)).ToHex();
             var v1 = version + 1;
             var v2 = version + 2;
             var v3 = version + 3;
@@ -349,32 +429,32 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             var token1 = new TokenDto()
             {
-                Keeper = DeriveKey(v2, proof, DeriveKey(v3, proof, DeriveKey(v3, proof, masterKey))),
+                Keeper = DeriveKey(v2, stamp, DeriveKey(v3, stamp, DeriveKey(v3, stamp, password).ToSecureString()).ToSecureString()),
                 Version = v1,
                 Principle = key1,
-                Stamp = proof,
+                Stamp = stamp,
                 Envelope = envelope,
-                Hint = DeriveKey(v2, proof, key2)
+                Hint = DeriveKey(v2, stamp, key2.ToSecureString())
             };
 
             var token2 = new TokenDto()
             {
-                Keeper = DeriveKey(v3, proof, DeriveKey(v4, proof, DeriveKey(v4, proof, masterKey))),
+                Keeper = DeriveKey(v3, stamp, DeriveKey(v4, stamp, DeriveKey(v4, stamp, password).ToSecureString()).ToSecureString()),
                 Version = v2,
                 Principle = key2,
-                Stamp = proof,
+                Stamp = stamp,
                 Envelope = envelope,
-                Hint = DeriveKey(v3, proof, DeriveKey(v3, proof, masterKey))
+                Hint = DeriveKey(v3, stamp, DeriveKey(v3, stamp, password).ToSecureString())
             };
 
             return Tuple.Create(token1, token2);
         }
 
-        public TokenDto SwapPartialOne(string masterKey, RedemptionKeyDto redemptionKey)
+        public TokenDto SwapPartialOne(SecureString password, RedemptionKeyDto redemptionKey)
         {
-            if (string.IsNullOrEmpty(masterKey))
+            if (password == null)
             {
-                throw new ArgumentException("Master Key cannot be null or empty!", nameof(masterKey));
+                throw new ArgumentNullException(nameof(password));
             }
 
             if (redemptionKey == null)
@@ -382,22 +462,22 @@ namespace TangramCypher.ApplicationLayer.Actor
                 throw new ArgumentNullException(nameof(redemptionKey));
             }
 
-            var token = FetchToken(redemptionKey.Proof, new CancellationToken()).GetAwaiter().GetResult();
+            var token = GetTokenAsync(redemptionKey.Stamp, new CancellationToken()).GetAwaiter().GetResult();
 
             if (token != null)
             {
-                var proof = _cryptography.GenericHashNoKey(string.Format("{0}{1}", token.Envelope.Amount.ToString(), token.Envelope.Serial)).ToHex();
+                var stamp = cryptography.GenericHashNoKey(string.Format("{0}{1}", token.Envelope.Amount.ToString(), token.Envelope.Serial)).ToHex();
 
-                if (proof.Equals(token.Stamp))
+                if (stamp.Equals(token.Stamp))
                 {
                     var v1 = token.Version + 1;
                     var v2 = token.Version + 2;
                     var v3 = token.Version + 3;
 
-                    token.Keeper = DeriveKey(v2, proof, DeriveKey(v3, proof, DeriveKey(v3, proof, masterKey)));
+                    token.Keeper = DeriveKey(v2, stamp, DeriveKey(v3, stamp, DeriveKey(v3, stamp, password).ToSecureString()).ToSecureString());
                     token.Version = v1;
                     token.Principle = redemptionKey.Key1;
-                    token.Stamp = proof;
+                    token.Stamp = stamp;
                     token.Envelope = token.Envelope;
                     token.Hint = redemptionKey.Key2;
 
@@ -445,5 +525,122 @@ namespace TangramCypher.ApplicationLayer.Actor
                ? 3
                : 4;
         }
+
+        private async Task SetSecretKey()
+        {
+            try
+            {
+                SecretKey(await walletService.GetStoreKey(Identifier(), From(), "SecretKey"));
+
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+
+        private async Task SetPublicKey()
+        {
+            try
+            {
+                PublicKey(await walletService.GetStoreKey(Identifier(), From(), "PublicKey"));
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+
+        async Task<JObject> ClientPostAsync<T>(T payload, Uri baseAddress, string path, CancellationToken cancellationToken)
+        {
+            if (!Equals(payload, default(T)))
+            {
+                throw new ArgumentNullException(nameof(payload));
+            }
+
+            if (baseAddress == null)
+            {
+                throw new ArgumentNullException(nameof(baseAddress));
+            }
+
+            if (string.IsNullOrEmpty(path))
+            {
+                throw new ArgumentException("Path is missing!", nameof(path));
+            }
+
+            using (var client = new HttpClient())
+            {
+                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
+
+                client.BaseAddress = baseAddress;
+                client.DefaultRequestHeaders.Accept.Clear();
+                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+                using (var request = new HttpRequestMessage(HttpMethod.Post, path))
+                {
+                    var content = JsonConvert.SerializeObject(payload, Formatting.Indented);
+                    var buffer = Encoding.UTF8.GetBytes(content);
+
+                    request.Content = new StringContent(content, Encoding.UTF8, "application/json");
+
+                    using (var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
+                    {
+                        var stream = await response.Content.ReadAsStreamAsync();
+
+                        if (response.IsSuccessStatusCode)
+                        {
+                            var result = Util.DeserializeJsonFromStream<JObject>(stream);
+                            return Task.FromResult(result).Result;
+                        }
+
+                        var contentResult = await Util.StreamToStringAsync(stream);
+                        throw new ApiException
+                        {
+                            StatusCode = (int)response.StatusCode,
+                            Content = contentResult
+                        };
+                    }
+                }
+            }
+        }
+
+        async Task<T> ClientGetAsync<T>(Uri baseAddress, string path, CancellationToken cancellationToken)
+        {
+            if (baseAddress == null)
+            {
+                throw new ArgumentNullException(nameof(baseAddress));
+            }
+
+            if (string.IsNullOrEmpty(path))
+            {
+                throw new ArgumentException("Path is missing!", nameof(path));
+            }
+
+            using (var client = new HttpClient())
+            {
+                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
+
+                client.BaseAddress = baseAddress;
+                client.DefaultRequestHeaders.Accept.Clear();
+                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+                using (var request = new HttpRequestMessage(HttpMethod.Get, path))
+                using (var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
+                {
+                    var stream = await response.Content.ReadAsStreamAsync();
+
+                    if (response.IsSuccessStatusCode)
+                        return Util.DeserializeJsonFromStream<T>(stream);
+
+                    var content = await Util.StreamToStringAsync(stream);
+                    throw new ApiException
+                    {
+                        StatusCode = (int)response.StatusCode,
+                        Content = content
+                    };
+                }
+            }
+        }
+
     }
 }

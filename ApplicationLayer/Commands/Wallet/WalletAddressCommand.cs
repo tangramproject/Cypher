@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
@@ -13,7 +11,9 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
 
         public override Task Execute()
         {
-            throw new NotImplementedException();
+            Console.WriteLine("Mehtod not implemented!");
+
+            return Task.CompletedTask;
         }
     }
 }

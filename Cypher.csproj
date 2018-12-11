@@ -7,6 +7,12 @@
     <LangVersion>7.1</LangVersion>
   </PropertyGroup>
 
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
   <ItemGroup>
     <RdXmlFile Include="rd.xml" />
   </ItemGroup>
@@ -29,6 +35,8 @@
     <PackageReference Include="VaultSharp" Version="0.11.0" />
     <PackageReference Include="DotNetTor" Version="2.3.3" />
     <PackageReference Include="ReadablePassphrase" Version="1.1.2" />
+    <PackageReference Include="ShellProgressBar" Version="4.2.0" />
+    <PackageReference Include="Isopoh.Cryptography.SecureArray" Version="1.0.8" />
   </ItemGroup>
 
   <ItemGroup>

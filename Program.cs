@@ -1,4 +1,3 @@
-using System;
 using Microsoft.Extensions.DependencyInjection;
 using TangramCypher.ApplicationLayer.Actor;
 using TangramCypher.ApplicationLayer.Commands;
@@ -11,9 +10,6 @@ using Cypher.ApplicationLayer.Onion;
 using Microsoft.Extensions.Configuration;
 using System.IO;
 using McMaster.Extensions.CommandLineUtils;
-using Microsoft.Extensions.Logging.Console;
-using System.Reflection;
-using TangramCypher.ApplicationLayer.Commands.Exceptions;
 using Microsoft.Extensions.Hosting;
 
 namespace TangramCypher

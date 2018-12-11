@@ -1,5 +1,4 @@
 ﻿using Microsoft.Extensions.Hosting;
-using System;
 using System.Threading.Tasks;
 
 namespace Cypher.ApplicationLayer.Onion
