@@ -7,7 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
 {
-    [CommandDescriptor(new string[] { "wallet", "transfer" }, "Transfer funds")]
+    [CommandDescriptor(new string[] { "wallet", "chiper" }, "Transfer funds")]
     public class WalletChiperCommand : Command
     {
         readonly IActorService actorService;

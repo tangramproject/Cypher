@@ -37,7 +37,6 @@ namespace TangramCypher
                         .AddSingleton<IActorService, ActorService>()
                         .AddSingleton<IWalletService, WalletService>()
                         .AddTransient<ICryptography, Cryptography>()
-                        .AddSingleton<IVaultService, VaultService>()
                         .AddSingleton<IOnionService, OnionService>()
                         .AddSingleton<IVaultService, VaultService>()
                         .AddSingleton<ICommandService, CommandService>()
@@ -49,10 +48,10 @@ namespace TangramCypher
                         {
                             return sp.GetService<IVaultService>() as VaultService;
                         })
-                    .AddSingleton<IHostedService, CommandService>(sp =>
-                    {
-                        return sp.GetService<ICommandService>() as CommandService;
-                    });
+                        .AddSingleton<IHostedService, CommandService>(sp =>
+                        {
+                            return sp.GetService<ICommandService>() as CommandService;
+                        });
 
                     services.Add(new ServiceDescriptor(typeof(IConsole), PhysicalConsole.Singleton));
 
