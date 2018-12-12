@@ -216,7 +216,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
         public byte[] GetSharedKey(Span<byte> bobPk)
         {
-            SetSecretKey().GetAwaiter();
+            SetSecretKey().GetAwaiter().GetResult();
 
             using (var insecure = SecretKey().Insecure())
             {
@@ -532,6 +532,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             {
                 SecretKey(await walletService.GetStoreKey(Identifier(), From(), "SecretKey"));
 
+                return;
             }
             catch (Exception ex)
             {
