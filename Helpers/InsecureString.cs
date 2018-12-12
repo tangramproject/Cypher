@@ -56,7 +56,7 @@ namespace TangramCypher.Helpers
                 RuntimeHelpers.CleanupCode cleanup = delegate
                 {
                     if (insecurePointer != IntPtr.Zero)
-                        Marshal.ZeroFreeGlobalAllocUnicode(insecurePointer);
+                        Marshal.ZeroFreeBSTR(insecurePointer);
                 };
 
                 RuntimeHelpers.ExecuteCodeWithGuaranteedCleanup(code, cleanup, null);
