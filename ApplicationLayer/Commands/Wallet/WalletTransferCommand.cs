@@ -1,13 +1,11 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 using System.Threading.Tasks;
 using McMaster.Extensions.CommandLineUtils;
 using TangramCypher.ApplicationLayer.Vault;
 using Microsoft.Extensions.DependencyInjection;
 using TangramCypher.ApplicationLayer.Actor;
+using TangramCypher.Helpers;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
 {
@@ -15,32 +13,56 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
     public class WalletTransferCommand : Command
     {
         readonly IActorService actorService;
-        readonly IVaultService vaultService;
         readonly IConsole console;
+        readonly IVaultService vaultService;
 
         public WalletTransferCommand(IServiceProvider serviceProvider)
         {
             actorService = serviceProvider.GetService<IActorService>();
-            vaultService = serviceProvider.GetService<IVaultService>();
             console = serviceProvider.GetService<IConsole>();
+            vaultService = serviceProvider.GetService<IVaultService>();
         }
-
         public override async Task Execute()
         {
-            var identifier = Prompt.GetPassword("Identifier:", ConsoleColor.Yellow);
-            var password = Prompt.GetPassword("Password:", ConsoleColor.Yellow);
-            var amount = Prompt.GetString("Amount:", null, ConsoleColor.Red);
-            var address = Prompt.GetString("To:", null, ConsoleColor.Green);
+            try
+            {
+                var identifier = Prompt.GetPassword("Identifier:", ConsoleColor.Yellow).ToSecureString();
+                var password = Prompt.GetPassword("Password:", ConsoleColor.Yellow).ToSecureString();
+                var amount = Prompt.GetString("Amount:", null, ConsoleColor.Red);
+                var address = Prompt.GetString("To:", null, ConsoleColor.Green);
+                var yesNo = Prompt.GetYesNo("Send redemption key to message pool?", true, ConsoleColor.DarkRed);
 
-            var data = await vaultService.GetDataAsync(identifier, password, $"wallets/{identifier}/wallet");
-            var stroreKeys = JObject.FromObject(data.Data["storeKeys"]);
+                using (var insecureIdentifier = identifier.Insecure())
+                {
+                    using (var insecurePassword = password.Insecure())
+                    {
+                        await vaultService.GetDataAsync(insecureIdentifier.Value, insecurePassword.Value, $"wallets/{insecureIdentifier.Value}/wallet");
+                    }
+                }
+               
+                actorService.ReceivedMessage += ReceivedMessage;
 
-            actorService
-                .From(password)
-                .Secret(stroreKeys.GetValue("SecretKey").Value<string>())
-                .Amount(Convert.ToDouble(amount))
-                .To(address)
-                .SendPayment();
+                actorService
+                    .From(password)
+                    .Identifier(identifier)
+                    .Amount(Convert.ToDouble(amount))
+                    .To(address)
+                    .SendPayment(yesNo);
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+
+        private void ReceivedMessage(object sender, ReceivedMessageEventArgs e)
+        {
+            actorService.ReceivedMessage -= ReceivedMessage;
+
+            if (e.ThroughSystem)
+                console.WriteLine($"Redemption Chiper: {JsonConvert.SerializeObject(e.Message)}");
+            else
+                console.WriteLine($"Redemption key was delivered: {e.Message}");
         }
     }
 }

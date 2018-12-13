@@ -5,6 +5,6 @@ namespace TangramCypher.ApplicationLayer.Actor
         public string Key1;
         public string Key2;
         public string Memo;
-        public string Proof;
+        public string Stamp;
     }
 }

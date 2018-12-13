@@ -1,5 +1,4 @@
-﻿using System;
-namespace TangramCypher.ApplicationLayer.Actor
+﻿namespace TangramCypher.ApplicationLayer.Actor
 {
     public class TokenDto
     {

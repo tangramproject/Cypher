@@ -31,7 +31,7 @@ namespace TangramCypher.Helpers
             var key1 = Encoding.UTF8.GetString(base58).Substring(64, 128);
             var key2 = Encoding.UTF8.GetString(base58).Substring(128, 192);
 
-            return new RedemptionKeyDto() { Key1 = key1, Key2 = key1, Proof = proof }; ;
+            return new RedemptionKeyDto() { Key1 = key1, Key2 = key1, Stamp = proof }; ;
         }
 
         public static IEnumerable<string> Split(string str, int chunkSize)
@@ -102,6 +102,7 @@ namespace TangramCypher.Helpers
             return content;
         }
 
-
+        [CLSCompliant(false)]
+        public static InsecureString Insecure(this SecureString secureString) => new InsecureString(secureString);
     }
 }

@@ -1,15 +1,17 @@
-using System.Collections.Generic;
-using TangramCypher.Helpers.LibSodium;
+using System.Security;
+using System.Threading.Tasks;
+using TangramCypher.ApplicationLayer.Actor;
 
 namespace TangramCypher.ApplicationLayer.Wallet
 {
     public interface IWalletService
     {
-        ICryptography _cryptography { get; }
-        string _id { get; set; }
-        ICollection<PkSkDto> _store { get; set; }
+        Task<double> GetBalance(SecureString identifier, SecureString password);
+        SecureString Id { get; set; }
         PkSkDto CreatePkSk();
-        string NewID(int bytes = 32);
-        string Passphrase();
+        SecureString NewID(int bytes = 32);
+        SecureString Passphrase();
+        Task AddEnvelope(SecureString identifier, SecureString password, EnvelopeDto envelope);
+        Task<SecureString> GetStoreKey(SecureString identifier, SecureString password, string storeKey);
     }
 }

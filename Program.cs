@@ -1,4 +1,3 @@
-using System;
 using Microsoft.Extensions.DependencyInjection;
 using TangramCypher.ApplicationLayer.Actor;
 using TangramCypher.ApplicationLayer.Commands;
@@ -11,9 +10,6 @@ using Cypher.ApplicationLayer.Onion;
 using Microsoft.Extensions.Configuration;
 using System.IO;
 using McMaster.Extensions.CommandLineUtils;
-using Microsoft.Extensions.Logging.Console;
-using System.Reflection;
-using TangramCypher.ApplicationLayer.Commands.Exceptions;
 using Microsoft.Extensions.Hosting;
 
 namespace TangramCypher
@@ -41,7 +37,6 @@ namespace TangramCypher
                         .AddSingleton<IActorService, ActorService>()
                         .AddSingleton<IWalletService, WalletService>()
                         .AddTransient<ICryptography, Cryptography>()
-                        .AddSingleton<IVaultService, VaultService>()
                         .AddSingleton<IOnionService, OnionService>()
                         .AddSingleton<IVaultService, VaultService>()
                         .AddSingleton<ICommandService, CommandService>()
@@ -53,10 +48,10 @@ namespace TangramCypher
                         {
                             return sp.GetService<IVaultService>() as VaultService;
                         })
-                    .AddSingleton<IHostedService, CommandService>(sp =>
-                    {
-                        return sp.GetService<ICommandService>() as CommandService;
-                    });
+                        .AddSingleton<IHostedService, CommandService>(sp =>
+                        {
+                            return sp.GetService<ICommandService>() as CommandService;
+                        });
 
                     services.Add(new ServiceDescriptor(typeof(IConsole), PhysicalConsole.Singleton));
 
