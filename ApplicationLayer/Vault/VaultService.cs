@@ -125,7 +125,7 @@ namespace TangramCypher.ApplicationLayer.Vault
                 }
                 else
                 {
-                   logger.LogWarning("Shard file missing from disk.");
+                   logger.LogWarning("Unable to find Vault shard file.");
                 }
 
                 if (serviceTokenFile.Exists)
@@ -202,7 +202,7 @@ namespace TangramCypher.ApplicationLayer.Vault
 
         public async Task Init()
         {
-            logger.LogInformation("Starting Vault Init");
+            logger.LogInformation($"Initializing Vault with {secretThreshold} of {secretShares} secret shares.");
 
             var initResponse = await vaultClient.V1.System.InitAsync(new InitOptions
             {
@@ -214,18 +214,22 @@ namespace TangramCypher.ApplicationLayer.Vault
 
             var serviceShard = initResponse.MasterKeys.First();
 
-            logger.LogInformation("Writing Vault Shard");
+            logger.LogInformation("Writing Vault Shard to disk");
 
             File.WriteAllText(shardFile.FullName, serviceShard);
 
+            logger.LogInformation("Printing secret shares to User");
+
             WriteKeys(userKeys);
 
+            logger.LogInformation("Temporarily unsealing the Vault to continue setup process");
             //  Unseal Vault so we can create the policy.
             for (int i = 0; i < secretThreshold; ++i)
             {
                 await Unseal(initResponse.MasterKeys[i], true);
             }
 
+            logger.LogInformation("Logging in using root token");
             Login(initResponse.RootToken);
 
             await CreateVaultServicePolicyAsync();
@@ -233,13 +237,18 @@ namespace TangramCypher.ApplicationLayer.Vault
             serviceToken = await CreateVaultServiceToken(initResponse.RootToken);
             var vaultServiceSerialized = JsonConvert.SerializeObject(serviceToken);
 
+            logger.LogInformation("Writing Vault Service Token to disk");
             File.WriteAllText(serviceTokenFile.FullName, vaultServiceSerialized);
 
             await CreateTemplatedWalletPolicyAsync();
             await EnableUserpassAuth();
+
+            logger.LogInformation("Revoking root token");
             await RevokeToken(initResponse.RootToken);
 
             //  Reseal the Vault.
+
+            logger.LogInformation("Sealing the Vault");
             await Seal();
 
             //  Partially unseal using the stored shard
@@ -248,6 +257,8 @@ namespace TangramCypher.ApplicationLayer.Vault
 
         private async Task EnableUserpassAuth()
         {
+            logger.LogInformation("Enabling Userpass Auth");
+
             await vaultClient.V1.System.MountAuthBackendAsync(new VaultSharp.V1.AuthMethods.AuthMethod()
             {
                 Path = "userpass",
@@ -301,6 +312,7 @@ namespace TangramCypher.ApplicationLayer.Vault
 
         private async Task<VaultTokenCreateResponseAuth> CreateVaultServiceToken(string authToken)
         {
+            logger.LogInformation("Creating Vault Service Token");
             return await CreateToken(authToken, new List<string> { "servicepolicy" });
         }
 
@@ -375,6 +387,7 @@ namespace TangramCypher.ApplicationLayer.Vault
 
         private async Task CreateVaultServicePolicyAsync()
         {
+            logger.LogInformation("Creating Vault Service Policy");
             console.ResetColor();
             console.WriteLine("Creating Vault Service Policy");
 
@@ -404,6 +417,7 @@ namespace TangramCypher.ApplicationLayer.Vault
         private async Task CreateTemplatedWalletPolicyAsync()
         {
             console.ResetColor();
+            logger.LogInformation("Creating Templated Wallet Policy");
             console.WriteLine("Creating Templated Wallet Policy");
 
             dynamic policy = new JObject();
