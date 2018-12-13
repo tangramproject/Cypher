@@ -148,7 +148,7 @@ namespace TangramCypher.ApplicationLayer.Vault
 
             vaultProcess = new Process();
             vaultProcess.StartInfo.FileName = vaultExecutable.FullName;
-            vaultProcess.StartInfo.Arguments = $"server -config vault.json";
+            vaultProcess.StartInfo.Arguments = $"server -config {tangramDirectory.FullName}vault.json";
             vaultProcess.StartInfo.UseShellExecute = false;
             vaultProcess.StartInfo.CreateNoWindow = true;
             vaultProcess.StartInfo.RedirectStandardOutput = true;

@@ -43,13 +43,21 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                     var pk = Utilities.HexToBinary(insecurePk.Value);
                     var sharedKey = actorService.GetSharedKey(pk);
                     var notificationAddress = cryptography.GenericHashWithKey(Utilities.BinaryToHex(pk.ToArray()), sharedKey);
-                    var message = await actorService.GetMessageAsync(Utilities.BinaryToHex(notificationAddress), new CancellationToken());
 
-                    using (var insecureSk = actorService.SecretKey().Insecure())
+                    try
                     {
-                        var redemptionKey = cryptography.OpenBoxSeal(Convert.FromBase64String(message.Chiper), new KeyPair(pk.ToArray(), Utilities.HexToBinary(insecureSk.Value)));
+                        var message = await actorService.GetMessageAsync(Utilities.BinaryToHex(notificationAddress), new CancellationToken());
 
-                        actorService.ReceivePayment(redemptionKey);
+                        using (var insecureSk = actorService.SecretKey().Insecure())
+                        {
+                            var redemptionKey = cryptography.OpenBoxSeal(Convert.FromBase64String(message.Chiper), new KeyPair(pk.ToArray(), Utilities.HexToBinary(insecureSk.Value)));
+
+                            actorService.ReceivePayment(redemptionKey);
+                        }
+                    }
+                    catch (Exception e)
+                    {
+
                     }
                 }
 
