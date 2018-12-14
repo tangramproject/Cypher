@@ -111,25 +111,36 @@ namespace TangramCypher.ApplicationLayer.Vault
             {
                 StartVaultProcess();
             }
+        }
+
+        private async Task ContinueInitialization()
+        {
+            logger.LogInformation("Checking Vault Init Status");
 
             if (!await vaultClient.V1.System.GetInitStatusAsync())
             {
+                logger.LogInformation("Vault not Initialized... Initializing");
+
                 await Init();
             }
             else
             {
                 if (shardFile.Exists)
                 {
+                    logger.LogInformation("Shard file exists");
+
                     shard = await File.ReadAllTextAsync(shardFile.FullName);
                     await Unseal(shard);
                 }
                 else
                 {
-                   logger.LogWarning("Unable to find Vault shard file.");
+                    logger.LogWarning("Unable to find Vault shard file.");
                 }
 
                 if (serviceTokenFile.Exists)
                 {
+                    logger.LogInformation("Service token file exists");
+
                     var serviceTokenJson = await File.ReadAllTextAsync(serviceTokenFile.FullName);
                     serviceToken = JsonConvert.DeserializeObject<VaultTokenCreateResponseAuth>(serviceTokenJson);
 
@@ -142,7 +153,7 @@ namespace TangramCypher.ApplicationLayer.Vault
             }
         }
 
-        private void StartVaultProcess()
+        private async Task StartVaultProcess()
         {
             logger.LogInformation($"WorkingDirectory: {tangramDirectory.FullName}");
 
@@ -152,7 +163,7 @@ namespace TangramCypher.ApplicationLayer.Vault
             vaultProcess.StartInfo.UseShellExecute = false;
             vaultProcess.StartInfo.CreateNoWindow = true;
             vaultProcess.StartInfo.RedirectStandardOutput = true;
-            vaultProcess.OutputDataReceived += (sender, e) =>
+            vaultProcess.OutputDataReceived += async (sender, e) =>
             {
                 if (!string.IsNullOrEmpty(e.Data))
                 {
@@ -167,6 +178,8 @@ namespace TangramCypher.ApplicationLayer.Vault
                         console.ResetColor();
                         console.WriteLine("Vault Server Started!");
                         logger.LogInformation("Vault Server Started!");
+
+                        await ContinueInitialization();
                     }
                 }
             };
@@ -223,6 +236,7 @@ namespace TangramCypher.ApplicationLayer.Vault
             WriteKeys(userKeys);
 
             logger.LogInformation("Temporarily unsealing the Vault to continue setup process");
+
             //  Unseal Vault so we can create the policy.
             for (int i = 0; i < secretThreshold; ++i)
             {

@@ -1,5 +1,8 @@
 ﻿<Directives xmlns="http://schemas.microsoft.com/netfx/2013/01/metadata">
   <Application>
+
+    <Assembly Name="System.Runtime" Dynamic="Required All" />
+    
     <Assembly Name="McMaster.Extensions.CommandLineUtils" Dynamic="Required All" />
     <Assembly Name="Microsoft.Extensions.Configuration.CommandLine" Dynamic="Required All" />
     <Assembly Name="Microsoft.Extensions.Configuration.FileExtensions" Dynamic="Required All" />
@@ -28,10 +31,12 @@
       <Type Name="Microsoft.Extensions.Options.OptionsManager`1[[Microsoft.Extensions.Hosting.ConsoleLifetimeOptions,Microsoft.Extensions.Hosting]]" Dynamic="Required All" />
     </Assembly>
 
+    <Assembly Name="System.Linq.Expressions" Activate="Required All" />
+    
     <Assembly Name="System.IO" Dynamic="Required All" />
 
-    <Assembly Name="System.Reflection" Dynamic="Required All">
-      <Type Name="System.Reflection.Assembly" Dynamic="Required All" />
+    <Assembly Name="System.Linq.Expressions">
+      <Type Name="System.Linq.Expressions.ExpressionCreator`1[[System.Func`2[[System.Object,System.Private.CoreLib],[System.Object,System.Private.CoreLib]],System.Private.CoreLib]]" Dynamic="Required All" />
     </Assembly>
     
     <Assembly Name="Microsoft.Extensions.Logging.Console" Dynamic="Required All" />
