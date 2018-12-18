@@ -12,6 +12,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
 using DotNetTor.SocksPort;
+using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
@@ -34,6 +35,7 @@ namespace Cypher.ApplicationLayer.Onion
         readonly ICryptography cryptography;
         readonly IConfigurationSection onionSection;
         readonly ILogger logger;
+        readonly IConsole console;
         readonly string socksHost;
         readonly int socksPort;
         readonly string controlHost;
@@ -48,12 +50,13 @@ namespace Cypher.ApplicationLayer.Onion
 
         public bool OnionStarted { get; private set; }
 
-        public OnionService(ICryptography cryptography, IConfiguration configuration, ILogger logger)
+        public OnionService(ICryptography cryptography, IConfiguration configuration, ILogger logger, IConsole console)
         {
             this.cryptography = cryptography;
             onionSection = configuration.GetSection(ONION);
 
             this.logger = logger;
+            this.console = console;
 
             socksHost = onionSection.GetValue<string>(SOCKS_HOST);
             socksPort = onionSection.GetValue<int>(SOCKS_PORT);
@@ -119,7 +122,7 @@ namespace Cypher.ApplicationLayer.Onion
             }
             catch (DotNetTor.TorException ex)
             {
-                Console.WriteLine(ex.Message);
+                console.WriteLine(ex.Message);
             }
         }
 
@@ -136,7 +139,28 @@ namespace Cypher.ApplicationLayer.Onion
             TorProcess = Process.Start(torProcessStartInfo);
 
             var sOut = TorProcess.StandardOutput;
-            var result = Regex.Replace(sOut.ReadToEnd(), Environment.NewLine, string.Empty);
+
+            var raw = sOut.ReadToEnd();
+
+            var lines = raw.Split(Environment.NewLine);
+
+            string result = string.Empty;
+
+            //  If it's multi-line use the last non-empty line.
+            //  We don't want to pull in potential warnings.
+            if(lines.Length > 1)
+            {
+                var rlines = lines.Reverse();
+                foreach(var line in rlines)
+                {
+                    if (!string.IsNullOrWhiteSpace(line))
+                    {
+                        result = Regex.Replace(line, Environment.NewLine, string.Empty);
+                        logger.LogInformation($"Hopefully password line: {line}");
+                        break;
+                    }
+                }
+            }
 
             if (!TorProcess.HasExited)
             {
@@ -171,7 +195,7 @@ namespace Cypher.ApplicationLayer.Onion
             }
             catch (DotNetTor.TorException ex)
             {
-                Console.WriteLine(ex.Message);
+                console.WriteLine(ex.Message);
             }
         }
 
@@ -391,7 +415,7 @@ namespace Cypher.ApplicationLayer.Onion
 
         protected override async Task ExecuteAsync(CancellationToken cancellationToken)
         {
-            Console.WriteLine("Starting Onion Service");
+            console.WriteLine("Starting Onion Service");
             logger.LogInformation("Starting Onion Service");
 
             StartOnion(GenerateHashPassword("ILoveTangram"));
