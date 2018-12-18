@@ -168,7 +168,7 @@ namespace TangramCypher.ApplicationLayer.Vault
                 if (!string.IsNullOrEmpty(e.Data))
                 {
                     logger.LogInformation(e.Data);
-                    console.WriteLine(e.Data);
+                    console.Write(e.Data);
                 }
 
                 if (e != null && e.Data != null)
@@ -190,9 +190,7 @@ namespace TangramCypher.ApplicationLayer.Vault
 
         public async Task Unseal(string shard, bool skipPrint = false)
         {
-            var unsealTask = await vaultClient.V1.System.UnsealAsync(shard);
-
-            var response = unsealTask;
+            var response = await PutAsJsonAsync<SealStatus>(new VaultUnsealRequest { key = shard, reset = false }, "/v1/sys/unseal");
 
             if (!response.Sealed && !skipPrint)
             {
@@ -210,7 +208,7 @@ namespace TangramCypher.ApplicationLayer.Vault
         public async Task RevokeToken(string token)
         {
             console.WriteLine("Revoking Root Token");
-            await vaultClient.V1.System.RevokeLeaseAsync(token);
+            var response = await PutAsJsonAsync<string>(new VaultLeaseRevokeRequest { lease_id = token }, "/v1/sys/leases/revoke", token);
         }
 
         public async Task Init()
@@ -246,7 +244,7 @@ namespace TangramCypher.ApplicationLayer.Vault
             logger.LogInformation("Logging in using root token");
             Login(initResponse.RootToken);
 
-            await CreateVaultServicePolicyAsync();
+            await CreateVaultServicePolicyAsync(initResponse.RootToken);
 
             serviceToken = await CreateVaultServiceToken(initResponse.RootToken);
             var vaultServiceSerialized = JsonConvert.SerializeObject(serviceToken);
@@ -254,7 +252,7 @@ namespace TangramCypher.ApplicationLayer.Vault
             logger.LogInformation("Writing Vault Service Token to disk");
             File.WriteAllText(serviceTokenFile.FullName, vaultServiceSerialized);
 
-            await CreateTemplatedWalletPolicyAsync();
+            await CreateTemplatedWalletPolicyAsync(initResponse.RootToken);
             await EnableUserpassAuth();
 
             logger.LogInformation("Revoking root token");
@@ -326,14 +324,24 @@ namespace TangramCypher.ApplicationLayer.Vault
 
         private async Task<VaultTokenCreateResponseAuth> CreateVaultServiceToken(string authToken)
         {
+            if (string.IsNullOrEmpty(authToken))
+            {
+                throw new ArgumentNullException(nameof(authToken));
+            }
+
             logger.LogInformation("Creating Vault Service Token");
             return await CreateToken(authToken, new List<string> { "servicepolicy" });
         }
 
-        private static async Task<T> PostAsJsonAsync<T>(object obj, string requestUri, string authToken = null)
+        private async Task<T> PostAsJsonAsync<T>(object obj, string requestUri, string authToken = null)
         {
+            var baseUri = new Uri(endpoint);
+            var uri = new Uri(baseUri, requestUri);
+
             using (var client = new HttpClient())
             {
+                logger.LogInformation($"PostAsJsonAsync {requestUri}");
+
                 if (!string.IsNullOrEmpty(authToken))
                     client.DefaultRequestHeaders.Add("X-Vault-Token", authToken);
 
@@ -341,9 +349,11 @@ namespace TangramCypher.ApplicationLayer.Vault
 
                 string json = JsonConvert.SerializeObject(obj, Formatting.None);
 
+                logger.LogInformation($"POST {json} to {requestUri}");
+
                 var httpContent = new StringContent(json, Encoding.UTF8, "application/json");
 
-                var response = await client.PostAsync(requestUri, httpContent);
+                var response = await client.PostAsync(uri, httpContent);
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -356,8 +366,45 @@ namespace TangramCypher.ApplicationLayer.Vault
             }
         }
 
-        private static async Task<T> GetAsJsonAsync<T>(string requestUri, string authToken = null)
+        private async Task<T> PutAsJsonAsync<T>(object obj, string requestUri, string authToken = null)
         {
+            var baseUri = new Uri(endpoint);
+            var uri = new Uri(baseUri, requestUri);
+
+            using (var client = new HttpClient())
+            {
+                logger.LogInformation($"PutAsJsonAsync {requestUri}");
+
+                if (!string.IsNullOrEmpty(authToken))
+                    client.DefaultRequestHeaders.Add("X-Vault-Token", authToken);
+
+                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+                string json = JsonConvert.SerializeObject(obj, Formatting.None);
+
+                logger.LogInformation($"PUT {json} to {requestUri}");
+
+                var httpContent = new StringContent(json, Encoding.UTF8, "application/json");
+
+                var response = await client.PutAsync(uri, httpContent);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var content = await response.Content.ReadAsStringAsync();
+
+                    return JsonConvert.DeserializeObject<T>(content);
+                }
+
+                throw new Exception($"Error: server returned status code {response.StatusCode}");
+            }
+        }
+
+
+        private async Task<T> GetAsJsonAsync<T>(string requestUri, string authToken = null)
+        {
+            var baseUri = new Uri(endpoint);
+            var uri = new Uri(baseUri, requestUri);
+
             using (var client = new HttpClient())
             {
                 if (!string.IsNullOrEmpty(authToken))
@@ -365,7 +412,7 @@ namespace TangramCypher.ApplicationLayer.Vault
 
                 client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
-                var response = await client.GetAsync(requestUri);
+                var response = await client.GetAsync(uri);
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -385,67 +432,125 @@ namespace TangramCypher.ApplicationLayer.Vault
                 throw new ArgumentNullException(nameof(authToken));
             }
 
-            var baseUri = new Uri(endpoint);
-            var uri = new Uri(baseUri, "/v1/auth/token/create");
-
-            dynamic token = new
+            var request = new VaultTokenCreateRequest
             {
-                policies,
+                policies = policies,
                 renewable = true
             };
 
-            var response = await PostAsJsonAsync<VaultTokenCreateResponse>(token, uri.ToString(), authToken);
+            console.WriteLine("Created dynamic token");
+
+            var response = await PostAsJsonAsync<VaultTokenCreateResponse>(request, "/v1/auth/token/create", authToken);
 
             return response.auth;
         }
 
-        private async Task CreateVaultServicePolicyAsync()
+        private async Task CreateVaultServicePolicyAsync(string rootToken)
         {
             logger.LogInformation("Creating Vault Service Policy");
             console.ResetColor();
             console.WriteLine("Creating Vault Service Policy");
 
-            dynamic policy = new JObject();
+            //dynamic policy = new JObject();
 
-            policy.path = new JObject();
-            policy.path["auth/userpass/users/*"] = new JObject();
-            policy.path["auth/userpass/users/*"]["capabilities"] = new JArray(new string[] { "create", "list" });
+            //policy.path = new JObject();
+            //policy.path["auth/userpass/users/*"] = new JObject();
+            //policy.path["auth/userpass/users/*"]["capabilities"] = new JArray(new string[] { "create", "list" });
 
-            policy.path["identity/*"] = new JObject();
-            policy.path["identity/*"]["capabilities"] = new JArray(new string[] { "create", "update" });
+            //policy.path["identity/*"] = new JObject();
+            //policy.path["identity/*"]["capabilities"] = new JArray(new string[] { "create", "update" });
 
-            policy.path["secret/wallets/*"] = new JObject();
-            policy.path["secret/wallets/*"]["capabilities"] = new JArray(new string[] { "list" });
+            //policy.path["secret/wallets/*"] = new JObject();
+            //policy.path["secret/wallets/*"]["capabilities"] = new JArray(new string[] { "list" });
 
-            policy.path["secret/data/wallets/*"] = new JObject();
-            policy.path["secret/data/wallets/*"]["capabilities"] = new JArray(new string[] { "list" });
+            //policy.path["secret/data/wallets/*"] = new JObject();
+            //policy.path["secret/data/wallets/*"]["capabilities"] = new JArray(new string[] { "list" });
 
-            policy.path["sys/auth"] = new JObject();
-            policy.path["sys/auth"]["capabilities"] = new JArray(new string[] { "read" });
+            //policy.path["sys/auth"] = new JObject();
+            //policy.path["sys/auth"]["capabilities"] = new JArray(new string[] { "read" });
 
-            var policyJSON = policy.ToString(Formatting.None);
+            logger.LogInformation("Creating Policy object");
 
-            await vaultClient.V1.System.WritePolicyAsync(new Policy { Name = "servicepolicy", Rules = policyJSON });
+            var p = "{" +
+                "\r\n  \"path\": {" +
+                "\r\n    \"auth/userpass/users/*\": {" +
+                "\r\n      \"capabilities\": [" +
+                "\r\n        \"create\"," +
+                "\r\n        \"list\"" +
+                "\r\n      ]" +
+                "\r\n    }," +
+                "\r\n    \"identity/*\": {" +
+                "\r\n      \"capabilities\": [" +
+                "\r\n        \"create\"," +
+                "\r\n        \"update\"" +
+                "\r\n      ]" +
+                "\r\n    }," +
+                "\r\n    \"secret/wallets/*\": {" +
+                "\r\n      \"capabilities\": [" +
+                "\r\n        \"list\"" +
+                "\r\n      ]" +
+                "\r\n    }," +
+                "\r\n    \"secret/data/wallets/*\": {" +
+                "\r\n      \"capabilities\": [" +
+                "\r\n        \"list\"" +
+                "\r\n      ]" +
+                "\r\n    }," +
+                "\r\n    \"sys/auth\": {" +
+                "\r\n      \"capabilities\": [" +
+                "\r\n        \"read\"" +
+                "\r\n      ]" +
+                "\r\n    }" +
+                "\r\n  }" +
+                "\r\n}";
+
+            var data = new VaultPolicyCreateRequest { policy = p };
+
+            logger.LogInformation("Created Policy object");
+
+            var response = await PutAsJsonAsync<string>(data, "/v1/sys/policy/servicepolicy", rootToken);
         }
 
-        private async Task CreateTemplatedWalletPolicyAsync()
+        private async Task CreateTemplatedWalletPolicyAsync(string rootToken)
         {
             console.ResetColor();
             logger.LogInformation("Creating Templated Wallet Policy");
             console.WriteLine("Creating Templated Wallet Policy");
 
-            dynamic policy = new JObject();
+            //dynamic policy = new JObject();
 
-            policy.path = new JObject();
-            policy.path["secret/wallets/{{identity.entity.name}}/*"] = new JObject();
-            policy.path["secret/wallets/{{identity.entity.name}}/*"]["capabilities"] = new JArray(new string[] { "create", "read", "update", "delete", "list" });
+            //policy.path = new JObject();
+            //policy.path["secret/wallets/{{identity.entity.name}}/*"] = new JObject();
+            //policy.path["secret/wallets/{{identity.entity.name}}/*"]["capabilities"] = new JArray(new string[] { "create", "read", "update", "delete", "list" });
 
-            policy.path["secret/data/wallets/{{identity.entity.name}}/*"] = new JObject();
-            policy.path["secret/data/wallets/{{identity.entity.name}}/*"]["capabilities"] = new JArray(new string[] { "create", "read", "update", "delete", "list" }); ;
+            //policy.path["secret/data/wallets/{{identity.entity.name}}/*"] = new JObject();
+            //policy.path["secret/data/wallets/{{identity.entity.name}}/*"]["capabilities"] = new JArray(new string[] { "create", "read", "update", "delete", "list" }); ;
 
-            var policyJSON = policy.ToString(Formatting.None);
+            var p = "{" +
+                "\r\n  \"path\": {" +
+                "\r\n    \"secret/wallets/{{identity.entity.name}}/*\": {" +
+                "\r\n      \"capabilities\": [" +
+                "\r\n        \"create\"," +
+                "\r\n        \"read\"," +
+                "\r\n        \"update\"," +
+                "\r\n        \"delete\"," +
+                "\r\n        \"list\"" +
+                "\r\n      ]" +
+                "\r\n    }," +
+                "\r\n    \"secret/data/wallets/{{identity.entity.name}}/*\": {" +
+                "\r\n      \"capabilities\": [" +
+                "\r\n        \"create\"," +
+                "\r\n        \"read\"," +
+                "\r\n        \"update\"," +
+                "\r\n        \"delete\"," +
+                "\r\n        \"list\"" +
+                "\r\n      ]" +
+                "\r\n    }" +
+                "\r\n  }" +
+                "\r\n}";
 
-            await vaultClient.V1.System.WritePolicyAsync(new Policy { Name = "walletpolicy", Rules = policyJSON });
+            var data = new VaultPolicyCreateRequest { policy = p };
+
+            var response = await PutAsJsonAsync<string>(data, "/v1/sys/policy/walletpolicy", rootToken);
         }
 
         public async Task CreateUserAsync(string username, string password)
@@ -460,31 +565,25 @@ namespace TangramCypher.ApplicationLayer.Vault
                 throw new ArgumentNullException(nameof(password));
             }
 
-            var baseUri = new Uri(endpoint);
-            var userUri = new Uri(baseUri, $"v1/auth/userpass/users/{username}").ToString();
+            await PostAsJsonAsync<object>(new { password }, $"v1/auth/userpass/users/{username}", serviceToken.client_token);
 
-            await PostAsJsonAsync<object>(new { password }, userUri, serviceToken.client_token);
-
-            var identityEntityUri = new Uri(baseUri, $"v1/identity/entity").ToString();
             var identityCreateResponse = await PostAsJsonAsync<VaultIdentityEntityCreateResponse>(
                 new { name = username,
                       policies = new string[] { "walletpolicy" }
-                }, 
-                identityEntityUri, 
+                },
+                $"v1/identity/entity", 
                 serviceToken.client_token);
 
-            var authUri = new Uri(baseUri, $"v1/sys/auth").ToString();
-            var authResponse = await GetAsJsonAsync<JObject>(authUri, serviceToken.client_token);
+            var authResponse = await GetAsJsonAsync<JObject>($"v1/sys/auth", serviceToken.client_token);
 
             var accesor = authResponse["userpass/"]["accessor"].Value<string>();
 
             var entityId = identityCreateResponse.data.id;
 
-            var identityAliasUri = new Uri(baseUri, $"v1/identity/entity-alias").ToString();
             var identityAliasCreateResponse = await PostAsJsonAsync<object>(new { name = username,
                                                                                   canonical_id = entityId,
-                                                                                  mount_accessor = accesor }, 
-                                                                            identityAliasUri, 
+                                                                                  mount_accessor = accesor },
+                                                                            $"v1/identity/entity-alias", 
                                                                             serviceToken.client_token);
         }
 
