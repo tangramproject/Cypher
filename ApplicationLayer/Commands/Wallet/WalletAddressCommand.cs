@@ -11,7 +11,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
 
         public override Task Execute()
         {
-            Console.WriteLine("Mehtod not implemented!");
+            Console.WriteLine("Method not implemented!");
 
             return Task.CompletedTask;
         }
