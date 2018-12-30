@@ -1,15 +1,19 @@
 using Microsoft.Extensions.Hosting;
+using Newtonsoft.Json.Linq;
 using System;
+using System.Security;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Cypher.ApplicationLayer.Onion
 {
     public interface IOnionService : IHostedService
     {
-        Task<string> GetAsync(string url, object data);
-        void ChangeCircuit(string password);
-        string GenerateHashPassword(string password);
-        Task<T> PostAsync<T>(string url, object data) where T : class, new();
-        void StartOnion(string password);
+        Task<T> ClientGetAsync<T>(Uri baseAddress, string path, CancellationToken cancellationToken);
+        Task<JObject> ClientPostAsync<T>(T payload, Uri baseAddress, string path, CancellationToken cancellationToken);
+        void ChangeCircuit(SecureString password);
+        void GenerateHashPassword(SecureString password);
+        void SendCommands(string command, SecureString password);
+        void StartOnion();
     }
 }

@@ -6,16 +6,16 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Runtime.InteropServices;
+using System.Security;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Web;
-using DotNetTor.SocksPort;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using TangramCypher.ApplicationLayer;
 using TangramCypher.Helpers;
 using TangramCypher.Helpers.LibSodium;
@@ -31,6 +31,9 @@ namespace Cypher.ApplicationLayer.Onion
         const string CONTROL_HOST = "onion_control_host";
         const string CONTROL_PORT = "onion_control_port";
         const string HASHED_CONTROL_PASSWORD = "onion_hashed_control_password";
+        const string HIDDEN_SERVICE_PORT = "onion_hidden_service_port";
+
+        private static readonly DirectoryInfo tangramDirectory = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
 
         readonly ICryptography cryptography;
         readonly IConfigurationSection onionSection;
@@ -43,6 +46,8 @@ namespace Cypher.ApplicationLayer.Onion
         readonly string onionDirectory;
         readonly string torrcPath;
         readonly string controlPortPath;
+        readonly string hiddenServicePath;
+        readonly string hiddenServicePort;
 
         string hashedPassword;
 
@@ -62,63 +67,66 @@ namespace Cypher.ApplicationLayer.Onion
             socksPort = onionSection.GetValue<int>(SOCKS_PORT);
             controlHost = onionSection.GetValue<string>(CONTROL_HOST);
             controlPort = onionSection.GetValue<int>(CONTROL_PORT);
+            hiddenServicePort = onionSection.GetValue<string>(HIDDEN_SERVICE_PORT);
 
             onionDirectory = Path.Combine(Path.GetDirectoryName(AppDomain.CurrentDomain.BaseDirectory), ONION);
             torrcPath = Path.Combine(onionDirectory, TORRC);
             controlPortPath = Path.Combine(onionDirectory, "control-port");
+            hiddenServicePath = Path.Combine(onionDirectory, "hidden_service");
         }
 
-        public async Task<string> GetAsync(string url, object data)
+        public async Task<T> ClientGetAsync<T>(Uri baseAddress, string path, CancellationToken cancellationToken)
         {
-            if (string.IsNullOrEmpty(url))
+            if (baseAddress == null)
             {
-                throw new ArgumentException("Url cannot be null or empty!", nameof(url));
+                throw new ArgumentNullException(nameof(baseAddress));
             }
 
-            if (data == null)
+            if (string.IsNullOrEmpty(path))
             {
-                throw new ArgumentNullException(nameof(data));
+                throw new ArgumentException("Path is missing!", nameof(path));
+            }
+
+            using (var client = new HttpClient())
+            {
+                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
+
+                client.BaseAddress = baseAddress;
+                client.DefaultRequestHeaders.Accept.Clear();
+                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+                using (var request = new HttpRequestMessage(HttpMethod.Get, path))
+                using (var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
+                {
+                    var stream = await response.Content.ReadAsStreamAsync();
+
+                    if (response.IsSuccessStatusCode)
+                        return Util.DeserializeJsonFromStream<T>(stream);
+
+                    var content = await Util.StreamToStringAsync(stream);
+                    throw new ApiException
+                    {
+                        StatusCode = (int)response.StatusCode,
+                        Content = content
+                    };
+                }
+            }
+        }
+
+        public void ChangeCircuit(SecureString password)
+        {
+            if (password == null)
+            {
+                throw new ArgumentNullException(nameof(password));
             }
 
             try
             {
-                using (var httpClient = new HttpClient(new SocksPortHandler(socksHost, socksPort)))
+                using (var insecurePassword = password.Insecure())
                 {
-                    string requestUrl = $"{url}?{GetQueryString(data)}";
-
-                    logger.LogInformation($"GetAsync Start, requestUrl:{requestUrl}");
-
-                    var response = await httpClient.GetAsync(requestUrl).ConfigureAwait(false);
-                    string result = await response.Content.ReadAsStringAsync();
-
-                    logger.LogInformation($"GetAsync End, requestUrl:{requestUrl}, HttpStatusCode:{response.StatusCode}, result:{result}");
-
-                    return result;
+                    var controlPortClient = new DotNetTor.ControlPort.Client(controlHost, controlPort, insecurePassword.Value);
+                    controlPortClient.ChangeCircuitAsync().Wait();
                 }
-
-            }
-            catch (WebException ex)
-            {
-                if (ex.Response != null)
-                {
-                    string responseContent = new StreamReader(ex.Response.GetResponseStream()).ReadToEnd();
-                    throw new Exception($"Response :{responseContent}", ex);
-                }
-                throw;
-            }
-        }
-
-        public void ChangeCircuit(string password)
-        {
-            if (string.IsNullOrEmpty(password))
-            {
-                throw new ArgumentException("Password cannot be null or empty!", nameof(password));
-            }
-
-            try
-            {
-                var controlPortClient = new DotNetTor.ControlPort.Client(controlHost, controlPort, password);
-                controlPortClient.ChangeCircuitAsync().Wait();
             }
             catch (DotNetTor.TorException ex)
             {
@@ -126,72 +134,76 @@ namespace Cypher.ApplicationLayer.Onion
             }
         }
 
-        public string GenerateHashPassword(string password)
+        public void GenerateHashPassword(SecureString password)
         {
-            var torProcessStartInfo = new ProcessStartInfo(GetTorFileName())
+            using (var insecurePassword = password.Insecure())
             {
-                Arguments = $"--hash-password {password}",
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true
-            };
-
-            TorProcess = Process.Start(torProcessStartInfo);
-
-            var sOut = TorProcess.StandardOutput;
-
-            var raw = sOut.ReadToEnd();
-
-            var lines = raw.Split(Environment.NewLine);
-
-            string result = string.Empty;
-
-            //  If it's multi-line use the last non-empty line.
-            //  We don't want to pull in potential warnings.
-            if(lines.Length > 1)
-            {
-                var rlines = lines.Reverse();
-                foreach(var line in rlines)
+                var torProcessStartInfo = new ProcessStartInfo(GetTorFileName())
                 {
-                    if (!string.IsNullOrWhiteSpace(line))
+                    Arguments = $"--hash-password {password}",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true
+                };
+
+                TorProcess = Process.Start(torProcessStartInfo);
+
+                var sOut = TorProcess.StandardOutput;
+
+                var raw = sOut.ReadToEnd();
+
+                var lines = raw.Split(Environment.NewLine);
+
+                string result = string.Empty;
+
+                //  If it's multi-line use the last non-empty line.
+                //  We don't want to pull in potential warnings.
+                if (lines.Length > 1)
+                {
+                    var rlines = lines.Reverse();
+                    foreach (var line in rlines)
                     {
-                        result = Regex.Replace(line, Environment.NewLine, string.Empty);
-                        logger.LogInformation($"Hopefully password line: {line}");
-                        break;
+                        if (!string.IsNullOrWhiteSpace(line))
+                        {
+                            result = Regex.Replace(line, Environment.NewLine, string.Empty);
+                            logger.LogInformation($"Hopefully password line: {line}");
+                            break;
+                        }
                     }
                 }
+
+                if (!TorProcess.HasExited)
+                {
+                    TorProcess.Kill();
+                }
+
+                sOut.Close();
+                TorProcess.Close();
+                TorProcess = null;
+
+                hashedPassword = Regex.Match(result, "16:[0-9A-F]+")?.Value ?? string.Empty;
             }
-
-            if (!TorProcess.HasExited)
-            {
-                TorProcess.Kill();
-            }
-
-            sOut.Close();
-            TorProcess.Close();
-            TorProcess = null;
-
-            hashedPassword = Regex.Match(result, "16:[0-9A-F]+")?.Value ?? string.Empty;
-
-            return password;
         }
 
-        void SendCommands(string command, string password)
+        public void SendCommands(string command, SecureString password)
         {
             if (string.IsNullOrEmpty(command))
             {
                 throw new ArgumentException("Command cannot be null or empty!", nameof(command));
             }
 
-            if (string.IsNullOrEmpty(password))
+            if (password == null)
             {
-                throw new ArgumentException("Password cannot be null or empty!", nameof(password));
+                throw new ArgumentNullException(nameof(password));
             }
 
             try
             {
-                var controlPortClient = new DotNetTor.ControlPort.Client(controlHost, controlPort, password);
-                var result = controlPortClient.SendCommandAsync(command).GetAwaiter().GetResult();
+                using (var insecurePassword = password.Insecure())
+                {
+                    var controlPortClient = new DotNetTor.ControlPort.Client(controlHost, controlPort, insecurePassword.Value);
+                    var result = controlPortClient.SendCommandAsync(command).GetAwaiter().GetResult();
+                }
             }
             catch (DotNetTor.TorException ex)
             {
@@ -199,117 +211,70 @@ namespace Cypher.ApplicationLayer.Onion
             }
         }
 
-        public async Task<T> PostAsync<T>(string url, object data) where T : class, new()
+        public async Task<JObject> ClientPostAsync<T>(T payload, Uri baseAddress, string path, CancellationToken cancellationToken)
         {
-            if (string.IsNullOrEmpty(url))
+            if (!Equals(payload, default(T)))
             {
-                throw new ArgumentException("Url cannot be null or empty!", nameof(url));
+                throw new ArgumentNullException(nameof(payload));
             }
 
-            try
+            if (baseAddress == null)
             {
-                using (var httpClient = new HttpClient(new SocksPortHandler(socksHost, socksPort)))
+                throw new ArgumentNullException(nameof(baseAddress));
+            }
+
+            if (string.IsNullOrEmpty(path))
+            {
+                throw new ArgumentException("Path is missing!", nameof(path));
+            }
+
+            using (var client = new HttpClient())
+            {
+                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
+
+                client.BaseAddress = baseAddress;
+                client.DefaultRequestHeaders.Accept.Clear();
+                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+                using (var request = new HttpRequestMessage(HttpMethod.Post, path))
                 {
-                    string content = JsonConvert.SerializeObject(data);
+                    var content = JsonConvert.SerializeObject(payload, Formatting.Indented);
                     var buffer = Encoding.UTF8.GetBytes(content);
-                    var byteContent = new ByteArrayContent(buffer);
 
-                    byteContent.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+                    request.Content = new StringContent(content, Encoding.UTF8, "application/json");
 
-                    var response = await httpClient.PostAsync(url, byteContent).ConfigureAwait(false);
-                    string result = await response.Content.ReadAsStringAsync();
-
-                    if (response.StatusCode != HttpStatusCode.OK)
+                    using (var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
                     {
-                        logger.LogError($"GetAsync End, url:{url}, HttpStatusCode:{response.StatusCode}, result:{result}");
-                        return new T();
+                        var stream = await response.Content.ReadAsStreamAsync();
+
+                        if (response.IsSuccessStatusCode)
+                        {
+                            var result = Util.DeserializeJsonFromStream<JObject>(stream);
+                            return Task.FromResult(result).Result;
+                        }
+
+                        var contentResult = await Util.StreamToStringAsync(stream);
+                        throw new ApiException
+                        {
+                            StatusCode = (int)response.StatusCode,
+                            Content = contentResult
+                        };
                     }
-
-                    logger.LogInformation($"GetAsync End, url:{url}, result:{result}");
-
-                    return JsonConvert.DeserializeObject<T>(result);
                 }
-            }
-            catch (WebException ex)
-            {
-                if (ex.Response != null)
-                {
-                    string responseContent = new StreamReader(ex.Response.GetResponseStream()).ReadToEnd();
-                    throw new Exception($"response :{responseContent}", ex);
-                }
-                throw;
             }
         }
 
-        public void StartOnion(string password)
+        public void StartOnion()
         {
             OnionStarted = false;
 
-            if (string.IsNullOrEmpty(password))
-            {
-                throw new ArgumentException("Password cannot be null or empty!", nameof(password));
-            }
-
             CreateTorrc();
-            StartTorProcess();
-
-            Task.Delay(3000).GetAwaiter().GetResult();
-
-            var controlPortClient = new DotNetTor.ControlPort.Client(controlHost, ReadControlPort(), password);
-
-            try
-            {
-                controlPortClient.IsCircuitEstablishedAsync().GetAwaiter().GetResult();
-                OnionStarted = true;
-            }
-            catch
-            {
-                var established = false;
-                var count = 0;
-
-                while (!established)
-                {
-                    if (count >= 21) throw new Exception("Couldn't establish circuit in time.");
-
-                    try
-                    {
-                        established = controlPortClient.IsCircuitEstablishedAsync().GetAwaiter().GetResult();
-                        OnionStarted = true;
-
-                        Task.Delay(1000).GetAwaiter().GetResult();
-                    }
-                    catch (DotNetTor.TorException ex)
-                    {
-                        logger.LogWarning(string.Format("Trying to establish circuit: {0}", ex.Message));
-                    }
-
-                    count++;
-                }
-            }
-
-            if (OnionStarted)
-            {
-                logger.LogInformation("Tor is running...... ;)");
-            }
-        }
-
-        static string GetQueryString(object obj)
-        {
-            if (obj == null)
-            {
-                throw new ArgumentNullException(nameof(obj));
-            }
-
-            var properties = from p in obj.GetType().GetProperties()
-                             where p.GetValue(obj, null) != null
-                             select p.Name + "=" + HttpUtility.UrlEncode(p.GetValue(obj, null).ToString());
-
-            return String.Join("&", properties.ToArray());
+            StartTorProcess().GetAwaiter();
         }
 
         static string GetTorFileName()
         {
-            var sTor = "tor";
+            var sTor = $"{tangramDirectory}tor";
 
             if (Util.GetOSPlatform() == OSPlatform.Windows)
                 sTor = "tor.exe";
@@ -346,6 +311,9 @@ namespace Cypher.ApplicationLayer.Onion
                 "SocksPort auto IPv6Traffic PreferIPv6 KeepAliveIsolateSOCKSAuth",
                 "ControlPort auto",
                 "CookieAuthentication 1",
+                $"HiddenServiceDir {hiddenServicePath}",
+                $"HiddenServicePort {hiddenServicePort}",
+                "HiddenServiceVersion 3",
                 "CircuitBuildTimeout 10",
                 "KeepalivePeriod 60",
                 "NumEntryGuards 8",
@@ -382,13 +350,17 @@ namespace Cypher.ApplicationLayer.Onion
                 {
                     int.TryParse(Util.Pop(File.ReadAllText(controlPortPath, Encoding.UTF8), ":"), out port);
                 }
+#pragma warning disable RECS0022 // A catch clause that catches System.Exception and has an empty body
                 catch { }
+#pragma warning restore RECS0022 // A catch clause that catches System.Exception and has an empty body
             }
 
             return port == 0 ? controlPort : port;
         }
 
-        void StartTorProcess()
+#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
+        async Task StartTorProcess()
+#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
         {
             TorProcess = new Process();
             TorProcess.StartInfo.FileName = GetTorFileName();
@@ -396,10 +368,22 @@ namespace Cypher.ApplicationLayer.Onion
             TorProcess.StartInfo.UseShellExecute = false;
             TorProcess.StartInfo.CreateNoWindow = true;
             TorProcess.StartInfo.RedirectStandardOutput = true;
-            TorProcess.OutputDataReceived += (sender, e) =>
+#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
+#pragma warning disable RECS0165 // Asynchronous methods should return a Task instead of void
+            TorProcess.OutputDataReceived += async (sender, e) =>
+#pragma warning restore RECS0165 // Asynchronous methods should return a Task instead of void
+#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
             {
-                if (!String.IsNullOrEmpty(e.Data))
+                if (!string.IsNullOrEmpty(e.Data))
                 {
+                    if (e.Data.Contains("Bootstrapped 100%: Done"))
+                    {
+                        OnionStarted = true;
+                        console.ResetColor();
+                        console.WriteLine("tor Started!");
+                        logger.LogInformation("tor Started!");
+                    }
+
                     logger.LogInformation(e.Data);
                 }
             };
@@ -408,18 +392,30 @@ namespace Cypher.ApplicationLayer.Onion
             TorProcess.BeginOutputReadLine();
         }
 
+#pragma warning disable CS0114 // Member hides inherited member; missing override keyword
         public void Dispose()
+#pragma warning restore CS0114 // Member hides inherited member; missing override keyword
         {
-            TorProcess?.Kill();
+            try
+            {
+                TorProcess?.Kill();
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex.Message);
+            }
         }
 
+#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
+#pragma warning disable RECS0133 // Parameter name differs in base declaration
         protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+#pragma warning restore RECS0133 // Parameter name differs in base declaration
+#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
         {
             console.WriteLine("Starting Onion Service");
             logger.LogInformation("Starting Onion Service");
-
-            StartOnion(GenerateHashPassword("ILoveTangram"));
-
+            GenerateHashPassword("ILoveTangram".ToSecureString());
+            StartOnion();
             return;
         }
     }
