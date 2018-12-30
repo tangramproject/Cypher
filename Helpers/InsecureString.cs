@@ -10,7 +10,9 @@ using System.Diagnostics;
 namespace TangramCypher.Helpers
 {
     [CLSCompliant(false)]
+#pragma warning disable CS3021 // Type or member does not need a CLSCompliant attribute because the assembly does not have a CLSCompliant attribute
     public sealed class InsecureString : IDisposable, IEnumerable<char>
+#pragma warning restore CS3021 // Type or member does not need a CLSCompliant attribute because the assembly does not have a CLSCompliant attribute
     {
         public string Value { get; private set; }
 
@@ -34,14 +36,14 @@ namespace TangramCypher.Helpers
                 _gcHandle = new GCHandle();
                 var insecurePointer = IntPtr.Zero;
 
-                RuntimeHelpers.TryCode code = delegate
+                void code(object userData)
                 {
                     Value = new string((char)0, _secureString.Length);
                     Action alloc = delegate { _gcHandle = GCHandle.Alloc(Value, GCHandleType.Pinned); };
 
                     alloc.ExecuteInConstrainedRegion();
 
-                    Action toBSTR = delegate { insecurePointer = Marshal.SecureStringToBSTR(_secureString); };
+                    Action toBSTR = delegate { insecurePointer = SecureStringMarshal.SecureStringToGlobalAllocAnsi(_secureString); };
 
                     toBSTR.ExecuteInConstrainedRegion();
 
@@ -52,12 +54,12 @@ namespace TangramCypher.Helpers
                     {
                         value[i] = charPointer[i];
                     }
-                };
+                }
 
                 RuntimeHelpers.CleanupCode cleanup = delegate
                 {
                     if (insecurePointer != IntPtr.Zero)
-                        Marshal.ZeroFreeBSTR(insecurePointer);
+                        Marshal.ZeroFreeGlobalAllocAnsi(insecurePointer);
                 };
 
                 RuntimeHelpers.ExecuteCodeWithGuaranteedCleanup(code, cleanup, null);

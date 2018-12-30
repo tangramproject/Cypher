@@ -62,11 +62,14 @@ namespace TangramCypher.ApplicationLayer.Vault
             var children = configuration.GetChildren();
 
             var vaultClientSettings = new VaultClientSettings(endpoint, null);
+
             //  TODO: Pull this from settings file.
             vaultClient = new VaultClient(vaultClientSettings);
         }
 
+#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
         public async Task StartVaultServiceAsync()
+#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
         {
             //  Find Vault Executable
             FileInfo[] fileInfo = null;
@@ -109,7 +112,9 @@ namespace TangramCypher.ApplicationLayer.Vault
             }
             else
             {
+#pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
                 StartVaultProcess();
+#pragma warning restore CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
             }
         }
 
@@ -153,7 +158,9 @@ namespace TangramCypher.ApplicationLayer.Vault
             }
         }
 
+#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
         private async Task StartVaultProcess()
+#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
         {
             logger.LogInformation($"WorkingDirectory: {tangramDirectory.FullName}");
 
@@ -163,7 +170,9 @@ namespace TangramCypher.ApplicationLayer.Vault
             vaultProcess.StartInfo.UseShellExecute = false;
             vaultProcess.StartInfo.CreateNoWindow = true;
             vaultProcess.StartInfo.RedirectStandardOutput = true;
+#pragma warning disable RECS0165 // Asynchronous methods should return a Task instead of void
             vaultProcess.OutputDataReceived += async (sender, e) =>
+#pragma warning restore RECS0165 // Asynchronous methods should return a Task instead of void
             {
                 if (!string.IsNullOrEmpty(e.Data))
                 {
@@ -612,7 +621,9 @@ namespace TangramCypher.ApplicationLayer.Vault
             return await vaultClient.V1.Secrets.KeyValue.V1.ReadSecretPathsAsync(path);
         }
 
+#pragma warning disable RECS0133 // Parameter name differs in base declaration
         protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+#pragma warning restore RECS0133 // Parameter name differs in base declaration
         {
             await StartVaultServiceAsync();
         }

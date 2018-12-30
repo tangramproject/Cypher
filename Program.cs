@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Cypher.ApplicationLayer.Onion;
 using Microsoft.Extensions.Configuration;
 using System.IO;
+using System.Linq;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Hosting;
 
@@ -64,6 +65,7 @@ namespace TangramCypher
                     services.Add(new ServiceDescriptor(typeof(ILogger),
                                                                 provider => logger,
                                                                 ServiceLifetime.Singleton));
+                                                               
                 })
                 .UseConsoleLifetime();
 

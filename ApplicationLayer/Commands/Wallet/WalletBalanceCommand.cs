@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Sodium;
 using TangramCypher.ApplicationLayer.Actor;
 using TangramCypher.ApplicationLayer.Wallet;
@@ -19,6 +20,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
         readonly ICryptography cryptography;
         readonly IWalletService walletService;
         readonly IConsole console;
+        readonly ILogger logger;
 
 
         public WalletBalanceCommand(IServiceProvider serviceProvider)
@@ -27,6 +29,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
             cryptography = serviceProvider.GetService<ICryptography>();
             walletService = serviceProvider.GetService<IWalletService>();
             console = serviceProvider.GetService<IConsole>();
+            logger = serviceProvider.GetService<ILogger>();
         }
 
         public override async Task Execute()
@@ -55,9 +58,9 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                             actorService.ReceivePayment(redemptionKey);
                         }
                     }
-                    catch (Exception e)
+                    catch (Exception ex)
                     {
-
+                        logger.LogError(ex.Message);
                     }
                 }
 
