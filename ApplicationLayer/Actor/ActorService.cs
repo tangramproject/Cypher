@@ -21,12 +21,6 @@ namespace TangramCypher.ApplicationLayer.Actor
 {
     public class ActorService : IActorService
     {
-        const string ENDPOINT = "endpoint";
-        const string TOKEN_API = "tokenAPI";
-        const string TOKEN = "token";
-        const string MESSAGEPOOL_API = "messagePoolAPI";
-        const string MESSAGEPOOL = "message";
-
         protected SecureString masterKey;
         protected string _toAdress;
         protected double? _amount;
@@ -35,8 +29,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         protected SecureString publicKey;
         protected SecureString identifier;
 
-        readonly IConfigurationSection nodeTokenSection;
-        readonly IConfigurationSection nodeMessagePoolSection;
+        readonly IConfigurationSection apiRestSection;
         readonly ILogger logger;
         readonly ICryptography cryptography;
         readonly IOnionService onionService;
@@ -57,8 +50,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             this.walletService = walletService;
             this.logger = logger;
 
-            nodeTokenSection = configuration.GetSection(TOKEN_API);
-            nodeMessagePoolSection = configuration.GetSection(MESSAGEPOOL_API);
+            apiRestSection = configuration.GetSection(Constant.ApiGateway);
         }
 
         // TODO: Temp fix until we get the onion client working.
@@ -69,24 +61,24 @@ namespace TangramCypher.ApplicationLayer.Actor
                 throw new ArgumentNullException(nameof(notification));
             }
 
-            var baseAddress = new Uri(nodeMessagePoolSection.GetValue<string>(ENDPOINT));
-            var path = nodeMessagePoolSection.GetValue<string>(MESSAGEPOOL);
+            var baseAddress = new Uri(apiRestSection.GetValue<string>(Constant.Endpoint));
+            var path = apiRestSection.GetSection(Constant.Routing).GetValue<string>(Constant.PostMessage);
             var result = await ClientPostAsync(notification, baseAddress, path, cancellationToken);
 
             return result;
         }
 
         // TODO: Temp fix until we get the onion client working.
-        public async Task<JObject> AddTokenAsync(TokenDto token, CancellationToken cancellationToken)
+        public async Task<JObject> AddCoinAsync(CoinDto coin, CancellationToken cancellationToken)
         {
-            if (token == null)
+            if (coin == null)
             {
-                throw new ArgumentNullException(nameof(token));
+                throw new ArgumentNullException(nameof(coin));
             }
 
-            var baseAddress = new Uri(nodeTokenSection.GetValue<string>(ENDPOINT));
-            var path = nodeTokenSection.GetValue<string>(TOKEN);
-            var result = await ClientPostAsync(token, baseAddress, path, cancellationToken);
+            var baseAddress = new Uri(apiRestSection.GetValue<string>(Constant.Endpoint));
+            var path = apiRestSection.GetSection(Constant.Routing).GetValue<string>(Constant.PostCoin);
+            var result = await ClientPostAsync(coin, baseAddress, path, cancellationToken);
 
             return result;
         }
@@ -153,7 +145,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             };
         }
 
-        public TokenDto DeriveToken(SecureString password, int version, EnvelopeDto envelope)
+        public CoinDto DeriveCoin(SecureString password, int version, EnvelopeDto envelope)
         {
             if (password == null)
             {
@@ -170,7 +162,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             var v1 = +version + 1;
             var v2 = +version + 2;
 
-            var chronicle = new TokenDto()
+            var chronicle = new CoinDto()
             {
                 Keeper = DeriveKey(v1, stamp, DeriveKey(v2, stamp, DeriveKey(v2, stamp, password).ToSecureString()).ToSecureString()),
                 Version = v0,
@@ -187,7 +179,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         {
             return masterKey;
         }
-        
+
         public ActorService From(SecureString password)
         {
             masterKey = password ?? throw new ArgumentNullException(nameof(masterKey));
@@ -207,8 +199,8 @@ namespace TangramCypher.ApplicationLayer.Actor
                 throw new ArgumentException("Address is missing!", nameof(address));
             }
 
-            var baseAddress = new Uri(nodeMessagePoolSection.GetValue<string>(ENDPOINT));
-            var path = string.Format("{0}/{1}", nodeMessagePoolSection.GetValue<string>(TOKEN), address);
+            var baseAddress = new Uri(apiRestSection.GetValue<string>(Constant.Endpoint));
+            var path = string.Format(apiRestSection.GetSection(Constant.Routing).GetValue<string>(Constant.GetMessage), address);
             var result = await ClientGetAsync<NotificationDto>(baseAddress, path, cancellationToken);
 
             return result;
@@ -225,32 +217,32 @@ namespace TangramCypher.ApplicationLayer.Actor
         }
 
         // TODO: Temp fix until we get the onion client working.
-        public async Task<TokenDto> GetTokenAsync(string stamp, CancellationToken cancellationToken)
+        public async Task<CoinDto> GetCoinAsync(string stamp, CancellationToken cancellationToken)
         {
             if (string.IsNullOrEmpty(stamp))
             {
                 throw new ArgumentException("Stamp is missing!", nameof(stamp));
             }
 
-            var baseAddress = new Uri(nodeTokenSection.GetValue<string>(ENDPOINT));
-            var path = string.Format("{0}/{1}", nodeTokenSection.GetValue<string>(TOKEN), stamp);
-            var result = await ClientGetAsync<TokenDto>(baseAddress, path, cancellationToken);
+            var baseAddress = new Uri(apiRestSection.GetValue<string>(Constant.Endpoint));
+            var path = string.Format(apiRestSection.GetSection(Constant.Routing).GetValue<string>(Constant.GetCoinStamp), stamp);
+            var result = await ClientGetAsync<CoinDto>(baseAddress, path, cancellationToken);
 
             return result;
 
         }
 
-        public string HotRelease(TokenDto token)
+        public string HotRelease(CoinDto coin)
         {
-            if (token == null)
+            if (coin == null)
             {
-                throw new ArgumentNullException(nameof(TokenDto));
+                throw new ArgumentNullException(nameof(CoinDto));
             }
 
 
-            var subKey1 = DeriveKey(token.Version + 1, token.Stamp, From());
-            var subKey2 = DeriveKey(token.Version + 2, token.Stamp, From());
-            var redemption = new RedemptionKeyDto() { Key1 = subKey1, Key2 = subKey2, Memo = Memo(), Stamp = token.Stamp };
+            var subKey1 = DeriveKey(coin.Version + 1, coin.Stamp, From());
+            var subKey2 = DeriveKey(coin.Version + 2, coin.Stamp, From());
+            var redemption = new RedemptionKeyDto() { Key1 = subKey1, Key2 = subKey2, Memo = Memo(), Stamp = coin.Stamp };
 
             return JsonConvert.SerializeObject(redemption);
         }
@@ -308,17 +300,17 @@ namespace TangramCypher.ApplicationLayer.Actor
             return message;
         }
 
-        public string PartialRelease(TokenDto token)
+        public string PartialRelease(CoinDto coin)
         {
-            if (token == null)
+            if (coin == null)
             {
-                throw new ArgumentNullException(nameof(token));
+                throw new ArgumentNullException(nameof(coin));
             }
 
-            var subKey1 = DeriveKey(token.Version + 1, token.Stamp, From());
-            var subKey2 = DeriveKey(token.Version + 2, token.Stamp, From()).ToSecureString();
-            var mix = DeriveKey(token.Version + 2, token.Stamp, subKey2);
-            var redemption = new RedemptionKeyDto() { Key1 = subKey1, Key2 = mix, Memo = Memo(), Stamp = token.Stamp };
+            var subKey1 = DeriveKey(coin.Version + 1, coin.Stamp, From());
+            var subKey2 = DeriveKey(coin.Version + 2, coin.Stamp, From()).ToSecureString();
+            var mix = DeriveKey(coin.Version + 2, coin.Stamp, subKey2);
+            var redemption = new RedemptionKeyDto() { Key1 = subKey1, Key2 = mix, Memo = Memo(), Stamp = coin.Stamp };
 
             return JsonConvert.SerializeObject(redemption);
         }
@@ -350,16 +342,16 @@ namespace TangramCypher.ApplicationLayer.Actor
                 {
                     var openMessage = cryptography.OpenBoxSeal(Convert.FromBase64String(redemptionKey), new KeyPair(Utilities.HexToBinary(insecurePk.Value), Utilities.HexToBinary(insecureSk.Value)));
                     var freeRedemptionKey = JsonConvert.DeserializeObject<RedemptionKeyDto>(openMessage);
-                    var token = GetTokenAsync(freeRedemptionKey.Stamp, new CancellationToken()).GetAwaiter().GetResult();
+                    var coin = GetCoinAsync(freeRedemptionKey.Stamp, new CancellationToken()).GetAwaiter().GetResult();
 
-                    if (token == null)
+                    if (coin == null)
                         return;
 
-                    var swap = Swap(From(), 1, freeRedemptionKey.Key1, freeRedemptionKey.Key2, token.Envelope);
-                    var token1 = DeriveToken(From(), swap.Item1.Version, swap.Item1.Envelope);
-                    var status1 = VerifyToken(swap.Item1, token1);
-                    var token2 = DeriveToken(From(), swap.Item2.Version, swap.Item2.Envelope);
-                    var status2 = VerifyToken(swap.Item2, token2);
+                    var swap = Swap(From(), 1, freeRedemptionKey.Key1, freeRedemptionKey.Key2, coin.Envelope);
+                    var token1 = DeriveCoin(From(), swap.Item1.Version, swap.Item1.Envelope);
+                    var status1 = VerifyCoin(swap.Item1, token1);
+                    var token2 = DeriveCoin(From(), swap.Item2.Version, swap.Item2.Envelope);
+                    var status2 = VerifyCoin(swap.Item2, token2);
 
                     if (status2 == 1)
                         walletService.AddEnvelope(Identifier(), From(), token2.Envelope).GetAwaiter();
@@ -382,8 +374,8 @@ namespace TangramCypher.ApplicationLayer.Actor
         {
             SetSecretKey().GetAwaiter();
 
-            var token = DeriveToken(From(), 0, DeriveEnvelope(From(), 1, Amount()));
-            token = DeriveToken(From(), 1, token.Envelope);
+            var token = DeriveCoin(From(), 0, DeriveEnvelope(From(), 1, Amount()));
+            token = DeriveCoin(From(), 1, token.Envelope);
 
             var redemptionKey = HotRelease(token);
             var bobPk = DecodeAddress(To());
@@ -399,7 +391,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             OnReceivedMessage(new ReceivedMessageEventArgs() { Message = delivered ? (object)true : notification.Chiper, ThroughSystem = answer });
         }
 
-        public Tuple<TokenDto, TokenDto> Swap(SecureString password, int version, string key1, string key2, EnvelopeDto envelope)
+        public Tuple<CoinDto, CoinDto> Swap(SecureString password, int version, string key1, string key2, EnvelopeDto envelope)
         {
             if (password == null)
             {
@@ -427,7 +419,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             var v3 = version + 3;
             var v4 = version + 4;
 
-            var token1 = new TokenDto()
+            var token1 = new CoinDto()
             {
                 Keeper = DeriveKey(v2, stamp, DeriveKey(v3, stamp, DeriveKey(v3, stamp, password).ToSecureString()).ToSecureString()),
                 Version = v1,
@@ -437,7 +429,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                 Hint = DeriveKey(v2, stamp, key2.ToSecureString())
             };
 
-            var token2 = new TokenDto()
+            var token2 = new CoinDto()
             {
                 Keeper = DeriveKey(v3, stamp, DeriveKey(v4, stamp, DeriveKey(v4, stamp, password).ToSecureString()).ToSecureString()),
                 Version = v2,
@@ -450,7 +442,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             return Tuple.Create(token1, token2);
         }
 
-        public TokenDto SwapPartialOne(SecureString password, RedemptionKeyDto redemptionKey)
+        public CoinDto SwapPartialOne(SecureString password, RedemptionKeyDto redemptionKey)
         {
             if (password == null)
             {
@@ -462,26 +454,26 @@ namespace TangramCypher.ApplicationLayer.Actor
                 throw new ArgumentNullException(nameof(redemptionKey));
             }
 
-            var token = GetTokenAsync(redemptionKey.Stamp, new CancellationToken()).GetAwaiter().GetResult();
+            var coin = GetCoinAsync(redemptionKey.Stamp, new CancellationToken()).GetAwaiter().GetResult();
 
-            if (token != null)
+            if (coin != null)
             {
-                var stamp = cryptography.GenericHashNoKey(string.Format("{0}{1}", token.Envelope.Amount.ToString(), token.Envelope.Serial)).ToHex();
+                var stamp = cryptography.GenericHashNoKey(string.Format("{0}{1}", coin.Envelope.Amount.ToString(), coin.Envelope.Serial)).ToHex();
 
-                if (stamp.Equals(token.Stamp))
+                if (stamp.Equals(coin.Stamp))
                 {
-                    var v1 = token.Version + 1;
-                    var v2 = token.Version + 2;
-                    var v3 = token.Version + 3;
+                    var v1 = coin.Version + 1;
+                    var v2 = coin.Version + 2;
+                    var v3 = coin.Version + 3;
 
-                    token.Keeper = DeriveKey(v2, stamp, DeriveKey(v3, stamp, DeriveKey(v3, stamp, password).ToSecureString()).ToSecureString());
-                    token.Version = v1;
-                    token.Principle = redemptionKey.Key1;
-                    token.Stamp = stamp;
-                    token.Envelope = token.Envelope;
-                    token.Hint = redemptionKey.Key2;
+                    coin.Keeper = DeriveKey(v2, stamp, DeriveKey(v3, stamp, DeriveKey(v3, stamp, password).ToSecureString()).ToSecureString());
+                    coin.Version = v1;
+                    coin.Principle = redemptionKey.Key1;
+                    coin.Stamp = stamp;
+                    coin.Envelope = coin.Envelope;
+                    coin.Hint = redemptionKey.Key2;
 
-                    return token;
+                    return coin;
                 }
             }
 
@@ -505,7 +497,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             return this;
         }
 
-        public int VerifyToken(TokenDto terminal, TokenDto current)
+        public int VerifyCoin(CoinDto terminal, CoinDto current)
         {
             if (terminal == null)
             {
@@ -642,6 +634,5 @@ namespace TangramCypher.ApplicationLayer.Actor
                 }
             }
         }
-
     }
 }

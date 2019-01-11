@@ -34,9 +34,9 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
 
             try
             {
-                var token = await AddToken(password, Convert.ToDouble(amount));
+                var coin = await AddCoin(password, Convert.ToDouble(amount));
 
-                await walletService.AddEnvelope(identifier, password, token.Envelope);
+                await walletService.AddEnvelope(identifier, password, coin.Envelope);
 
                 console.WriteLine($"Wallet updated with {amount}");
             }
@@ -50,9 +50,9 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
             }
         }
 
-        async Task<TokenDto> AddToken(SecureString passphrase, double? amount)
+        async Task<CoinDto> AddCoin(SecureString passphrase, double? amount)
         {
-            var token = actorService.DeriveToken(passphrase, 1, actorService.DeriveEnvelope(passphrase, 1, amount.Value));
+            var token = actorService.DeriveCoin(passphrase, 1, actorService.DeriveEnvelope(passphrase, 1, amount.Value));
 
             token.Envelope.Serial = Convert.ToBase64String(Encoding.UTF8.GetBytes(token.Envelope.Serial));
             token.Hint = Convert.ToBase64String(Encoding.UTF8.GetBytes(token.Hint));
@@ -60,7 +60,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
             token.Principle = Convert.ToBase64String(Encoding.UTF8.GetBytes(token.Principle));
             token.Stamp = Convert.ToBase64String(Encoding.UTF8.GetBytes(token.Stamp));
 
-            var result = await actorService.AddTokenAsync(token, new System.Threading.CancellationToken());
+            var result = await actorService.AddCoinAsync(token, new System.Threading.CancellationToken());
             var transaction = JsonConvert.DeserializeObject<JObject>(result.AsJson().ReadAsStringAsync().Result);
 
             if (transaction != null)

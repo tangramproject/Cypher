@@ -32,6 +32,7 @@ namespace Cypher.ApplicationLayer.Onion
         const string CONTROL_PORT = "onion_control_port";
         const string HASHED_CONTROL_PASSWORD = "onion_hashed_control_password";
         const string HIDDEN_SERVICE_PORT = "onion_hidden_service_port";
+        const string ONION_ENABLED = "onion_enabled";
 
         private static readonly DirectoryInfo tangramDirectory = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
 
@@ -48,6 +49,7 @@ namespace Cypher.ApplicationLayer.Onion
         readonly string controlPortPath;
         readonly string hiddenServicePath;
         readonly string hiddenServicePort;
+        readonly int onionEnabled;
 
         string hashedPassword;
 
@@ -68,6 +70,7 @@ namespace Cypher.ApplicationLayer.Onion
             controlHost = onionSection.GetValue<string>(CONTROL_HOST);
             controlPort = onionSection.GetValue<int>(CONTROL_PORT);
             hiddenServicePort = onionSection.GetValue<string>(HIDDEN_SERVICE_PORT);
+            onionEnabled = onionSection.GetValue<int>(ONION_ENABLED);
 
             onionDirectory = Path.Combine(Path.GetDirectoryName(AppDomain.CurrentDomain.BaseDirectory), ONION);
             torrcPath = Path.Combine(onionDirectory, TORRC);
@@ -412,10 +415,13 @@ namespace Cypher.ApplicationLayer.Onion
 #pragma warning restore RECS0133 // Parameter name differs in base declaration
 #pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
         {
-            console.WriteLine("Starting Onion Service");
-            logger.LogInformation("Starting Onion Service");
-            GenerateHashPassword("ILoveTangram".ToSecureString());
-            StartOnion();
+            if(onionEnabled == 1)
+            {
+                console.WriteLine("Starting Onion Service");
+                logger.LogInformation("Starting Onion Service");
+                GenerateHashPassword("ILoveTangram".ToSecureString());
+                StartOnion();
+            }
             return;
         }
     }

@@ -1,6 +1,6 @@
 ﻿namespace TangramCypher.ApplicationLayer.Actor
 {
-    public class TokenDto
+    public class CoinDto
     {
         public EnvelopeDto Envelope { get; set; }
 
