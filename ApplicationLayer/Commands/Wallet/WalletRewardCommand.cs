@@ -40,6 +40,12 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
 
                 console.WriteLine($"Wallet updated with {amount}");
             }
+            catch (NullReferenceException ex)
+            {
+                console.ForegroundColor = ConsoleColor.Red;
+                console.WriteLine($"Wallet failed to updated.\n Error: {ex.Message}");
+                console.ForegroundColor = ConsoleColor.White;
+            }
             catch (ApiException ex)
             {
                 throw ex;
@@ -52,19 +58,19 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
 
         async Task<CoinDto> AddCoin(SecureString passphrase, double? amount)
         {
-            var token = actorService.DeriveCoin(passphrase, 1, actorService.DeriveEnvelope(passphrase, 1, amount.Value));
+            var coin = actorService.DeriveCoin(passphrase, 1, actorService.DeriveEnvelope(passphrase, 1, amount.Value));
 
-            token.Envelope.Serial = Convert.ToBase64String(Encoding.UTF8.GetBytes(token.Envelope.Serial));
-            token.Hint = Convert.ToBase64String(Encoding.UTF8.GetBytes(token.Hint));
-            token.Keeper = Convert.ToBase64String(Encoding.UTF8.GetBytes(token.Keeper));
-            token.Principle = Convert.ToBase64String(Encoding.UTF8.GetBytes(token.Principle));
-            token.Stamp = Convert.ToBase64String(Encoding.UTF8.GetBytes(token.Stamp));
+            coin.Envelope.Serial = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Envelope.Serial));
+            coin.Hint = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Hint));
+            coin.Keeper = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Keeper));
+            coin.Principle = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Principle));
+            coin.Stamp = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Stamp));
 
-            var result = await actorService.AddCoinAsync(token, new System.Threading.CancellationToken());
+            var result = await actorService.AddCoinAsync(coin, new System.Threading.CancellationToken());
             var transaction = JsonConvert.DeserializeObject<JObject>(result.AsJson().ReadAsStringAsync().Result);
 
             if (transaction != null)
-                return token;
+                return coin;
 
             return null;
         }

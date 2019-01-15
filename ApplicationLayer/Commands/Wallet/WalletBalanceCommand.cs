@@ -36,32 +36,26 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
         {
             try
             {
-                actorService.Identifier(Prompt.GetPassword("Identifier:", ConsoleColor.Yellow).ToSecureString());
-                actorService.From(Prompt.GetPassword("Password:", ConsoleColor.Yellow).ToSecureString());
+                var identifier = Prompt.GetPassword("Identifier:", ConsoleColor.Yellow).ToSecureString();
+                var password = Prompt.GetPassword("Password:", ConsoleColor.Yellow).ToSecureString();
+                var storePk = await walletService.GetStoreKey(identifier, password, "PublicKey");
+                var pk = Utilities.HexToBinary(storePk.ToUnSecureString());
 
-                var securePk = await walletService.GetStoreKey(actorService.Identifier(), actorService.From(), "PublicKey");
-
-                using (var insecurePk = securePk.Insecure())
+                // var sharedKey = actorService.GetSharedKey(pk);
+                // TODO: Needs reworking..
+                var notificationAddress = cryptography.GenericHashWithKey(pk.ToHex(), pk).ToHex();
+                try
                 {
-                    var pk = Utilities.HexToBinary(insecurePk.Value);
-                    var sharedKey = actorService.GetSharedKey(pk);
-                    var notificationAddress = cryptography.GenericHashWithKey(Utilities.BinaryToHex(pk.ToArray()), sharedKey);
+                    var message = await actorService.GetMessageAsync(notificationAddress, new CancellationToken());
 
-                    try
-                    {
-                        var message = await actorService.GetMessageAsync(Utilities.BinaryToHex(notificationAddress), new CancellationToken());
-
-                        using (var insecureSk = actorService.SecretKey().Insecure())
-                        {
-                            var redemptionKey = cryptography.OpenBoxSeal(Convert.FromBase64String(message.Chiper), new KeyPair(pk.ToArray(), Utilities.HexToBinary(insecureSk.Value)));
-
-                            actorService.ReceivePayment(redemptionKey);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        logger.LogError(ex.Message);
-                    }
+                    actorService
+                        .Identifier(identifier)
+                        .From(password)
+                        .ReceivePayment(message);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex.Message);
                 }
 
                 var total = await walletService.GetBalance(actorService.Identifier(), actorService.From());

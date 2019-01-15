@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Collections.Generic;
 using System.Security;
 using System.Threading.Tasks;
@@ -80,7 +81,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
             return new PkSkDto()
             {
                 PublicKey = kp.PublicKey.ToHex(),
-                SecretKey = kp.SecretKey.ToHex().ToSecureString(),
+                SecretKey = kp.SecretKey.ToHex(),
                 Address = Base58.Bitcoin.Encode(kp.PublicKey)
             };
         }
@@ -136,18 +137,18 @@ namespace TangramCypher.ApplicationLayer.Wallet
             {
                 using (var insecurePassword = password.Insecure())
                 {
+                    var found = false;
                     var data = await vaultService.GetDataAsync(insecureIdentifier.Value, insecurePassword.Value, $"wallets/{insecureIdentifier.Value}/wallet");
 
                     if (data.Data.TryGetValue("envelopes", out object envelopes))
                     {
-                        foreach (JObject item in ((JArray)envelopes).Children())
+                        foreach (JObject item in ((JArray)envelopes).Children().ToList())
                         {
                             var serial = item.GetValue("Serial");
-                            if (!serial.Equals(envelope.Serial))
-                            {
-                                ((JArray)envelopes).Add(JObject.FromObject(envelope));
-                            }
+                            found = serial.Value<string>().Equals(envelope.Serial) ? true : false;
                         }
+                        if (!found)
+                            ((JArray)envelopes).Add(JObject.FromObject(envelope));
                     }
                     else
                         data.Data.Add("envelopes", new List<EnvelopeDto> { envelope });
@@ -171,10 +172,11 @@ namespace TangramCypher.ApplicationLayer.Wallet
                 using (var insecurePassword = password.Insecure())
                 {
                     var data = await vaultService.GetDataAsync(insecureIdentifier.Value, insecurePassword.Value, $"wallets/{insecureIdentifier.Value}/wallet");
-                    var stroreKeys = JObject.FromObject(data.Data["storeKeys"]);
+                    var storeKeys = JObject.FromObject(data.Data["storeKeys"]);
+                    var key = storeKeys.GetValue(storeKey).Value<string>();
                     var secureString = new SecureString();
 
-                    foreach (var c in stroreKeys.GetValue(storeKey).Value<string>()) secureString.AppendChar(Convert.ToChar(c));
+                    foreach (var c in key) secureString.AppendChar(Convert.ToChar(c));
 
                     return secureString;
                 }

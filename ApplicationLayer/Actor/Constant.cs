@@ -8,7 +8,7 @@
         public const string PostBlock = "postBlock";
         public const string GetBlockMerkle = "getBlockMerkle";
         public const string PostCoin = "postCoin";
-        public const string GetCoinStamp = "getCoinStamp";
+        public const string GetCoin = "getCoin";
         public const string GetTransaction = "getTransaction";
         public const string GetTransactionCount = "getTransactionCount";
         public const string GetTransactionRange = "getTransactionRange";

@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.Contracts;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -54,16 +55,16 @@ namespace TangramCypher.ApplicationLayer.Actor
         }
 
         // TODO: Temp fix until we get the onion client working.
-        public async Task<JObject> AddMessageAsync(NotificationDto notification, CancellationToken cancellationToken)
+        public async Task<JObject> AddMessageAsync(MessageDto message, CancellationToken cancellationToken)
         {
-            if (notification == null)
+            if (message == null)
             {
-                throw new ArgumentNullException(nameof(notification));
+                throw new ArgumentNullException(nameof(message));
             }
 
             var baseAddress = new Uri(apiRestSection.GetValue<string>(Constant.Endpoint));
             var path = apiRestSection.GetSection(Constant.Routing).GetValue<string>(Constant.PostMessage);
-            var result = await ClientPostAsync(notification, baseAddress, path, cancellationToken);
+            var result = await ClientPostAsync(message, baseAddress, path, cancellationToken);
 
             return result;
         }
@@ -104,6 +105,15 @@ namespace TangramCypher.ApplicationLayer.Actor
             return this;
         }
 
+        /// <summary>
+        /// Balance check.
+        /// </summary>
+        /// <returns>The check.</returns>
+        public async Task<double> BalanceCheck()
+        {
+            return await walletService.GetBalance(Identifier(), From());
+        }
+
         public Span<byte> DecodeAddress(string key)
         {
             return Base58.Bitcoin.Decode(key);
@@ -116,7 +126,10 @@ namespace TangramCypher.ApplicationLayer.Actor
                 throw new ArgumentException("Stamp cannot be null or empty!", nameof(stamp));
             }
 
-            return cryptography.GenericHashNoKey(string.Format("{0} {1} {2}", version, stamp, password), bytes).ToHex();
+            using (var insecurePassword = password.Insecure())
+            {
+                return cryptography.GenericHashNoKey(string.Format("{0} {1} {2}", version, stamp, insecurePassword.Value), bytes).ToHex();
+            }
         }
 
         public string DeriveSerialKey(int version, double? amount, SecureString password, int bytes = 32)
@@ -126,8 +139,11 @@ namespace TangramCypher.ApplicationLayer.Actor
                 throw new ArgumentNullException(nameof(password));
             }
 
-            return
-            cryptography.GenericHashNoKey(string.Format("{0} {1} {2}", version, amount.Value.ToString(), masterKey), bytes).ToHex();
+            using (var insecurePassword = password.Insecure())
+            {
+                return
+                cryptography.GenericHashNoKey(string.Format("{0} {1} {2} {3}", version, amount.Value.ToString(), insecurePassword.Value, cryptography.RandomKey().ToHex()), bytes).ToHex();
+            }
         }
 
         public EnvelopeDto DeriveEnvelope(SecureString password, int version, double? amount)
@@ -162,17 +178,17 @@ namespace TangramCypher.ApplicationLayer.Actor
             var v1 = +version + 1;
             var v2 = +version + 2;
 
-            var chronicle = new CoinDto()
+            var coin = new CoinDto()
             {
                 Keeper = DeriveKey(v1, stamp, DeriveKey(v2, stamp, DeriveKey(v2, stamp, password).ToSecureString()).ToSecureString()),
                 Version = v0,
-                Principle = DeriveKey(v0, stamp, masterKey),
+                Principle = DeriveKey(v0, stamp, password),
                 Stamp = stamp,
                 Envelope = envelope,
                 Hint = DeriveKey(v1, stamp, DeriveKey(v1, stamp, password).ToSecureString())
             };
 
-            return chronicle;
+            return coin;
         }
 
         public SecureString From()
@@ -186,9 +202,9 @@ namespace TangramCypher.ApplicationLayer.Actor
             return this;
         }
 
-        public byte[] GetChiper(string redemptionKey, Span<byte> bobPk)
+        public byte[] GetChiper(string redemptionKey, byte[] pk)
         {
-            return cryptography.BoxSeal(redemptionKey, bobPk.ToArray());
+            return cryptography.BoxSeal(Utilities.BinaryToHex(Encoding.UTF8.GetBytes(redemptionKey)), pk);
         }
 
         // TODO: Temp fix until we get the onion client working.
@@ -206,13 +222,13 @@ namespace TangramCypher.ApplicationLayer.Actor
             return result;
         }
 
-        public byte[] GetSharedKey(Span<byte> bobPk)
+        public byte[] GetSharedKey(byte[] pk)
         {
             SetSecretKey().GetAwaiter().GetResult();
 
             using (var insecure = SecretKey().Insecure())
             {
-                return cryptography.ScalarMult(Utilities.HexToBinary(insecure.Value), bobPk.ToArray());
+                return cryptography.ScalarMult(Utilities.HexToBinary(insecure.Value), pk);
             }
         }
 
@@ -225,7 +241,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             }
 
             var baseAddress = new Uri(apiRestSection.GetValue<string>(Constant.Endpoint));
-            var path = string.Format(apiRestSection.GetSection(Constant.Routing).GetValue<string>(Constant.GetCoinStamp), stamp);
+            var path = string.Format(apiRestSection.GetSection(Constant.Routing).GetValue<string>(Constant.GetCoin), stamp);
             var result = await ClientGetAsync<CoinDto>(baseAddress, path, cancellationToken);
 
             return result;
@@ -238,7 +254,6 @@ namespace TangramCypher.ApplicationLayer.Actor
             {
                 throw new ArgumentNullException(nameof(CoinDto));
             }
-
 
             var subKey1 = DeriveKey(coin.Version + 1, coin.Stamp, From());
             var subKey2 = DeriveKey(coin.Version + 2, coin.Stamp, From());
@@ -293,7 +308,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             }
 
             var pk = Encoding.UTF8.GetBytes(pkSkDto.PublicKey);
-            var sk = Encoding.UTF8.GetBytes(pkSkDto.SecretKey.ToUnSecureString());
+            var sk = Encoding.UTF8.GetBytes(pkSkDto.SecretKey);
             var cypher = Encoding.UTF8.GetBytes(cipher);
             var message = cryptography.OpenBoxSeal(cypher, new KeyPair(pk, sk));
 
@@ -326,36 +341,42 @@ namespace TangramCypher.ApplicationLayer.Actor
             return this;
         }
 
-        public void ReceivePayment(string redemptionKey)
+        public void ReceivePayment(NotificationDto notification)
         {
-            if (string.IsNullOrEmpty(redemptionKey))
+            if (notification == null)
             {
-                throw new ArgumentException("Redemption Key cannot be null or empty!", nameof(redemptionKey));
+                throw new ArgumentNullException(nameof(notification));
             }
 
-            SetSecretKey().GetAwaiter();
-            SetPublicKey().GetAwaiter();
+            SetSecretKey().GetAwaiter().GetResult();
 
-            using (var insecurePk = PublicKey().Insecure())
+            var storePk = walletService.GetStoreKey(Identifier(), From(), "PublicKey").GetAwaiter().GetResult();
+            var pk = Utilities.HexToBinary(storePk.ToUnSecureString());
+
+            using (var insecureSk = SecretKey().Insecure())
             {
-                using (var insecureSk = SecretKey().Insecure())
-                {
-                    var openMessage = cryptography.OpenBoxSeal(Convert.FromBase64String(redemptionKey), new KeyPair(Utilities.HexToBinary(insecurePk.Value), Utilities.HexToBinary(insecureSk.Value)));
-                    var freeRedemptionKey = JsonConvert.DeserializeObject<RedemptionKeyDto>(openMessage);
-                    var coin = GetCoinAsync(freeRedemptionKey.Stamp, new CancellationToken()).GetAwaiter().GetResult();
+                var message = Convert.FromBase64String(notification.Body);
+                var openMessage = cryptography.OpenBoxSeal(Utilities.HexToBinary(Encoding.UTF8.GetString(message)),
+                    new KeyPair(pk, Utilities.HexToBinary(insecureSk.Value)));
 
-                    if (coin == null)
-                        return;
+                openMessage = Encoding.UTF8.GetString(Utilities.HexToBinary(openMessage));
 
-                    var swap = Swap(From(), 1, freeRedemptionKey.Key1, freeRedemptionKey.Key2, coin.Envelope);
-                    var token1 = DeriveCoin(From(), swap.Item1.Version, swap.Item1.Envelope);
-                    var status1 = VerifyCoin(swap.Item1, token1);
-                    var token2 = DeriveCoin(From(), swap.Item2.Version, swap.Item2.Envelope);
-                    var status2 = VerifyCoin(swap.Item2, token2);
+                var freeRedemptionKey = JsonConvert.DeserializeObject<RedemptionKeyDto>(openMessage);
+                var coin = GetCoinAsync(freeRedemptionKey.Stamp, new CancellationToken()).GetAwaiter().GetResult();
 
-                    if (status2 == 1)
-                        walletService.AddEnvelope(Identifier(), From(), token2.Envelope).GetAwaiter();
-                }
+                if (coin == null)
+                    return;
+
+                coin = FormatCoinFromBase64(coin);
+
+                var swap = Swap(From(), coin.Version, freeRedemptionKey.Key1, freeRedemptionKey.Key2, coin.Envelope);
+                var token1 = DeriveCoin(From(), swap.Item1.Version, swap.Item1.Envelope);
+                var status1 = VerifyCoin(swap.Item1, token1);
+                var token2 = DeriveCoin(From(), swap.Item2.Version, swap.Item2.Envelope);
+                var status2 = VerifyCoin(swap.Item2, token2);
+
+                if (status2 == 1)
+                    walletService.AddEnvelope(Identifier(), From(), token2.Envelope).GetAwaiter();
             }
         }
 
@@ -370,25 +391,54 @@ namespace TangramCypher.ApplicationLayer.Actor
             return this;
         }
 
-        public void SendPayment(bool answer)
+        public async Task SendPayment(bool answer)
         {
-            SetSecretKey().GetAwaiter();
+            var bal = await BalanceCheck();
+            if (bal < Amount())
+            {
+                Console.ForegroundColor = ConsoleColor.Magenta;
+                Console.WriteLine($"\nAvailable balance:\t{bal}");
+                Console.WriteLine($"Spend amount:\t\t{Amount()}\n");
+                Console.ForegroundColor = ConsoleColor.White;
+                return;
+            }
 
-            var token = DeriveCoin(From(), 0, DeriveEnvelope(From(), 1, Amount()));
-            token = DeriveCoin(From(), 1, token.Envelope);
+            var coin = DeriveCoin(From(), 0, DeriveEnvelope(From(), 1, -Math.Abs(Amount().Value)));
+            coin = DeriveCoin(From(), 1, coin.Envelope);
 
-            var redemptionKey = HotRelease(token);
-            var bobPk = DecodeAddress(To());
-            var cipher = GetChiper(redemptionKey, bobPk);
-            var sharedKey = GetSharedKey(bobPk);
-            var notificationAddress = cryptography.GenericHashWithKey(Utilities.BinaryToHex(bobPk.ToArray()), sharedKey);
-            var notification = new NotificationDto() { Address = Utilities.BinaryToHex(notificationAddress), Chiper = Convert.ToBase64String(cipher) };
-            var delivered = false;
+            var formattedCoin = FormatCoinToBase64(coin);
+            var transaction = await AddCoinAsync(formattedCoin, new CancellationToken());
+            if (transaction == null)
+                return;
+
+            await walletService.AddEnvelope(Identifier(), From(), coin.Envelope);
+
+            bal = await BalanceCheck();
+
+            Console.ForegroundColor = ConsoleColor.Magenta;
+            Console.WriteLine($"\nAvailable balance:\t{bal}\n");
+            Console.ForegroundColor = ConsoleColor.White;
+
+            await SetSecretKey();
+
+            var redemptionKey = HotRelease(coin);
+            var pk = DecodeAddress(To()).ToArray();
+            var cipher = GetChiper(redemptionKey, pk);
+            // var sharedKey = GetSharedKey(pk.ToArray());
+            // TODO: Needs reworking..
+            var notificationAddress = cryptography.GenericHashWithKey(pk.ToHex(), pk);
+            var message = new MessageDto()
+            {
+                Address = notificationAddress.ToBase64(),
+                Body = cipher.ToBase64()
+            };
+
+            object delivered = null;
 
             if (answer)
-                delivered = (bool)AddMessageAsync(notification, new CancellationToken()).GetAwaiter().GetResult();
+                delivered = await AddMessageAsync(message, new CancellationToken());
 
-            OnReceivedMessage(new ReceivedMessageEventArgs() { Message = delivered ? (object)true : notification.Chiper, ThroughSystem = answer });
+            OnReceivedMessage(new ReceivedMessageEventArgs() { Message = delivered ?? message, ThroughSystem = answer });
         }
 
         public Tuple<CoinDto, CoinDto> Swap(SecureString password, int version, string key1, string key2, EnvelopeDto envelope)
@@ -546,11 +596,6 @@ namespace TangramCypher.ApplicationLayer.Actor
 
         async Task<JObject> ClientPostAsync<T>(T payload, Uri baseAddress, string path, CancellationToken cancellationToken)
         {
-            if (!Equals(payload, default(T)))
-            {
-                throw new ArgumentNullException(nameof(payload));
-            }
-
             if (baseAddress == null)
             {
                 throw new ArgumentNullException(nameof(baseAddress));
@@ -576,25 +621,34 @@ namespace TangramCypher.ApplicationLayer.Actor
 
                     request.Content = new StringContent(content, Encoding.UTF8, "application/json");
 
-                    using (var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
+                    try
                     {
-                        var stream = await response.Content.ReadAsStreamAsync();
-
-                        if (response.IsSuccessStatusCode)
+                        using (var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
                         {
-                            var result = Util.DeserializeJsonFromStream<JObject>(stream);
-                            return Task.FromResult(result).Result;
+                            var stream = await response.Content.ReadAsStreamAsync();
+
+                            if (response.IsSuccessStatusCode)
+                            {
+                                var result = Util.DeserializeJsonFromStream<JObject>(stream);
+                                return Task.FromResult(result).Result;
+                            }
+
+                            var contentResult = await Util.StreamToStringAsync(stream);
+                            throw new ApiException
+                            {
+                                StatusCode = (int)response.StatusCode,
+                                Content = contentResult
+                            };
                         }
-
-                        var contentResult = await Util.StreamToStringAsync(stream);
-                        throw new ApiException
-                        {
-                            StatusCode = (int)response.StatusCode,
-                            Content = contentResult
-                        };
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine(ex.Message);
                     }
                 }
             }
+
+            return null;
         }
 
         async Task<T> ClientGetAsync<T>(Uri baseAddress, string path, CancellationToken cancellationToken)
@@ -633,6 +687,49 @@ namespace TangramCypher.ApplicationLayer.Actor
                     };
                 }
             }
+        }
+
+        /// <summary>
+        /// Formats the coin base64.
+        /// </summary>
+        /// <returns>The coin base64.</returns>
+        /// <param name="coin">Coin.</param>
+        private CoinDto FormatCoinToBase64(CoinDto coin)
+        {
+            var formattedCoin = new CoinDto
+            {
+                Envelope = new EnvelopeDto()
+                {
+                    Amount = coin.Envelope.Amount,
+                    Serial = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Envelope.Serial))
+                }
+            };
+            formattedCoin.Hint = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Hint));
+            formattedCoin.Keeper = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Keeper));
+            formattedCoin.Principle = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Principle));
+            formattedCoin.Stamp = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Stamp));
+            formattedCoin.Version = coin.Version;
+
+            return formattedCoin;
+        }
+
+        private CoinDto FormatCoinFromBase64(CoinDto coin)
+        {
+            var formattedCoin = new CoinDto
+            {
+                Envelope = new EnvelopeDto()
+                {
+                    Amount = coin.Envelope.Amount,
+                    Serial = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Envelope.Serial))
+                }
+            };
+            formattedCoin.Hint = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Hint));
+            formattedCoin.Keeper = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Keeper));
+            formattedCoin.Principle = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Principle));
+            formattedCoin.Stamp = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Stamp));
+            formattedCoin.Version = coin.Version;
+
+            return formattedCoin;
         }
     }
 }

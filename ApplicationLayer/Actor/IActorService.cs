@@ -11,19 +11,20 @@ namespace TangramCypher.ApplicationLayer.Actor
     {
         event ReceivedMessageEventHandler ReceivedMessage;
 
-        Task<JObject> AddMessageAsync(NotificationDto notification, CancellationToken cancellationToken);
+        Task<JObject> AddMessageAsync(MessageDto message, CancellationToken cancellationToken);
         Task<JObject> AddCoinAsync(CoinDto coin, CancellationToken cancellationToken);
         double? Amount();
         ActorService Amount(double? value);
+        Task<double> BalanceCheck();
         Span<byte> DecodeAddress(string key);
         EnvelopeDto DeriveEnvelope(SecureString password, int version, double? amount);
         string DeriveKey(int version, string proof, SecureString password, int bytes = 32);
         CoinDto DeriveCoin(SecureString password, int version, EnvelopeDto envelope);
         SecureString From();
         ActorService From(SecureString password);
-        byte[] GetChiper(string redemptionKey, Span<byte> bobPk);
+        byte[] GetChiper(string redemptionKey, byte[] pk);
         Task<NotificationDto> GetMessageAsync(string address, CancellationToken cancellationToken);
-        byte[] GetSharedKey(Span<byte> bobPk);
+        byte[] GetSharedKey(byte[] pk);
         Task<CoinDto> GetCoinAsync(string stamp, CancellationToken cancellationToken);
         string HotRelease(CoinDto coin);
         SecureString Identifier();
@@ -34,10 +35,10 @@ namespace TangramCypher.ApplicationLayer.Actor
         string PartialRelease(CoinDto coin);
         SecureString PublicKey();
         ActorService PublicKey(SecureString pk);
-        void ReceivePayment(string redemptionKey);
+        void ReceivePayment(NotificationDto notification);
         SecureString SecretKey();
         ActorService SecretKey(SecureString sk);
-        void SendPayment(bool answer);
+        Task SendPayment(bool answer);
         Tuple<CoinDto, CoinDto> Swap(SecureString password, int version, string key1, string key2, EnvelopeDto envelope);
         string To();
         ActorService To(string address);
