@@ -574,13 +574,15 @@ namespace TangramCypher.ApplicationLayer.Vault
                 throw new ArgumentNullException(nameof(password));
             }
 
-            await PostAsJsonAsync<object>(new { password }, $"v1/auth/userpass/users/{username}", serviceToken.client_token);
+            await PostAsJsonAsync<object>(new VaultUserCreateRequest { password = password }, $"v1/auth/userpass/users/{username}", serviceToken.client_token);
 
             var identityCreateResponse = await PostAsJsonAsync<VaultIdentityEntityCreateResponse>(
-                new { name = username,
-                      policies = new string[] { "walletpolicy" }
+                new VaultIdentityEntityCreateRequest
+                {
+                    name = username,
+                    policies = new string[] { "walletpolicy" }
                 },
-                $"v1/identity/entity", 
+                $"v1/identity/entity",
                 serviceToken.client_token);
 
             var authResponse = await GetAsJsonAsync<JObject>($"v1/sys/auth", serviceToken.client_token);
@@ -589,16 +591,19 @@ namespace TangramCypher.ApplicationLayer.Vault
 
             var entityId = identityCreateResponse.data.id;
 
-            var identityAliasCreateResponse = await PostAsJsonAsync<object>(new { name = username,
-                                                                                  canonical_id = entityId,
-                                                                                  mount_accessor = accesor },
-                                                                            $"v1/identity/entity-alias", 
+            var identityAliasCreateResponse = await PostAsJsonAsync<object>(new VaultCreateEntityAliasRequest
+            {
+                name = username,
+                canonical_id = entityId,
+                mount_accessor = accesor
+            },
+                                                                            $"v1/identity/entity-alias",
                                                                             serviceToken.client_token);
         }
 
         public async Task SaveDataAsync(string username, string password, string path, IDictionary<string, object> data)
         {
-            var vaultClientSettings = new VaultClientSettings(endpoint, new UserPassAuthMethodInfo(username, 
+            var vaultClientSettings = new VaultClientSettings(endpoint, new UserPassAuthMethodInfo(username,
                                                                                                    password));
             var vaultWalletClient = new VaultClient(vaultClientSettings);
 
