@@ -23,10 +23,10 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
         {
             try
             {
-                actorService
-                    .Identifier(Prompt.GetPassword("Identifier:", ConsoleColor.Yellow).ToSecureString())
-                    .From(Prompt.GetPassword("Password:", ConsoleColor.Yellow).ToSecureString())
-                    .ReceivePayment(Prompt.GetString("Chiper:", null, ConsoleColor.Green));
+                //actorService
+                    //.Identifier(Prompt.GetPassword("Identifier:", ConsoleColor.Yellow).ToSecureString())
+                    //.From(Prompt.GetPassword("Password:", ConsoleColor.Yellow).ToSecureString())
+                    //.ReceivePayment(Prompt.GetString("Chiper:", null, ConsoleColor.Green));
             }
             catch (Exception ex)
             {

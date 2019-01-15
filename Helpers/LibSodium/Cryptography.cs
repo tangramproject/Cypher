@@ -94,7 +94,7 @@ namespace TangramCypher.Helpers.LibSodium
             return SodiumCore.GetRandomNumber(n);
         }
 
-        public byte[] ScalarMultBase(byte[] sk)
+        public byte[] ScalarBase(byte[] sk)
         {
             if (sk == null)
             {
@@ -104,19 +104,19 @@ namespace TangramCypher.Helpers.LibSodium
             return Sodium.ScalarMult.Base(sk);
         }
 
-        public byte[] ScalarMult(byte[] aliceSk, byte[] bobPk)
+        public byte[] ScalarMult(byte[] sk, byte[] pk)
         {
-            if (aliceSk == null)
+            if (sk == null)
             {
-                throw new ArgumentNullException(nameof(aliceSk));
+                throw new ArgumentNullException(nameof(sk));
             }
 
-            if (bobPk == null)
+            if (pk == null)
             {
-                throw new ArgumentNullException(nameof(bobPk));
+                throw new ArgumentNullException(nameof(pk));
             }
 
-            return Sodium.ScalarMult.Mult(aliceSk, bobPk);
+            return Sodium.ScalarMult.Mult(sk, pk);
         }
 
         public byte[] ShortHash(string message, byte[] key)

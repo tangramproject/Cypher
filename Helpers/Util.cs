@@ -11,6 +11,7 @@ using System.Net;
 using System.Security;
 using Newtonsoft.Json;
 using System.Threading.Tasks;
+using Sodium;
 
 namespace TangramCypher.Helpers
 {

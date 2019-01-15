@@ -43,7 +43,7 @@ namespace TangramCypher.Helpers
 
                     alloc.ExecuteInConstrainedRegion();
 
-                    Action toBSTR = delegate { insecurePointer = SecureStringMarshal.SecureStringToGlobalAllocAnsi(_secureString); };
+                    Action toBSTR = delegate { insecurePointer = SecureStringMarshal.SecureStringToGlobalAllocUnicode(_secureString); };
 
                     toBSTR.ExecuteInConstrainedRegion();
 
@@ -59,7 +59,7 @@ namespace TangramCypher.Helpers
                 RuntimeHelpers.CleanupCode cleanup = delegate
                 {
                     if (insecurePointer != IntPtr.Zero)
-                        Marshal.ZeroFreeGlobalAllocAnsi(insecurePointer);
+                        Marshal.ZeroFreeGlobalAllocUnicode(insecurePointer);
                 };
 
                 RuntimeHelpers.ExecuteCodeWithGuaranteedCleanup(code, cleanup, null);

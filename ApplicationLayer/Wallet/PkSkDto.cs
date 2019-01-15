@@ -5,7 +5,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
     public class PkSkDto
     {
         public string PublicKey;
-        public SecureString SecretKey;
+        public string SecretKey;
         public string Address;
     }
 }
