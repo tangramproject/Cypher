@@ -313,14 +313,14 @@ namespace TangramCypher.ApplicationLayer.Actor
             return this;
         }
 
-        public void ReceivePayment(NotificationDto notification)
+        public async Task ReceivePayment(NotificationDto notification)
         {
             if (notification == null)
                 throw new ArgumentNullException(nameof(notification));
 
-            SetSecretKey().GetAwaiter().GetResult();
+            await SetSecretKey();
 
-            var storePk = walletService.GetStoreKey(Identifier(), From(), "PublicKey").GetAwaiter().GetResult();
+            var storePk = await walletService.GetStoreKey(Identifier(), From(), "PublicKey");
             var pk = Utilities.HexToBinary(storePk.ToUnSecureString());
 
             using (var insecureSk = SecretKey().Insecure())
@@ -332,21 +332,45 @@ namespace TangramCypher.ApplicationLayer.Actor
                 openMessage = Encoding.UTF8.GetString(Utilities.HexToBinary(openMessage));
 
                 var freeRedemptionKey = JsonConvert.DeserializeObject<RedemptionKeyDto>(openMessage);
-                var coin = GetCoinAsync(freeRedemptionKey.Stamp, new CancellationToken()).GetAwaiter().GetResult();
+                var coin = await GetCoinAsync(freeRedemptionKey.Stamp, new CancellationToken());
 
-                if (coin == null)
-                    return;
+                if (coin != null)
+                {
+                    coin = coin.FormatCoinFromBase64();
 
-                coin = coin.FormatCoinFromBase64();
+                    var swap = Swap(From(), coin.Version, freeRedemptionKey.Key1, freeRedemptionKey.Key2, coin.Envelope);
 
-                var swap = Swap(From(), coin.Version, freeRedemptionKey.Key1, freeRedemptionKey.Key2, coin.Envelope);
-                var token1 = DeriveCoin(From(), swap.Item1.Version, swap.Item1.Envelope);
-                var status1 = VerifyCoin(swap.Item1, token1);
-                var token2 = DeriveCoin(From(), swap.Item2.Version, swap.Item2.Envelope);
-                var status2 = VerifyCoin(swap.Item2, token2);
+                    var coinSwap1 = swap.Item1;
+                    var result = await AddCoinAsync(coinSwap1.FormatCoinToBase64(), new CancellationToken());
 
-                if (status2 == 1)
-                    walletService.AddEnvelope(Identifier(), From(), token2.Envelope).GetAwaiter();
+                    if (result == null)
+                        return;
+
+                    var coinSwap2 = swap.Item2;
+                    result = await AddCoinAsync(coinSwap2.FormatCoinToBase64(), new CancellationToken());
+
+                    if (result == null)
+                        return;
+
+                    var coin1 = DeriveCoin(From(), coinSwap1.Version, coinSwap1.Envelope);
+                    var status1 = VerifyCoin(coinSwap1, coin1);
+
+                    if (status1.Equals(4))
+                        return;
+
+                    var coin2 = DeriveCoin(From(), coinSwap2.Version, coinSwap2.Envelope);
+                    var status2 = VerifyCoin(coinSwap2, coin2);
+
+                    if (status2.Equals(1))
+                    {
+                        result = await AddCoinAsync(coin2.FormatCoinToBase64(), new CancellationToken());
+
+                        if (result == null)
+                            return;
+
+                        await walletService.AddEnvelope(Identifier(), From(), coin2.Envelope);
+                    }
+                }
             }
         }
 
@@ -431,7 +455,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             var v3 = version + 3;
             var v4 = version + 4;
 
-            var token1 = new CoinDto()
+            var coin1 = new CoinDto()
             {
                 Keeper = DeriveKey(v2, stamp, DeriveKey(v3, stamp, DeriveKey(v3, stamp, password).ToSecureString()).ToSecureString()),
                 Version = v1,
@@ -441,7 +465,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                 Hint = DeriveKey(v2, stamp, key2.ToSecureString())
             };
 
-            var token2 = new CoinDto()
+            var coin2 = new CoinDto()
             {
                 Keeper = DeriveKey(v3, stamp, DeriveKey(v4, stamp, DeriveKey(v4, stamp, password).ToSecureString()).ToSecureString()),
                 Version = v2,
@@ -451,7 +475,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                 Hint = DeriveKey(v3, stamp, DeriveKey(v3, stamp, password).ToSecureString())
             };
 
-            return Tuple.Create(token1, token2);
+            return Tuple.Create(coin1, coin2);
         }
 
         public CoinDto SwapPartialOne(SecureString password, RedemptionKeyDto redemptionKey)
