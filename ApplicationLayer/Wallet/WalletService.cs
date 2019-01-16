@@ -36,14 +36,10 @@ namespace TangramCypher.ApplicationLayer.Wallet
         public async Task<double> GetBalance(SecureString identifier, SecureString password)
         {
             if (identifier == null)
-            {
                 throw new ArgumentNullException(nameof(identifier));
-            }
 
             if (password == null)
-            {
                 throw new ArgumentNullException(nameof(password));
-            }
 
             var total = 0.0;
 
@@ -119,19 +115,13 @@ namespace TangramCypher.ApplicationLayer.Wallet
         public async Task AddEnvelope(SecureString identifier, SecureString password, EnvelopeDto envelope)
         {
             if (identifier == null)
-            {
                 throw new ArgumentNullException(nameof(identifier));
-            }
 
             if (password == null)
-            {
                 throw new ArgumentNullException(nameof(password));
-            }
 
             if (envelope == null)
-            {
                 throw new ArgumentNullException(nameof(envelope));
-            }
 
             using (var insecureIdentifier = identifier.Insecure())
             {
@@ -145,7 +135,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
                         foreach (JObject item in ((JArray)envelopes).Children().ToList())
                         {
                             var serial = item.GetValue("Serial");
-                            found = serial.Value<string>().Equals(envelope.Serial) ? true : false;
+                            found = serial.Value<string>().Equals(envelope.Serial);
                         }
                         if (!found)
                             ((JArray)envelopes).Add(JObject.FromObject(envelope));
@@ -167,6 +157,15 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <param name="storeKey">Store key.</param>
         public async Task<SecureString> GetStoreKey(SecureString identifier, SecureString password, string storeKey)
         {
+            if (identifier == null)
+                throw new ArgumentNullException(nameof(identifier));
+
+            if (password == null)
+                throw new ArgumentNullException(nameof(password));
+
+            if (string.IsNullOrEmpty(storeKey))
+                throw new ArgumentException("Store key is missing!", nameof(storeKey));
+
             using (var insecureIdentifier = identifier.Insecure())
             {
                 using (var insecurePassword = password.Insecure())
