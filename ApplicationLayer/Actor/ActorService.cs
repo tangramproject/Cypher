@@ -694,7 +694,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// </summary>
         /// <returns>The coin base64.</returns>
         /// <param name="coin">Coin.</param>
-        private CoinDto FormatCoinToBase64(CoinDto coin)
+        public CoinDto FormatCoinToBase64(CoinDto coin)
         {
             var formattedCoin = new CoinDto
             {
@@ -713,7 +713,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             return formattedCoin;
         }
 
-        private CoinDto FormatCoinFromBase64(CoinDto coin)
+        public CoinDto FormatCoinFromBase64(CoinDto coin)
         {
             var formattedCoin = new CoinDto
             {
