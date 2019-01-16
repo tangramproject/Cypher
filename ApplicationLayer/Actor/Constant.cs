@@ -15,5 +15,6 @@
         public const string GetVerifiyShortTransactions = "getVerifiyShortTransactions";
         public const string GetMessage = "getMessage";
         public const string PostMessage = "postMessage";
+        public const string GetMessages = "getMessages";
     }
 }
