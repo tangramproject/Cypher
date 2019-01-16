@@ -59,10 +59,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
         async Task<CoinDto> AddCoin(SecureString passphrase, double? amount)
         {
             var coin = actorService.DeriveCoin(passphrase, 1, actorService.DeriveEnvelope(passphrase, 1, amount.Value));
-
-            coin = actorService.FormatCoinToBase64(coin);
-
-            var result = await actorService.AddCoinAsync(coin, new System.Threading.CancellationToken());
+            var result = await actorService.AddCoinAsync(coin.FormatCoinToBase64(), new System.Threading.CancellationToken());
 
             if (result != null)
                 return coin;

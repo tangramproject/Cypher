@@ -337,7 +337,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                 if (coin == null)
                     return;
 
-                coin = FormatCoinFromBase64(coin);
+                coin = coin.FormatCoinFromBase64();
 
                 var swap = Swap(From(), coin.Version, freeRedemptionKey.Key1, freeRedemptionKey.Key2, coin.Envelope);
                 var token1 = DeriveCoin(From(), swap.Item1.Version, swap.Item1.Envelope);
@@ -376,7 +376,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             var coin = DeriveCoin(From(), 0, DeriveEnvelope(From(), 1, -Math.Abs(Amount().Value)));
             coin = DeriveCoin(From(), 1, coin.Envelope);
 
-            var formattedCoin = FormatCoinToBase64(coin);
+            var formattedCoin = coin.FormatCoinFromBase64();
             var transaction = await AddCoinAsync(formattedCoin, new CancellationToken());
             if (transaction == null)
                 return;
@@ -633,49 +633,6 @@ namespace TangramCypher.ApplicationLayer.Actor
                     };
                 }
             }
-        }
-
-        /// <summary>
-        /// Formats the coin base64.
-        /// </summary>
-        /// <returns>The coin base64.</returns>
-        /// <param name="coin">Coin.</param>
-        public CoinDto FormatCoinToBase64(CoinDto coin)
-        {
-            var formattedCoin = new CoinDto
-            {
-                Envelope = new EnvelopeDto()
-                {
-                    Amount = coin.Envelope.Amount,
-                    Serial = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Envelope.Serial))
-                }
-            };
-            formattedCoin.Hint = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Hint));
-            formattedCoin.Keeper = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Keeper));
-            formattedCoin.Principle = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Principle));
-            formattedCoin.Stamp = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Stamp));
-            formattedCoin.Version = coin.Version;
-
-            return formattedCoin;
-        }
-
-        public CoinDto FormatCoinFromBase64(CoinDto coin)
-        {
-            var formattedCoin = new CoinDto
-            {
-                Envelope = new EnvelopeDto()
-                {
-                    Amount = coin.Envelope.Amount,
-                    Serial = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Envelope.Serial))
-                }
-            };
-            formattedCoin.Hint = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Hint));
-            formattedCoin.Keeper = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Keeper));
-            formattedCoin.Principle = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Principle));
-            formattedCoin.Stamp = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Stamp));
-            formattedCoin.Version = coin.Version;
-
-            return formattedCoin;
         }
     }
 }

@@ -7,6 +7,7 @@ using System.Security;
 using System.Text;
 using Newtonsoft.Json;
 using Sodium;
+using TangramCypher.ApplicationLayer.Actor;
 
 namespace TangramCypher.Helpers
 {
@@ -91,6 +92,42 @@ namespace TangramCypher.Helpers
                 if (bstr != IntPtr.Zero)
                     Marshal.ZeroFreeBSTR(bstr);
             }
+        }
+        public static CoinDto FormatCoinToBase64(this CoinDto coin)
+        {
+            var formattedCoin = new CoinDto
+            {
+                Envelope = new EnvelopeDto()
+                {
+                    Amount = coin.Envelope.Amount,
+                    Serial = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Envelope.Serial))
+                }
+            };
+            formattedCoin.Hint = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Hint));
+            formattedCoin.Keeper = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Keeper));
+            formattedCoin.Principle = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Principle));
+            formattedCoin.Stamp = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Stamp));
+            formattedCoin.Version = coin.Version;
+
+            return formattedCoin;
+        }
+        public static CoinDto FormatCoinFromBase64(this CoinDto coin)
+        {
+            var formattedCoin = new CoinDto
+            {
+                Envelope = new EnvelopeDto()
+                {
+                    Amount = coin.Envelope.Amount,
+                    Serial = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Envelope.Serial))
+                }
+            };
+            formattedCoin.Hint = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Hint));
+            formattedCoin.Keeper = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Keeper));
+            formattedCoin.Principle = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Principle));
+            formattedCoin.Stamp = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Stamp));
+            formattedCoin.Version = coin.Version;
+
+            return formattedCoin;
         }
     }
 }

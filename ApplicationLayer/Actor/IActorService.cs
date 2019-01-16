@@ -43,7 +43,5 @@ namespace TangramCypher.ApplicationLayer.Actor
         string To();
         ActorService To(string address);
         int VerifyCoin(CoinDto terminal, CoinDto current);
-        CoinDto FormatCoinFromBase64(CoinDto coin);
-        CoinDto FormatCoinToBase64(CoinDto coin);
     }
 }
