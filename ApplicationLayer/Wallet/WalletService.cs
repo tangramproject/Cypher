@@ -26,7 +26,6 @@ namespace TangramCypher.ApplicationLayer.Wallet
             this.cryptography = cryptography;
         }
 
-
         /// <summary>
         /// Gets the balance.
         /// </summary>

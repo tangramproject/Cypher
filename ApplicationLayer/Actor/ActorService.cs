@@ -73,9 +73,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         public async Task<JObject> AddCoinAsync(CoinDto coin, CancellationToken cancellationToken)
         {
             if (coin == null)
-            {
                 throw new ArgumentNullException(nameof(coin));
-            }
 
             var baseAddress = new Uri(apiRestSection.GetValue<string>(Constant.Endpoint));
             var path = apiRestSection.GetSection(Constant.Routing).GetValue<string>(Constant.PostCoin);
@@ -92,13 +90,9 @@ namespace TangramCypher.ApplicationLayer.Actor
         public ActorService Amount(double? value)
         {
             if (value == null)
-            {
                 throw new Exception("Value can not be null!");
-            }
             if (Math.Abs(value.GetValueOrDefault()) <= 0)
-            {
                 throw new Exception("Value can not be zero!");
-            }
 
             _amount = value;
 
@@ -135,23 +129,17 @@ namespace TangramCypher.ApplicationLayer.Actor
         public string DeriveSerialKey(int version, double? amount, SecureString password, int bytes = 32)
         {
             if (password == null)
-            {
                 throw new ArgumentNullException(nameof(password));
-            }
 
             using (var insecurePassword = password.Insecure())
-            {
                 return
                 cryptography.GenericHashNoKey(string.Format("{0} {1} {2} {3}", version, amount.Value.ToString(), insecurePassword.Value, cryptography.RandomKey().ToHex()), bytes).ToHex();
-            }
         }
 
         public EnvelopeDto DeriveEnvelope(SecureString password, int version, double? amount)
         {
             if (password == null)
-            {
                 throw new ArgumentNullException(nameof(password));
-            }
 
             var v0 = +version;
             return new EnvelopeDto()
@@ -164,14 +152,10 @@ namespace TangramCypher.ApplicationLayer.Actor
         public CoinDto DeriveCoin(SecureString password, int version, EnvelopeDto envelope)
         {
             if (password == null)
-            {
                 throw new ArgumentNullException(nameof(password));
-            }
 
             if (envelope == null)
-            {
                 throw new ArgumentNullException(nameof(envelope));
-            }
 
             var stamp = cryptography.GenericHashNoKey(string.Format("{0}{1}", envelope.Amount.ToString(), envelope.Serial)).ToHex();
             var v0 = +version;
@@ -211,9 +195,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         public async Task<NotificationDto> GetMessageAsync(string address, CancellationToken cancellationToken)
         {
             if (string.IsNullOrEmpty(address))
-            {
                 throw new ArgumentException("Address is missing!", nameof(address));
-            }
 
             var baseAddress = new Uri(apiRestSection.GetValue<string>(Constant.Endpoint));
             var path = string.Format(apiRestSection.GetSection(Constant.Routing).GetValue<string>(Constant.GetMessage), address);
@@ -236,9 +218,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         public async Task<CoinDto> GetCoinAsync(string stamp, CancellationToken cancellationToken)
         {
             if (string.IsNullOrEmpty(stamp))
-            {
                 throw new ArgumentException("Stamp is missing!", nameof(stamp));
-            }
 
             var baseAddress = new Uri(apiRestSection.GetValue<string>(Constant.Endpoint));
             var path = string.Format(apiRestSection.GetSection(Constant.Routing).GetValue<string>(Constant.GetCoin), stamp);
@@ -251,9 +231,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         public string HotRelease(CoinDto coin)
         {
             if (coin == null)
-            {
                 throw new ArgumentNullException(nameof(CoinDto));
-            }
 
             var subKey1 = DeriveKey(coin.Version + 1, coin.Stamp, From());
             var subKey2 = DeriveKey(coin.Version + 2, coin.Stamp, From());
@@ -298,14 +276,10 @@ namespace TangramCypher.ApplicationLayer.Actor
         public string OpenBoxSeal(string cipher, PkSkDto pkSkDto)
         {
             if (string.IsNullOrEmpty(cipher))
-            {
                 throw new ArgumentException("Cipher cannot be null or empty!", nameof(cipher));
-            }
 
             if (pkSkDto == null)
-            {
                 throw new ArgumentNullException(nameof(pkSkDto));
-            }
 
             var pk = Encoding.UTF8.GetBytes(pkSkDto.PublicKey);
             var sk = Encoding.UTF8.GetBytes(pkSkDto.SecretKey);
@@ -318,9 +292,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         public string PartialRelease(CoinDto coin)
         {
             if (coin == null)
-            {
                 throw new ArgumentNullException(nameof(coin));
-            }
 
             var subKey1 = DeriveKey(coin.Version + 1, coin.Stamp, From());
             var subKey2 = DeriveKey(coin.Version + 2, coin.Stamp, From()).ToSecureString();
@@ -344,9 +316,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         public void ReceivePayment(NotificationDto notification)
         {
             if (notification == null)
-            {
                 throw new ArgumentNullException(nameof(notification));
-            }
 
             SetSecretKey().GetAwaiter().GetResult();
 
@@ -444,24 +414,16 @@ namespace TangramCypher.ApplicationLayer.Actor
         public Tuple<CoinDto, CoinDto> Swap(SecureString password, int version, string key1, string key2, EnvelopeDto envelope)
         {
             if (password == null)
-            {
                 throw new ArgumentNullException(nameof(password));
-            }
 
             if (string.IsNullOrEmpty(key1))
-            {
                 throw new ArgumentException("Sub Key1 cannot be null or empty", nameof(key1));
-            }
 
             if (string.IsNullOrEmpty(key2))
-            {
                 throw new ArgumentException("Sub Key2 cannot be null or empty", nameof(key2));
-            }
 
             if (envelope == null)
-            {
                 throw new ArgumentNullException(nameof(envelope));
-            }
 
             var stamp = cryptography.GenericHashNoKey(string.Format("{0}{1}", envelope.Amount.ToString(), envelope.Serial)).ToHex();
             var v1 = version + 1;
@@ -495,14 +457,10 @@ namespace TangramCypher.ApplicationLayer.Actor
         public CoinDto SwapPartialOne(SecureString password, RedemptionKeyDto redemptionKey)
         {
             if (password == null)
-            {
                 throw new ArgumentNullException(nameof(password));
-            }
 
             if (redemptionKey == null)
-            {
                 throw new ArgumentNullException(nameof(redemptionKey));
-            }
 
             var coin = GetCoinAsync(redemptionKey.Stamp, new CancellationToken()).GetAwaiter().GetResult();
 
@@ -550,14 +508,10 @@ namespace TangramCypher.ApplicationLayer.Actor
         public int VerifyCoin(CoinDto terminal, CoinDto current)
         {
             if (terminal == null)
-            {
                 throw new ArgumentNullException(nameof(terminal));
-            }
 
             if (current == null)
-            {
                 throw new ArgumentNullException(nameof(current));
-            }
 
             return terminal.Keeper.Equals(current.Keeper) && terminal.Hint.Equals(current.Hint)
                ? 1
@@ -597,14 +551,10 @@ namespace TangramCypher.ApplicationLayer.Actor
         async Task<JObject> ClientPostAsync<T>(T payload, Uri baseAddress, string path, CancellationToken cancellationToken)
         {
             if (baseAddress == null)
-            {
                 throw new ArgumentNullException(nameof(baseAddress));
-            }
 
             if (string.IsNullOrEmpty(path))
-            {
                 throw new ArgumentException("Path is missing!", nameof(path));
-            }
 
             using (var client = new HttpClient())
             {
@@ -654,14 +604,10 @@ namespace TangramCypher.ApplicationLayer.Actor
         async Task<T> ClientGetAsync<T>(Uri baseAddress, string path, CancellationToken cancellationToken)
         {
             if (baseAddress == null)
-            {
                 throw new ArgumentNullException(nameof(baseAddress));
-            }
 
             if (string.IsNullOrEmpty(path))
-            {
                 throw new ArgumentException("Path is missing!", nameof(path));
-            }
 
             using (var client = new HttpClient())
             {
