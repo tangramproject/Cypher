@@ -58,13 +58,20 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
 
         async Task<CoinDto> AddCoin(SecureString passphrase, double? amount)
         {
-            var coin = actorService.DeriveCoin(passphrase, 1, actorService.DeriveEnvelope(passphrase, 1, amount.Value));
+            var coin = actorService.DeriveCoin(passphrase, 0, actorService.DeriveEnvelope(passphrase, 0, amount.Value));
             var result = await actorService.AddCoinAsync(coin.FormatCoinToBase64(), new System.Threading.CancellationToken());
 
-            if (result != null)
-                return coin;
+            if (result == null)
+                return null;
 
-            return null;
+            coin = actorService.DeriveCoin(passphrase, 1, actorService.DeriveEnvelope(passphrase, 1, amount.Value));
+            result = await actorService.AddCoinAsync(coin.FormatCoinToBase64(), new System.Threading.CancellationToken());
+
+            if (result == null)
+                return null;
+
+            return coin;
+
         }
     }
 }
