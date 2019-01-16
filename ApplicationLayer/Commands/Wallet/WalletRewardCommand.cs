@@ -60,16 +60,11 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
         {
             var coin = actorService.DeriveCoin(passphrase, 1, actorService.DeriveEnvelope(passphrase, 1, amount.Value));
 
-            coin.Envelope.Serial = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Envelope.Serial));
-            coin.Hint = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Hint));
-            coin.Keeper = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Keeper));
-            coin.Principle = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Principle));
-            coin.Stamp = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Stamp));
+            coin = actorService.FormatCoinToBase64(coin);
 
             var result = await actorService.AddCoinAsync(coin, new System.Threading.CancellationToken());
-            var transaction = JsonConvert.DeserializeObject<JObject>(result.AsJson().ReadAsStringAsync().Result);
 
-            if (transaction != null)
+            if (result != null)
                 return coin;
 
             return null;
