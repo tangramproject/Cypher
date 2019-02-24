@@ -4,7 +4,7 @@ using McMaster.Extensions.CommandLineUtils;
 using TangramCypher.ApplicationLayer.Vault;
 using Microsoft.Extensions.DependencyInjection;
 using TangramCypher.ApplicationLayer.Actor;
-using TangramCypher.Helpers;
+using TangramCypher.Helper;
 using Newtonsoft.Json;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
@@ -34,39 +34,29 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                 var yesNo = Prompt.GetYesNo("Send redemption key to message pool?", true, ConsoleColor.Yellow);
 
                 using (var insecureIdentifier = identifier.Insecure())
+                using (var insecurePassword = password.Insecure())
                 {
-                    using (var insecurePassword = password.Insecure())
-                    {
-                        await vaultService.GetDataAsync(insecureIdentifier.Value, insecurePassword.Value, $"wallets/{insecureIdentifier.Value}/wallet");
-                    }
+                    await vaultService.GetDataAsync(insecureIdentifier.Value, insecurePassword.Value, $"wallets/{insecureIdentifier.Value}/wallet");
                 }
 
-                actorService.ReceivedMessage += ReceivedMessage;
+                if (double.TryParse(amount, out double t))
+                {
+                    var message =
+                        await actorService
+                                .From(password)
+                                .Identifier(identifier)
+                                .Amount(t)
+                                .To(address)
+                                .Memo(memo)
+                                .SendPayment(yesNo);
 
-                await actorService
-                    .From(password)
-                    .Identifier(identifier)
-                    .Amount(Convert.ToDouble(amount))
-                    .To(address)
-                    .Memo(memo)
-                    .SendPayment(yesNo);
+                    console.WriteLine(JsonConvert.SerializeObject(message));
+                }
             }
             catch (Exception ex)
             {
                 throw ex;
             }
-        }
-
-        private void ReceivedMessage(object sender, ReceivedMessageEventArgs e)
-        {
-            actorService.ReceivedMessage -= ReceivedMessage;
-
-            if (e.ThroughSystem)
-            {
-                console.WriteLine($"Redemption key was delivered: {e.Message ?? false}");
-            }
-            else
-                console.WriteLine($"Redemption Chiper: {JsonConvert.SerializeObject(e.Message)}");
         }
     }
 }

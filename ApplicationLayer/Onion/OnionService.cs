@@ -11,14 +11,15 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using DotNetTor.SocksPort;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using TangramCypher.ApplicationLayer;
-using TangramCypher.Helpers;
-using TangramCypher.Helpers.LibSodium;
+using TangramCypher.Helper;
+using TangramCypher.Helper.LibSodium;
 
 namespace Cypher.ApplicationLayer.Onion
 {
@@ -36,7 +37,6 @@ namespace Cypher.ApplicationLayer.Onion
 
         private static readonly DirectoryInfo tangramDirectory = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
 
-        readonly ICryptography cryptography;
         readonly IConfigurationSection onionSection;
         readonly ILogger logger;
         readonly IConsole console;
@@ -57,9 +57,8 @@ namespace Cypher.ApplicationLayer.Onion
 
         public bool OnionStarted { get; private set; }
 
-        public OnionService(ICryptography cryptography, IConfiguration configuration, ILogger logger, IConsole console)
+        public OnionService(IConfiguration configuration, ILogger logger, IConsole console)
         {
-            this.cryptography = cryptography;
             onionSection = configuration.GetSection(ONION);
 
             this.logger = logger;
@@ -90,17 +89,21 @@ namespace Cypher.ApplicationLayer.Onion
                 throw new ArgumentException("Path is missing!", nameof(path));
             }
 
-            using (var client = new HttpClient())
+            using (var client = new HttpClient(new SocksPortHandler(socksHost, socksPort)))
             {
-                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
+                //ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
 
                 client.BaseAddress = baseAddress;
                 client.DefaultRequestHeaders.Accept.Clear();
                 client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
-                using (var request = new HttpRequestMessage(HttpMethod.Get, path))
+
+                using (var request = new HttpRequestMessage(HttpMethod.Get, string.Format("{0}{1}", baseAddress, path)))
                 using (var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
                 {
+
+                    ChangeCircuit("ILoveTangram".ToSecureString());
+
                     var stream = await response.Content.ReadAsStreamAsync();
 
                     if (response.IsSuccessStatusCode)
@@ -216,11 +219,6 @@ namespace Cypher.ApplicationLayer.Onion
 
         public async Task<JObject> ClientPostAsync<T>(T payload, Uri baseAddress, string path, CancellationToken cancellationToken)
         {
-            if (!Equals(payload, default(T)))
-            {
-                throw new ArgumentNullException(nameof(payload));
-            }
-
             if (baseAddress == null)
             {
                 throw new ArgumentNullException(nameof(baseAddress));
@@ -231,9 +229,9 @@ namespace Cypher.ApplicationLayer.Onion
                 throw new ArgumentException("Path is missing!", nameof(path));
             }
 
-            using (var client = new HttpClient())
+            using (var client = new HttpClient(new SocksPortHandler(socksHost, socksPort)))
             {
-                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
+                // ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
 
                 client.BaseAddress = baseAddress;
                 client.DefaultRequestHeaders.Accept.Clear();
@@ -248,6 +246,8 @@ namespace Cypher.ApplicationLayer.Onion
 
                     using (var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
                     {
+                        ChangeCircuit("ILoveTangram".ToSecureString());
+
                         var stream = await response.Content.ReadAsStreamAsync();
 
                         if (response.IsSuccessStatusCode)
@@ -415,7 +415,7 @@ namespace Cypher.ApplicationLayer.Onion
 #pragma warning restore RECS0133 // Parameter name differs in base declaration
 #pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
         {
-            if(onionEnabled == 1)
+            if (onionEnabled == 1)
             {
                 console.WriteLine("Starting Onion Service");
                 logger.LogInformation("Starting Onion Service");

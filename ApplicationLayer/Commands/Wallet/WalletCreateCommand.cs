@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using McMaster.Extensions.CommandLineUtils;
 using TangramCypher.ApplicationLayer.Wallet;
-using TangramCypher.Helpers;
+using TangramCypher.Helper;
 using TangramCypher.ApplicationLayer.Vault;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
