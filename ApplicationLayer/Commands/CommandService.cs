@@ -23,10 +23,10 @@ namespace TangramCypher.ApplicationLayer.Commands
         readonly IDictionary<string[], Type> commands;
         private bool prompt = true;
 
-        public CommandService(IConsole cnsl, IServiceProvider provider)
+        public CommandService(IConsole cnsl, IServiceProvider provider, ILogger lgr)
         {
             console = cnsl;
-            //logger = lgr;
+            logger = lgr;
             serviceProvider = provider;
 
             commands = new Dictionary<string[], Type>(new CommandEqualityComparer());
