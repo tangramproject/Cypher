@@ -1,8 +1,6 @@
 using System;
-using System.Diagnostics.Contracts;
-using System.Net;
-using System.Net.Http;
-using System.Net.Http.Headers;
+using System.Collections.Generic;
+using System.Linq;
 using System.Security;
 using System.Text;
 using System.Threading;
@@ -14,207 +12,239 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using SimpleBase;
 using Sodium;
+using TangramCypher.ApplicationLayer.Helper.ZeroKP;
 using TangramCypher.ApplicationLayer.Wallet;
-using TangramCypher.Helpers;
-using TangramCypher.Helpers.LibSodium;
+using TangramCypher.Helper;
+using TangramCypher.Helper.Http;
+using TangramCypher.Helper.LibSodium;
+using TangramCypher.ApplicationLayer.Coin;
 
 namespace TangramCypher.ApplicationLayer.Actor
 {
     public class ActorService : IActorService
     {
         protected SecureString masterKey;
-        protected string _toAdress;
-        protected double? _amount;
-        protected string _memo;
+        protected string toAdress;
+        protected double? amount;
+        protected string memo;
+        protected double? change;
         protected SecureString secretKey;
         protected SecureString publicKey;
         protected SecureString identifier;
 
-        readonly IConfigurationSection apiRestSection;
-        readonly ILogger logger;
-        readonly ICryptography cryptography;
-        readonly IOnionService onionService;
-        readonly IWalletService walletService;
+        private readonly IConfigurationSection apiRestSection;
+        private readonly IConfigurationSection apiOnionSection;
+        private readonly ILogger logger;
+        private readonly IOnionService onionService;
+        private readonly IWalletService walletService;
+        private readonly ICoinService coinService;
 
-
-        public event ReceivedMessageEventHandler ReceivedMessage;
-
-        protected virtual void OnReceivedMessage(ReceivedMessageEventArgs e)
+        public ActorService(IOnionService onionService, IWalletService walletService, ICoinService coinService, IConfiguration configuration, ILogger logger)
         {
-            ReceivedMessage?.Invoke(this, e);
-        }
-
-        public ActorService(ICryptography cryptography, IOnionService onionService, IWalletService walletService, IConfiguration configuration, ILogger logger)
-        {
-            this.cryptography = cryptography;
             this.onionService = onionService;
             this.walletService = walletService;
+            this.coinService = coinService;
             this.logger = logger;
 
             apiRestSection = configuration.GetSection(Constant.ApiGateway);
+            apiOnionSection = configuration.GetSection(Constant.Onion);
+
+            //var pass = "the few depth squeaked animist ones relabels a sadistic gap".ToSecureString();
+            //var id = "id_04ec58c0c32b0dc517f54516b2b17f59".ToSecureString();
+            //var h = "7da16ee30a273db6b04a9e05dcdeed229f63e03cabc856de48726f6b9f1a9ac4";
+
+            //var coin = coinService
+            //      .Password(pass)
+            //      .Input(5)
+            //      .Output(2)
+            //      .Stamp(GetStamp())
+            //      .Version(1)
+            //      .Build();
+
+            //change = coinService.Change();
+
+            //// var result = AddCoinAsync(coin.FormatCoinToBase64(), new CancellationToken()).GetAwaiter().GetResult();
+
+            //coin = coinService
+            //      .Password(pass)
+            //      .Input(GetChange())
+            //      .Output(0){"request_id":"0c76ec31-472d-a748-4cb2-640714a952de","lease_id":"","renewable":false,"lease_duration":2764800,"data":{"storeKeys":{"Address":"GLpSn2pX2Xyv5FwbyRMrJJF2HRVHZ88q9AGEMhskssMd","PublicKey":"e3f2fc1ed1c1bfb7df5f81fc8383e195a54c37eaa8576d3b3668eecc442dbf74","SecretKey":"83557fe14469adf59a620f2c5b8d350790ef9b6ffc8dd95b00792d55f66d1094"},"transactions":[{"Amount":3.0,"Commitment":"0873e72f13c8910589945f264060e9952b271ce750f9c3826240376e7c2ada2d3d","Hash":"7da16ee30a273db6b04a9e05dcdeed229f63e03cabc856de48726f6b9f1a9ac4","Stamp":"cf40359d6a24c4383d73131831c8884dca59ff9d384673c700a60e0578f4f083","Version":1}]},"wrap_info":null,"warnings":null,"auth":null}
+            //      .Stamp(GetStamp())
+            //      .Version(1)
+            //      .Build();
+
+            //// result = AddCoinAsync(coin.FormatCoinToBase64(), new CancellationToken()).GetAwaiter().GetResult();
+
+
+            // var result = GetCoinAsync(h, new CancellationToken()).GetAwaiter().GetResult();
+
+
+            //From(pass);
+            //Identifier(id);
+
+            //result = result.FormatCoinFromBase64();
+
+            //walletService.AddTransaction(Identifier(), From(), new TransactionDto
+            //{
+            //    Amount = change.Value,
+            //    Commitment = result.Envelope.Commitment,
+            //    Hash = result.Hash,
+            //    Stamp = result.Stamp,
+            //    Version = result.Version
+            //});
+
         }
 
-        // TODO: Temp fix until we get the onion client working.
+        /// <summary>
+        /// Adds the message async.
+        /// </summary>
+        /// <returns>The message async.</returns>
+        /// <param name="message">Message.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
         public async Task<JObject> AddMessageAsync(MessageDto message, CancellationToken cancellationToken)
         {
             if (message == null)
-            {
                 throw new ArgumentNullException(nameof(message));
-            }
 
             var baseAddress = new Uri(apiRestSection.GetValue<string>(Constant.Endpoint));
             var path = apiRestSection.GetSection(Constant.Routing).GetValue<string>(Constant.PostMessage);
-            var result = await ClientPostAsync(message, baseAddress, path, cancellationToken);
 
-            return result;
+            JObject jObject = apiOnionSection.GetValue<int>(Constant.OnionEnabled) == 1
+                ? await onionService.ClientPostAsync(message, baseAddress, path, cancellationToken)
+                : await Client.PostAsync(message, baseAddress, path, cancellationToken);
+
+            return jObject;
         }
 
-        // TODO: Temp fix until we get the onion client working.
+        /// <summary>
+        /// Adds the coin async.
+        /// </summary>
+        /// <returns>The coin async.</returns>
+        /// <param name="coin">Coin.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
         public async Task<JObject> AddCoinAsync(CoinDto coin, CancellationToken cancellationToken)
         {
             if (coin == null)
                 throw new ArgumentNullException(nameof(coin));
-
             var baseAddress = new Uri(apiRestSection.GetValue<string>(Constant.Endpoint));
             var path = apiRestSection.GetSection(Constant.Routing).GetValue<string>(Constant.PostCoin);
-            var result = await ClientPostAsync(coin, baseAddress, path, cancellationToken);
 
-            return result;
+            JObject jObject = apiOnionSection.GetValue<int>(Constant.OnionEnabled) == 1
+                ? await onionService.ClientPostAsync(coin, baseAddress, path, cancellationToken)
+                : await Client.PostAsync(coin, baseAddress, path, cancellationToken);
+
+            return jObject;
         }
 
-        public double? Amount()
-        {
-            return _amount;
-        }
+        /// <summary>
+        /// Gets the Amount instance.
+        /// </summary>
+        /// <returns>The amount.</returns>
+        public double? Amount() => amount;
 
+        /// <summary>
+        /// Sets the specified Amount value.
+        /// </summary>
+        /// <returns>The amount.</returns>
+        /// <param name="value">Value.</param>
         public ActorService Amount(double? value)
         {
             if (value == null)
                 throw new Exception("Value can not be null!");
-            if (Math.Abs(value.GetValueOrDefault()) <= 0)
-                throw new Exception("Value can not be zero!");
+            if (Math.Abs(value.GetValueOrDefault()) < 0)
+                throw new Exception("Value can not be less than zero!");
 
-            _amount = value;
+            amount = Math.Abs(value.Value);
 
             return this;
         }
 
+        public double? GetChange() => change;
+
         /// <summary>
-        /// Balance check.
+        /// Checks the balance.
         /// </summary>
-        /// <returns>The check.</returns>
-        public async Task<double> BalanceCheck()
-        {
-            return await walletService.GetBalance(Identifier(), From());
-        }
+        /// <returns>The balance.</returns>
+        public async Task<double> CheckBalance() => await walletService.GetBalance(Identifier(), From());
 
-        public Span<byte> DecodeAddress(string key)
-        {
-            return Base58.Bitcoin.Decode(key);
-        }
+        /// <summary>
+        /// Decodes the address.
+        /// </summary>
+        /// <returns>The address.</returns>
+        /// <param name="key">Key.</param>
+        public Span<byte> DecodeAddress(string key) => Base58.Bitcoin.Decode(key);
 
-        public string DeriveKey(int version, string stamp, SecureString password, int bytes = 32)
-        {
-            if (string.IsNullOrEmpty(stamp))
-            {
-                throw new ArgumentException("Stamp cannot be null or empty!", nameof(stamp));
-            }
 
-            using (var insecurePassword = password.Insecure())
-            {
-                return cryptography.GenericHashNoKey(string.Format("{0} {1} {2}", version, stamp, insecurePassword.Value), bytes).ToHex();
-            }
-        }
+        /// <summary>
+        /// Gets the master key instance.
+        /// </summary>
+        /// <returns>The from.</returns>
+        public SecureString From() => masterKey;
 
-        public string DeriveSerialKey(int version, double? amount, SecureString password, int bytes = 32)
-        {
-            if (password == null)
-                throw new ArgumentNullException(nameof(password));
-
-            using (var insecurePassword = password.Insecure())
-                return
-                cryptography.GenericHashNoKey(string.Format("{0} {1} {2} {3}", version, amount.Value.ToString(), insecurePassword.Value, cryptography.RandomKey().ToHex()), bytes).ToHex();
-        }
-
-        public EnvelopeDto DeriveEnvelope(SecureString password, int version, double? amount)
-        {
-            if (password == null)
-                throw new ArgumentNullException(nameof(password));
-
-            var v0 = +version;
-            return new EnvelopeDto()
-            {
-                Amount = amount.Value,
-                Serial = DeriveSerialKey(v0, amount, password)
-            };
-        }
-
-        public CoinDto DeriveCoin(SecureString password, int version, EnvelopeDto envelope)
-        {
-            if (password == null)
-                throw new ArgumentNullException(nameof(password));
-
-            if (envelope == null)
-                throw new ArgumentNullException(nameof(envelope));
-
-            var stamp = cryptography.GenericHashNoKey(string.Format("{0}{1}", envelope.Amount.ToString(), envelope.Serial)).ToHex();
-            var v0 = +version;
-            var v1 = +version + 1;
-            var v2 = +version + 2;
-
-            var coin = new CoinDto()
-            {
-                Keeper = DeriveKey(v1, stamp, DeriveKey(v2, stamp, DeriveKey(v2, stamp, password).ToSecureString()).ToSecureString()),
-                Version = v0,
-                Principle = DeriveKey(v0, stamp, password),
-                Stamp = stamp,
-                Envelope = envelope,
-                Hint = DeriveKey(v1, stamp, DeriveKey(v1, stamp, password).ToSecureString())
-            };
-
-            return coin;
-        }
-
-        public SecureString From()
-        {
-            return masterKey;
-        }
-
+        /// <summary>
+        /// Sets the specified password.
+        /// </summary>
+        /// <returns>The from.</returns>
+        /// <param name="password">Password.</param>
         public ActorService From(SecureString password)
         {
             masterKey = password ?? throw new ArgumentNullException(nameof(masterKey));
             return this;
         }
 
-        public byte[] GetChiper(string redemptionKey, byte[] pk)
+        /// <summary>
+        /// Gets the cypher.
+        /// </summary>
+        /// <returns>The chiper.</returns>
+        /// <param name="redemptionKey">Redemption key.</param>
+        /// <param name="pk">Pk.</param>
+        public byte[] GetCypher(string redemptionKey, byte[] pk)
         {
-            return cryptography.BoxSeal(Utilities.BinaryToHex(Encoding.UTF8.GetBytes(redemptionKey)), pk);
+            return Cryptography.BoxSeal(Utilities.BinaryToHex(Encoding.UTF8.GetBytes(redemptionKey)), pk);
         }
 
-        // TODO: Temp fix until we get the onion client working.
+        /// <summary>
+        /// Gets the message async.
+        /// </summary>
+        /// <returns>The message async.</returns>
+        /// <param name="address">Address.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
         public async Task<NotificationDto> GetMessageAsync(string address, CancellationToken cancellationToken)
         {
             if (string.IsNullOrEmpty(address))
                 throw new ArgumentException("Address is missing!", nameof(address));
 
             var baseAddress = new Uri(apiRestSection.GetValue<string>(Constant.Endpoint));
-            var path = string.Format(apiRestSection.GetSection(Constant.Routing).GetValue<string>(Constant.GetMessage), address);
-            var result = await ClientGetAsync<NotificationDto>(baseAddress, path, cancellationToken);
+            var path = string.Format(apiRestSection.GetSection(Constant.Routing).GetValue<string>(Constant.GetMessages), address);
 
-            return result;
+            NotificationDto message = apiOnionSection.GetValue<int>(Constant.OnionEnabled) == 1
+                ? await onionService.ClientGetAsync<NotificationDto>(baseAddress, path, cancellationToken)
+                : await Client.GetAsync<NotificationDto>(baseAddress, path, cancellationToken);
+
+            return message;
         }
 
-        public byte[] GetSharedKey(byte[] pk)
+        /// <summary>
+        /// Gets the shared key.
+        /// </summary>
+        /// <returns>The shared key.</returns>
+        /// <param name="pk">Pk.</param>
+        public async Task<byte[]> ToSharedKey(byte[] pk)
         {
-            SetSecretKey().GetAwaiter().GetResult();
+            await SetSecretKey();
 
             using (var insecure = SecretKey().Insecure())
             {
-                return cryptography.ScalarMult(Utilities.HexToBinary(insecure.Value), pk);
+                return Cryptography.ScalarMult(Utilities.HexToBinary(insecure.Value), pk);
             }
         }
 
-        // TODO: Temp fix until we get the onion client working.
+        /// <summary>
+        /// Gets the coin async.
+        /// </summary>
+        /// <returns>The coin async.</returns>
+        /// <param name="stamp">Stamp.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
         public async Task<CoinDto> GetCoinAsync(string stamp, CancellationToken cancellationToken)
         {
             if (string.IsNullOrEmpty(stamp))
@@ -222,125 +252,126 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             var baseAddress = new Uri(apiRestSection.GetValue<string>(Constant.Endpoint));
             var path = string.Format(apiRestSection.GetSection(Constant.Routing).GetValue<string>(Constant.GetCoin), stamp);
-            var result = await ClientGetAsync<CoinDto>(baseAddress, path, cancellationToken);
 
-            return result;
+            CoinDto coin = apiOnionSection.GetValue<int>(Constant.OnionEnabled) == 1
+                ? await onionService.ClientGetAsync<CoinDto>(baseAddress, path, cancellationToken)
+                : await Client.GetAsync<CoinDto>(baseAddress, path, cancellationToken);
 
+            return coin;
         }
 
-        public string HotRelease(CoinDto coin)
-        {
-            if (coin == null)
-                throw new ArgumentNullException(nameof(CoinDto));
+        /// <summary>
+        /// Gets the walletId instance.
+        /// </summary>
+        /// <returns>The identifier.</returns>
+        public SecureString Identifier() => identifier;
 
-            var subKey1 = DeriveKey(coin.Version + 1, coin.Stamp, From());
-            var subKey2 = DeriveKey(coin.Version + 2, coin.Stamp, From());
-            var redemption = new RedemptionKeyDto() { Key1 = subKey1, Key2 = subKey2, Memo = Memo(), Stamp = coin.Stamp };
-
-            return JsonConvert.SerializeObject(redemption);
-        }
-
-        public SecureString Identifier()
-        {
-            return identifier;
-        }
-
+        /// <summary>
+        /// Sets the specified walletId.
+        /// </summary>
+        /// <returns>The identifier.</returns>
+        /// <param name="walletId">Wallet identifier.</param>
         public ActorService Identifier(SecureString walletId)
         {
             identifier = walletId ?? throw new ArgumentNullException(nameof(walletId));
             return this;
         }
 
-        public string Memo()
-        {
-            return _memo;
-        }
+        /// <summary>
+        /// gets the Memo text instance.
+        /// </summary>
+        /// <returns>The memo.</returns>
+        public string Memo() => memo;
 
+        /// <summary>
+        /// Sets the specified memo text.
+        /// </summary>
+        /// <returns>The memo.</returns>
+        /// <param name="text">Text.</param>
         public ActorService Memo(string text)
         {
             if (string.IsNullOrEmpty(text))
-            {
-                _memo = string.Empty;
-            }
+                memo = string.Empty;
 
             if (text.Length > 64)
-            {
                 throw new Exception("Memo field cannot be more than 64 characters long!");
-            }
 
-            _memo = text;
+            memo = text;
 
             return this;
         }
 
-        public string OpenBoxSeal(string cipher, PkSkDto pkSkDto)
+        /// <summary>
+        /// Opens the box seal.
+        /// </summary>
+        /// <returns>The box seal.</returns>
+        /// <param name="cypher">Cypher.</param>
+        /// <param name="pkSkDto">Pk sk dto.</param>
+        public string OpenBoxSeal(string cypher, PkSkDto pkSkDto)
         {
-            if (string.IsNullOrEmpty(cipher))
-                throw new ArgumentException("Cipher cannot be null or empty!", nameof(cipher));
+            if (string.IsNullOrEmpty(cypher))
+                throw new ArgumentException("Cypher is missing!", nameof(cypher));
 
             if (pkSkDto == null)
                 throw new ArgumentNullException(nameof(pkSkDto));
 
             var pk = Encoding.UTF8.GetBytes(pkSkDto.PublicKey);
             var sk = Encoding.UTF8.GetBytes(pkSkDto.SecretKey);
-            var cypher = Encoding.UTF8.GetBytes(cipher);
-            var message = cryptography.OpenBoxSeal(cypher, new KeyPair(pk, sk));
+            var message = Cryptography.OpenBoxSeal(Encoding.UTF8.GetBytes(cypher), new KeyPair(pk, sk));
 
             return message;
         }
 
-        public string PartialRelease(CoinDto coin)
-        {
-            if (coin == null)
-                throw new ArgumentNullException(nameof(coin));
+        /// <summary>
+        /// Gets the poublic key.
+        /// </summary>
+        /// <returns>The key.</returns>
+        public SecureString PublicKey() => publicKey;
 
-            var subKey1 = DeriveKey(coin.Version + 1, coin.Stamp, From());
-            var subKey2 = DeriveKey(coin.Version + 2, coin.Stamp, From()).ToSecureString();
-            var mix = DeriveKey(coin.Version + 2, coin.Stamp, subKey2);
-            var redemption = new RedemptionKeyDto() { Key1 = subKey1, Key2 = mix, Memo = Memo(), Stamp = coin.Stamp };
-
-            return JsonConvert.SerializeObject(redemption);
-        }
-
-        public SecureString PublicKey()
-        {
-            return publicKey;
-        }
-
+        /// <summary>
+        /// Sets the public key.
+        /// </summary>
+        /// <returns>The key.</returns>
+        /// <param name="pk">Pk.</param>
         public ActorService PublicKey(SecureString pk)
         {
             publicKey = pk ?? throw new ArgumentNullException(nameof(pk));
             return this;
         }
 
-        public async Task ReceivePayment(NotificationDto notification)
+        /// <summary>
+        /// Receives the payment.
+        /// </summary>
+        /// <returns>The payment.</returns>
+        /// <param name="notification">Notification.</param>
+        public async Task ReceivePayment(string address, NotificationDto notification)
         {
             if (notification == null)
                 throw new ArgumentNullException(nameof(notification));
 
-            await SetSecretKey();
+            var pk = DecodeAddress(address).ToArray();
 
-            var storePk = await walletService.GetStoreKey(Identifier(), From(), "PublicKey");
-            var pk = Utilities.HexToBinary(storePk.ToUnSecureString());
+            await SetSecretKey();
 
             using (var insecureSk = SecretKey().Insecure())
             {
                 var message = Convert.FromBase64String(notification.Body);
-                var openMessage = cryptography.OpenBoxSeal(Utilities.HexToBinary(Encoding.UTF8.GetString(message)),
+                var openMessage = Cryptography.OpenBoxSeal(Utilities.HexToBinary(Encoding.UTF8.GetString(message)),
                     new KeyPair(pk, Utilities.HexToBinary(insecureSk.Value)));
 
                 openMessage = Encoding.UTF8.GetString(Utilities.HexToBinary(openMessage));
 
                 var freeRedemptionKey = JsonConvert.DeserializeObject<RedemptionKeyDto>(openMessage);
                 var coin = await GetCoinAsync(freeRedemptionKey.Stamp, new CancellationToken());
-
+                // TODO: Add chain of responsibility..
                 if (coin != null)
                 {
                     coin = coin.FormatCoinFromBase64();
 
-                    var swap = Swap(From(), coin.Version, freeRedemptionKey.Key1, freeRedemptionKey.Key2, coin.Envelope);
+                    var swap = coinService.CoinSwap(From(), coin, freeRedemptionKey);
 
                     var coinSwap1 = swap.Item1;
+
                     var result = await AddCoinAsync(coinSwap1.FormatCoinToBase64(), new CancellationToken());
 
                     if (result == null)
@@ -352,14 +383,14 @@ namespace TangramCypher.ApplicationLayer.Actor
                     if (result == null)
                         return;
 
-                    var coin1 = DeriveCoin(From(), coinSwap1.Version, coinSwap1.Envelope);
-                    var status1 = VerifyCoin(coinSwap1, coin1);
+                    var coin1 = coinService.DeriveCoin(From(), coinSwap1);
+                    var status1 = coinService.VerifyCoin(coinSwap1, coin1);
 
                     if (status1.Equals(4))
                         return;
 
-                    var coin2 = DeriveCoin(From(), coinSwap2.Version, coinSwap2.Envelope);
-                    var status2 = VerifyCoin(coinSwap2, coin2);
+                    var coin2 = coinService.DeriveCoin(From(), coinSwap2);
+                    var status2 = coinService.VerifyCoin(coinSwap2, coin2);
 
                     if (status2.Equals(1))
                     {
@@ -368,191 +399,91 @@ namespace TangramCypher.ApplicationLayer.Actor
                         if (result == null)
                             return;
 
-                        await walletService.AddEnvelope(Identifier(), From(), coin2.Envelope);
+                        await walletService.AddTransaction(Identifier(), From(),
+                            new TransactionDto
+                            {
+                                Amount = 0,
+                                Commitment = coin.Envelope.Commitment,
+                                Hash = coin2.Hash,
+                                Stamp = coin2.Stamp,
+                                Version = coin2.Version
+                            });
                     }
                 }
             }
         }
 
-        public SecureString SecretKey()
-        {
-            return secretKey;
-        }
+        /// <summary>
+        /// Gets the secret key.
+        /// </summary>
+        /// <returns>The key.</returns>
+        public SecureString SecretKey() => secretKey;
 
+        /// <summary>
+        /// Secrets the key.
+        /// </summary>
+        /// <returns>The key.</returns>
+        /// <param name="sk">Sk.</param>
         public ActorService SecretKey(SecureString sk)
         {
             secretKey = sk ?? throw new ArgumentNullException(nameof(sk));
             return this;
         }
 
-        public async Task SendPayment(bool answer)
+        /// <summary>
+        /// Sends the payment.
+        /// </summary>
+        /// <returns>The payment.</returns>
+        public async Task<JObject> SendPayment(bool sendMessage)
         {
-            var bal = await BalanceCheck();
+            var bal = await CheckBalance();
+
             if (bal < Amount())
-            {
-                Console.ForegroundColor = ConsoleColor.Magenta;
-                Console.WriteLine($"\nAvailable balance:\t{bal}");
-                Console.WriteLine($"Spend amount:\t\t{Amount()}\n");
-                Console.ForegroundColor = ConsoleColor.White;
-                return;
-            }
-
-            var coin = DeriveCoin(From(), 0, DeriveEnvelope(From(), 1, -Math.Abs(Amount().Value)));
-            coin = DeriveCoin(From(), 1, coin.Envelope);
-
-            var formattedCoin = coin.FormatCoinFromBase64();
-            var transaction = await AddCoinAsync(formattedCoin, new CancellationToken());
-            if (transaction == null)
-                return;
-
-            await walletService.AddEnvelope(Identifier(), From(), coin.Envelope);
-
-            bal = await BalanceCheck();
-
-            Console.ForegroundColor = ConsoleColor.Magenta;
-            Console.WriteLine($"\nAvailable balance:\t{bal}\n");
-            Console.ForegroundColor = ConsoleColor.White;
+                return JObject.Parse(@"{success: false, message: { available:" + bal + ", spend:" + Amount() + "}}");
 
             await SetSecretKey();
 
-            var redemptionKey = HotRelease(coin);
-            var pk = DecodeAddress(To()).ToArray();
-            var cipher = GetChiper(redemptionKey, pk);
-            // var sharedKey = GetSharedKey(pk.ToArray());
-            // TODO: Needs reworking..
-            var notificationAddress = cryptography.GenericHashWithKey(pk.ToHex(), pk);
-            var message = new MessageDto()
-            {
-                Address = notificationAddress.ToBase64(),
-                Body = cipher.ToBase64()
-            };
+            var spendCoins = await GetCoinsToSpend();
 
-            object delivered = null;
 
-            if (answer)
-                delivered = await AddMessageAsync(message, new CancellationToken());
+            var coins = await PostCoins(spendCoins);
 
-            OnReceivedMessage(new ReceivedMessageEventArgs() { Message = delivered ?? message, ThroughSystem = answer });
-        }
+            await AddWalletTransactions(coins);
 
-        public Tuple<CoinDto, CoinDto> Swap(SecureString password, int version, string key1, string key2, EnvelopeDto envelope)
-        {
-            if (password == null)
-                throw new ArgumentNullException(nameof(password));
-
-            if (string.IsNullOrEmpty(key1))
-                throw new ArgumentException("Sub Key1 cannot be null or empty", nameof(key1));
-
-            if (string.IsNullOrEmpty(key2))
-                throw new ArgumentException("Sub Key2 cannot be null or empty", nameof(key2));
-
-            if (envelope == null)
-                throw new ArgumentNullException(nameof(envelope));
-
-            var stamp = cryptography.GenericHashNoKey(string.Format("{0}{1}", envelope.Amount.ToString(), envelope.Serial)).ToHex();
-            var v1 = version + 1;
-            var v2 = version + 2;
-            var v3 = version + 3;
-            var v4 = version + 4;
-
-            var coin1 = new CoinDto()
-            {
-                Keeper = DeriveKey(v2, stamp, DeriveKey(v3, stamp, DeriveKey(v3, stamp, password).ToSecureString()).ToSecureString()),
-                Version = v1,
-                Principle = key1,
-                Stamp = stamp,
-                Envelope = envelope,
-                Hint = DeriveKey(v2, stamp, key2.ToSecureString())
-            };
-
-            var coin2 = new CoinDto()
-            {
-                Keeper = DeriveKey(v3, stamp, DeriveKey(v4, stamp, DeriveKey(v4, stamp, password).ToSecureString()).ToSecureString()),
-                Version = v2,
-                Principle = key2,
-                Stamp = stamp,
-                Envelope = envelope,
-                Hint = DeriveKey(v3, stamp, DeriveKey(v3, stamp, password).ToSecureString())
-            };
-
-            return Tuple.Create(coin1, coin2);
-        }
-
-        public CoinDto SwapPartialOne(SecureString password, RedemptionKeyDto redemptionKey)
-        {
-            if (password == null)
-                throw new ArgumentNullException(nameof(password));
-
-            if (redemptionKey == null)
-                throw new ArgumentNullException(nameof(redemptionKey));
-
-            var coin = GetCoinAsync(redemptionKey.Stamp, new CancellationToken()).GetAwaiter().GetResult();
-
-            if (coin != null)
-            {
-                var stamp = cryptography.GenericHashNoKey(string.Format("{0}{1}", coin.Envelope.Amount.ToString(), coin.Envelope.Serial)).ToHex();
-
-                if (stamp.Equals(coin.Stamp))
-                {
-                    var v1 = coin.Version + 1;
-                    var v2 = coin.Version + 2;
-                    var v3 = coin.Version + 3;
-
-                    coin.Keeper = DeriveKey(v2, stamp, DeriveKey(v3, stamp, DeriveKey(v3, stamp, password).ToSecureString()).ToSecureString());
-                    coin.Version = v1;
-                    coin.Principle = redemptionKey.Key1;
-                    coin.Stamp = stamp;
-                    coin.Envelope = coin.Envelope;
-                    coin.Hint = redemptionKey.Key2;
-
-                    return coin;
-                }
-            }
-
+            // TODO Return message(s)
             return null;
         }
 
-        public string To()
-        {
-            return _toAdress;
-        }
+        /// <summary>
+        /// Gets the specified To address.
+        /// </summary>
+        /// <returns>The to.</returns>
+        public string To() => toAdress;
 
+        /// <summary>
+        /// Set the specified To address.
+        /// </summary>
+        /// <returns>The to.</returns>
+        /// <param name="address">Address.</param>
         public ActorService To(string address)
         {
             if (string.IsNullOrEmpty(address))
-            {
                 throw new Exception("To address is missing!");
-            }
 
-            _toAdress = address;
+            toAdress = address;
 
             return this;
         }
 
-        public int VerifyCoin(CoinDto terminal, CoinDto current)
-        {
-            if (terminal == null)
-                throw new ArgumentNullException(nameof(terminal));
-
-            if (current == null)
-                throw new ArgumentNullException(nameof(current));
-
-            return terminal.Keeper.Equals(current.Keeper) && terminal.Hint.Equals(current.Hint)
-               ? 1
-               : terminal.Hint.Equals(current.Hint)
-               ? 2
-               : terminal.Keeper.Equals(current.Keeper)
-               ? 3
-               : 4;
-        }
-
+        /// <summary>
+        /// Sets the secret key.
+        /// </summary>
+        /// <returns>The secret key.</returns>
         private async Task SetSecretKey()
         {
             try
             {
                 SecretKey(await walletService.GetStoreKey(Identifier(), From(), "SecretKey"));
-
-                return;
             }
             catch (Exception ex)
             {
@@ -560,6 +491,10 @@ namespace TangramCypher.ApplicationLayer.Actor
             }
         }
 
+        /// <summary>
+        /// Sets the public key.
+        /// </summary>
+        /// <returns>The public key.</returns>
         private async Task SetPublicKey()
         {
             try
@@ -572,91 +507,99 @@ namespace TangramCypher.ApplicationLayer.Actor
             }
         }
 
-        async Task<JObject> ClientPostAsync<T>(T payload, Uri baseAddress, string path, CancellationToken cancellationToken)
+        /// <summary>
+        /// Gets the stamp.
+        /// </summary>
+        /// <returns>The stamp.</returns>
+        private string GetStamp()
         {
-            if (baseAddress == null)
-                throw new ArgumentNullException(nameof(baseAddress));
-
-            if (string.IsNullOrEmpty(path))
-                throw new ArgumentException("Path is missing!", nameof(path));
-
-            using (var client = new HttpClient())
-            {
-                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
-
-                client.BaseAddress = baseAddress;
-                client.DefaultRequestHeaders.Accept.Clear();
-                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-
-                using (var request = new HttpRequestMessage(HttpMethod.Post, path))
-                {
-                    var content = JsonConvert.SerializeObject(payload, Formatting.Indented);
-                    var buffer = Encoding.UTF8.GetBytes(content);
-
-                    request.Content = new StringContent(content, Encoding.UTF8, "application/json");
-
-                    try
-                    {
-                        using (var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
-                        {
-                            var stream = await response.Content.ReadAsStreamAsync();
-
-                            if (response.IsSuccessStatusCode)
-                            {
-                                var result = Util.DeserializeJsonFromStream<JObject>(stream);
-                                return Task.FromResult(result).Result;
-                            }
-
-                            var contentResult = await Util.StreamToStringAsync(stream);
-                            throw new ApiException
-                            {
-                                StatusCode = (int)response.StatusCode,
-                                Content = contentResult
-                            };
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine(ex.Message);
-                    }
-                }
-            }
-
-            return null;
+            return Cryptography.GenericHashNoKey(Cryptography.RandomKey()).ToHex();
         }
 
-        async Task<T> ClientGetAsync<T>(Uri baseAddress, string path, CancellationToken cancellationToken)
+        /// <summary>
+        /// Returns provers password.
+        /// </summary>
+        /// <returns>The password.</returns>
+        /// <param name="password">Password.</param>
+        /// <param name="version">Version.</param>
+        public string ProverPassword(SecureString password, int version)
         {
-            if (baseAddress == null)
-                throw new ArgumentNullException(nameof(baseAddress));
-
-            if (string.IsNullOrEmpty(path))
-                throw new ArgumentException("Path is missing!", nameof(path));
-
-            using (var client = new HttpClient())
+            using (var insecurePassword = password.Insecure())
             {
-                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
-
-                client.BaseAddress = baseAddress;
-                client.DefaultRequestHeaders.Accept.Clear();
-                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-
-                using (var request = new HttpRequestMessage(HttpMethod.Get, path))
-                using (var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
-                {
-                    var stream = await response.Content.ReadAsStreamAsync();
-
-                    if (response.IsSuccessStatusCode)
-                        return Util.DeserializeJsonFromStream<T>(stream);
-
-                    var content = await Util.StreamToStringAsync(stream);
-                    throw new ApiException
-                    {
-                        StatusCode = (int)response.StatusCode,
-                        Content = content
-                    };
-                }
+                var hash = Cryptography.GenericHashNoKey(string.Format("{0} {1}", version, insecurePassword.Value));
+                return Prover.GetHashStringNumber(hash).ToByteArray().ToHex();
             }
+        }
+
+        /// <summary>
+        /// Builds the redemption key message.
+        /// </summary>
+        /// <returns>The redemption key message.</returns>
+        /// <param name="coin">Coin.</param>
+        private async Task<MessageDto> BuildRedemptionKeyMessage(CoinDto coin)
+        {
+            var redemptionKey = coinService.HotRelease(coin.Version, coin.Stamp, Memo(), From());
+            var pk = DecodeAddress(To()).ToArray();
+            var cypher = GetCypher(redemptionKey, pk);
+            var sharedKey = await ToSharedKey(pk.ToArray());
+            var notificationAddress = Cryptography.GenericHashWithKey(sharedKey.ToHex(), pk);
+            var message = new MessageDto()
+            {
+                Address = notificationAddress.ToBase64(),
+                Body = cypher.ToBase64()
+            };
+
+            return message;
+        }
+
+        /// <summary>
+        /// Gets the coins to spend.
+        /// </summary>
+        /// <returns>The coins to spend.</returns>
+        private async Task<IEnumerable<CoinDto>> GetCoinsToSpend()
+        {
+            var makeChange = await walletService.MakeChange(Identifier(), From(), Amount().Value);
+
+            makeChange.Transactions.Add(makeChange.Transaction);
+
+            var coins = coinService.MakeMultipleCoins(makeChange.Transactions, From());
+
+            return coins;
+        }
+
+        /// <summary>
+        /// Adds the wallet transactions.
+        /// </summary>
+        /// <returns>The wallet transactions.</returns>
+        /// <param name="coins">Coins.</param>
+        private async Task AddWalletTransactions(IEnumerable<JObject> coins)
+        {
+            var tasks = coins.Select(c =>
+            {
+                var coin = c.ToObject<CoinDto>();
+                var transaction = new TransactionDto
+                {
+                    Amount = 0,
+                    Commitment = coin.Envelope.Commitment,
+                    Hash = coin.Hash,
+                    Stamp = coin.Stamp,
+                    Version = coin.Version
+                };
+                return walletService.AddTransaction(Identifier(), From(), transaction);
+            });
+
+            await Task.WhenAll(tasks);
+        }
+
+        /// <summary>
+        /// Posts the coins.
+        /// </summary>
+        /// <returns>The coins.</returns>
+        /// <param name="coins">Coins.</param>
+        private async Task<IEnumerable<JObject>> PostCoins(IEnumerable<CoinDto> coins)
+        {
+            var tasks = coins.Select(i => AddCoinAsync(i.FormatCoinToBase64(), new CancellationToken()));
+            return await Task.WhenAll(tasks);
         }
     }
 }

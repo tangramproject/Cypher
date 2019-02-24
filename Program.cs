@@ -3,15 +3,15 @@ using TangramCypher.ApplicationLayer.Actor;
 using TangramCypher.ApplicationLayer.Commands;
 using TangramCypher.ApplicationLayer.Vault;
 using TangramCypher.ApplicationLayer.Wallet;
-using TangramCypher.Helpers.LibSodium;
+using TangramCypher.Helper.LibSodium;
 using Microsoft.Extensions.Logging;
 using System.Threading.Tasks;
 using Cypher.ApplicationLayer.Onion;
 using Microsoft.Extensions.Configuration;
 using System.IO;
-using System.Linq;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Hosting;
+using TangramCypher.ApplicationLayer.Coin;
 
 namespace TangramCypher
 {
@@ -37,10 +37,10 @@ namespace TangramCypher
                     services
                         .AddSingleton<IActorService, ActorService>()
                         .AddSingleton<IWalletService, WalletService>()
-                        .AddTransient<ICryptography, Cryptography>()
                         .AddSingleton<IOnionService, OnionService>()
                         .AddSingleton<IVaultService, VaultService>()
                         .AddSingleton<ICommandService, CommandService>()
+                        .AddSingleton<ICoinService, CoinService>()
                         .AddSingleton<IHostedService, OnionService>(sp =>
                         {
                             return sp.GetService<IOnionService>() as OnionService;

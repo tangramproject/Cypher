@@ -1,17 +1,22 @@
+using System.Collections.Generic;
 using System.Security;
 using System.Threading.Tasks;
 using TangramCypher.ApplicationLayer.Actor;
+using TangramCypher.ApplicationLayer.Coin;
 
 namespace TangramCypher.ApplicationLayer.Wallet
 {
     public interface IWalletService
     {
         Task<double> GetBalance(SecureString identifier, SecureString password);
-        SecureString Id { get; set; }
         PkSkDto CreatePkSk();
         SecureString NewID(int bytes = 32);
         SecureString Passphrase();
-        Task AddEnvelope(SecureString identifier, SecureString password, EnvelopeDto envelope);
+        byte[] HashPassword(SecureString passphrase);
+        Task AddTransaction(SecureString identifier, SecureString password, TransactionDto transaction);
+        Task<TransactionDto> GetTransaction(SecureString identifier, SecureString password, string hash);
+        Task<List<TransactionDto>> GetTransactions(SecureString identifier, SecureString password);
         Task<SecureString> GetStoreKey(SecureString identifier, SecureString password, string storeKey);
+        Task<TransactionChange> MakeChange(SecureString identifier, SecureString password, double amount);
     }
 }
