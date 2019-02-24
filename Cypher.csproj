@@ -29,9 +29,11 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="2.1.1" />
     <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="2.1.1" />
     <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
+    <PackageReference Include="runtime.native.System.IO.Compression" Version="4.3.2" />
     <PackageReference Include="Serilog.Extensions.Logging.File" Version="1.1.0" />
     <PackageReference Include="Sodium.Core" Version="1.2.0" />
     <PackageReference Include="SimpleBase" Version="1.6.1" />
+    <PackageReference Include="Tangram.Tor" Version="1.0.0" />
     <PackageReference Include="VaultSharp" Version="0.11.0" />
     <PackageReference Include="DotNetTor" Version="2.3.3" />
     <PackageReference Include="ReadablePassphrase" Version="1.1.2" />
