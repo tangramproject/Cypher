@@ -570,13 +570,17 @@ namespace TangramCypher.ApplicationLayer.Actor
         {
             var tasks = coins.Select(async coin =>
             {
+                var formattedCoin = coin.FormatCoinFromBase64();
+                var sumAmount = Math.Abs(await walletService.GetTransactionAmount(Identifier(), From(), formattedCoin.Stamp)) - Math.Abs(Amount().Value);
+                var isAmount = sumAmount.Equals(coinService.Change().Value) ? coinService.Change().Value : sumAmount;
+
                 var transaction = new TransactionDto
                 {
-                    Amount = await walletService.GetTransactionAmount(Identifier(), From(), coin.Stamp),
-                    Commitment = coin.Envelope.Commitment,
-                    Hash = coin.Hash,
-                    Stamp = coin.Stamp,
-                    Version = coin.Version
+                    Amount = isAmount,
+                    Commitment = formattedCoin.Envelope.Commitment,
+                    Hash = formattedCoin.Hash,
+                    Stamp = formattedCoin.Stamp,
+                    Version = formattedCoin.Version
                 };
 
                 return walletService.AddTransaction(Identifier(), From(), transaction);
