@@ -9,9 +9,7 @@
 /wallet
 /wallet/core
 /ApplicationLayer/.DS_Store
-
 *.log
-
 *.user
 wallet
 servicetoken
