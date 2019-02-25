@@ -444,8 +444,6 @@ namespace TangramCypher.ApplicationLayer.Actor
             await SetSecretKey();
 
             var spendCoins = await GetCoinsToSpend();
-
-
             var coins = await PostCoins(spendCoins);
 
             await AddWalletTransactions(coins);
@@ -552,19 +550,30 @@ namespace TangramCypher.ApplicationLayer.Actor
             return message;
         }
 
+        /// TODO: Now operating on a single coin as the output will create a new block. 
+        /// We need to handle mutiple coins...
+
         /// <summary>
         /// Gets the coins to spend.
         /// </summary>
         /// <returns>The coins to spend.</returns>
         private async Task<IEnumerable<CoinDto>> GetCoinsToSpend()
         {
+            CoinDto coin = null;
             var makeChange = await walletService.MakeChange(Identifier(), From(), Amount().Value);
 
-            makeChange.Transactions.Add(makeChange.Transaction);
+            if ((makeChange != null) && (makeChange.Transaction != null))
+            {
+                coin = coinService
+                  .Password(From())
+                  .Input(makeChange.AmountFor)
+                  .Output(0)
+                  .Stamp(makeChange.Transaction.Stamp)
+                  .Version(makeChange.Transaction.Version)
+                  .Build();
+            }
 
-            var coins = coinService.MakeMultipleCoins(makeChange.Transactions, From());
-
-            return coins;
+            return new List<CoinDto> { coin };
         }
 
         /// <summary>
@@ -598,7 +607,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <param name="coins">Coins.</param>
         private async Task<IEnumerable<JObject>> PostCoins(IEnumerable<CoinDto> coins)
         {
-            var tasks = coins.Select(i => AddCoinAsync(i.FormatCoinToBase64(), new CancellationToken()));
+            var tasks = coins.Select(coin => AddCoinAsync(coin.FormatCoinToBase64(), new CancellationToken()));
             return await Task.WhenAll(tasks);
         }
     }
