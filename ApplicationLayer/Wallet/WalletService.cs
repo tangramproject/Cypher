@@ -15,7 +15,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
     public class WalletService : IWalletService
     {
         private const string Transactions = "transactions";
-        private const string Hash = "hash";
+        private const string Hash = "Hash";
 
         private readonly IVaultService vaultService;
 
@@ -186,15 +186,13 @@ namespace TangramCypher.ApplicationLayer.Wallet
             var transaction = transactions.Select(tx =>
             {
                 if (tx.Stamp.Equals(stamp))
-                {
                     if (double.TryParse(tx.Amount.ToString(), out double t))
                         total = t;
-                }
 
                 return total;
             });
 
-            return total;
+            return transaction.FirstOrDefault();
         }
 
         /// <summary>
