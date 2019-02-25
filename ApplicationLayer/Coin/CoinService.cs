@@ -509,13 +509,12 @@ namespace TangramCypher.ApplicationLayer.Coin
             if (password == null)
                 throw new ArgumentNullException(nameof(password));
 
-            return DeriveCoin(Password(),
-                new CoinDto
-                {
-                    Version = Version(),
-                    Stamp = Stamp(),
-                    Envelope = new EnvelopeDto()
-                });
+            return DeriveCoin(new CoinDto
+            {
+                Version = Version() + 1,
+                Stamp = Stamp(),
+                Envelope = new EnvelopeDto()
+            });
         }
 
         /// <summary>
