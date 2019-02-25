@@ -6,11 +6,9 @@ using System.Threading.Tasks;
 using MurrayGrant.ReadablePassphrase;
 using Newtonsoft.Json.Linq;
 using SimpleBase;
-using TangramCypher.ApplicationLayer.Actor;
 using TangramCypher.ApplicationLayer.Vault;
 using TangramCypher.Helper;
 using TangramCypher.Helper.LibSodium;
-using TangramCypher.ApplicationLayer.Coin;
 
 namespace TangramCypher.ApplicationLayer.Wallet
 {
@@ -118,7 +116,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
 
             if (transaction == null)
                 throw new ArgumentNullException(nameof(transaction));
-                
+
             using (var insecureIdentifier = identifier.Insecure())
             using (var insecurePassword = password.Insecure())
             {
@@ -163,6 +161,40 @@ namespace TangramCypher.ApplicationLayer.Wallet
             var transactions = await GetTransactions(identifier, password);
 
             return transactions.FirstOrDefault(t => t.Hash.Equals(hash));
+        }
+
+        /// <summary>
+        /// Gets the transaction amount.
+        /// </summary>
+        /// <returns>The transaction amount.</returns>
+        /// <param name="identifier">Identifier.</param>
+        /// <param name="password">Password.</param>
+        /// <param name="stamp">Stamp.</param>
+        public async Task<double> GetTransactionAmount(SecureString identifier, SecureString password, string stamp)
+        {
+            if (identifier == null)
+                throw new ArgumentNullException(nameof(identifier));
+
+            if (password == null)
+                throw new ArgumentNullException(nameof(password));
+
+            if (string.IsNullOrEmpty(stamp))
+                throw new ArgumentException("Stamp is missing!", nameof(stamp));
+
+            var total = 0.0D;
+            var transactions = await GetTransactions(identifier, password);
+            var transaction = transactions.Select(tx =>
+            {
+                if (tx.Stamp.Equals(stamp))
+                {
+                    if (double.TryParse(tx.Amount.ToString(), out double t))
+                        total = t;
+                }
+
+                return total;
+            });
+
+            return total;
         }
 
         /// <summary>

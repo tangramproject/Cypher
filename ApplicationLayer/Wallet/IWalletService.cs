@@ -16,6 +16,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
         Task AddTransaction(SecureString identifier, SecureString password, TransactionDto transaction);
         Task<TransactionDto> GetTransaction(SecureString identifier, SecureString password, string hash);
         Task<List<TransactionDto>> GetTransactions(SecureString identifier, SecureString password);
+        Task<double> GetTransactionAmount(SecureString identifier, SecureString password, string stamp);
         Task<SecureString> GetStoreKey(SecureString identifier, SecureString password, string storeKey);
         Task<TransactionChange> MakeChange(SecureString identifier, SecureString password, double amount);
     }
