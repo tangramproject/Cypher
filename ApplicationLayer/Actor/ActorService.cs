@@ -49,48 +49,33 @@ namespace TangramCypher.ApplicationLayer.Actor
             apiRestSection = configuration.GetSection(Constant.ApiGateway);
             apiOnionSection = configuration.GetSection(Constant.Onion);
 
-            //var pass = "the few depth squeaked animist ones relabels a sadistic gap".ToSecureString();
-            //var id = "id_04ec58c0c32b0dc517f54516b2b17f59".ToSecureString();
+            //var pass = "Beckett commented those blank things might trump their swag".ToSecureString();
+            //var id = "id_cdb4bd886ed56de8b28657e739627bb9".ToSecureString();
             //var h = "7da16ee30a273db6b04a9e05dcdeed229f63e03cabc856de48726f6b9f1a9ac4";
 
             //var coin = coinService
             //      .Password(pass)
-            //      .Input(5)
-            //      .Output(2)
+            //      .Input(1000)
+            //      .Output(300)
             //      .Stamp(GetStamp())
-            //      .Version(1)
             //      .Build();
 
             //change = coinService.Change();
 
-            //// var result = AddCoinAsync(coin.FormatCoinToBase64(), new CancellationToken()).GetAwaiter().GetResult();
-
-            //coin = coinService
-            //      .Password(pass)
-            //      .Input(GetChange())
-            //      .Output(0){"request_id":"0c76ec31-472d-a748-4cb2-640714a952de","lease_id":"","renewable":false,"lease_duration":2764800,"data":{"storeKeys":{"Address":"GLpSn2pX2Xyv5FwbyRMrJJF2HRVHZ88q9AGEMhskssMd","PublicKey":"e3f2fc1ed1c1bfb7df5f81fc8383e195a54c37eaa8576d3b3668eecc442dbf74","SecretKey":"83557fe14469adf59a620f2c5b8d350790ef9b6ffc8dd95b00792d55f66d1094"},"transactions":[{"Amount":3.0,"Commitment":"0873e72f13c8910589945f264060e9952b271ce750f9c3826240376e7c2ada2d3d","Hash":"7da16ee30a273db6b04a9e05dcdeed229f63e03cabc856de48726f6b9f1a9ac4","Stamp":"cf40359d6a24c4383d73131831c8884dca59ff9d384673c700a60e0578f4f083","Version":1}]},"wrap_info":null,"warnings":null,"auth":null}
-            //      .Stamp(GetStamp())
-            //      .Version(1)
-            //      .Build();
-
-            //// result = AddCoinAsync(coin.FormatCoinToBase64(), new CancellationToken()).GetAwaiter().GetResult();
-
-
-            // var result = GetCoinAsync(h, new CancellationToken()).GetAwaiter().GetResult();
-
+            //var result = AddCoinAsync(coin.FormatCoinToBase64(), new CancellationToken()).GetAwaiter().GetResult();
 
             //From(pass);
             //Identifier(id);
 
-            //result = result.FormatCoinFromBase64();
+            //coin = result.ToObject<CoinDto>().FormatCoinFromBase64();
 
             //walletService.AddTransaction(Identifier(), From(), new TransactionDto
             //{
             //    Amount = change.Value,
-            //    Commitment = result.Envelope.Commitment,
-            //    Hash = result.Hash,
-            //    Stamp = result.Stamp,
-            //    Version = result.Version
+            //    Commitment = coin.Envelope.Commitment,
+            //    Hash = coin.Hash,
+            //    Stamp = coin.Stamp,
+            //    Version = coin.Version
             //});
 
         }
@@ -566,8 +551,8 @@ namespace TangramCypher.ApplicationLayer.Actor
             {
                 coin = coinService
                   .Password(From())
-                  .Input(makeChange.AmountFor)
-                  .Output(0)
+                  .Input(makeChange.Transaction.Amount)
+                  .Output(makeChange.AmountFor)
                   .Stamp(makeChange.Transaction.Stamp)
                   .Version(makeChange.Transaction.Version)
                   .Build();
@@ -581,19 +566,19 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// </summary>
         /// <returns>The wallet transactions.</returns>
         /// <param name="coins">Coins.</param>
-        private async Task AddWalletTransactions(IEnumerable<JObject> coins)
+        private async Task AddWalletTransactions(IEnumerable<CoinDto> coins)
         {
-            var tasks = coins.Select(c =>
+            var tasks = coins.Select(async coin =>
             {
-                var coin = c.ToObject<CoinDto>();
                 var transaction = new TransactionDto
                 {
-                    Amount = 0,
+                    Amount = await walletService.GetTransactionAmount(Identifier(), From(), coin.Stamp),
                     Commitment = coin.Envelope.Commitment,
                     Hash = coin.Hash,
                     Stamp = coin.Stamp,
                     Version = coin.Version
                 };
+
                 return walletService.AddTransaction(Identifier(), From(), transaction);
             });
 
@@ -605,10 +590,13 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// </summary>
         /// <returns>The coins.</returns>
         /// <param name="coins">Coins.</param>
-        private async Task<IEnumerable<JObject>> PostCoins(IEnumerable<CoinDto> coins)
+        private async Task<IEnumerable<CoinDto>> PostCoins(IEnumerable<CoinDto> coins)
         {
             var tasks = coins.Select(coin => AddCoinAsync(coin.FormatCoinToBase64(), new CancellationToken()));
-            return await Task.WhenAll(tasks);
+            var results = await Task.WhenAll(tasks);
+            var json = await results.AsJson().ReadAsStringAsync();
+
+            return JToken.Parse(json).ToObject<IEnumerable<CoinDto>>();
         }
     }
 }

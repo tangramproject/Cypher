@@ -35,11 +35,11 @@ namespace TangramCypher.ApplicationLayer.Coin
                 var commitNeg = Commit((ulong)Output().Value, blindNeg);
                 var commitSum = pedersen.CommitSum(new List<byte[]> { commitPos }, new List<byte[]> { commitNeg });
 
-                var testCommit = Commit(5 - 2, blindSum);
+                var testCommit = Commit((ulong)(Input() - Output()), blindSum);
 
                 var verifiy = pedersen.VerifyCommitSum(new List<byte[]> { commitPos }, new List<byte[]> { commitNeg, commitSum });
 
-                Console.WriteLine(testCommit.ToHex().Equals(commitSum.ToHex()));
+                // Console.WriteLine(testCommit.ToHex().Equals(commitSum.ToHex()));
 
                 var (k1, k2) = Split(blindSum);
 
