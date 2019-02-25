@@ -1,7 +1,7 @@
 ﻿using System;
 namespace TangramCypher.ApplicationLayer.Wallet
 {
-    public class TransacrtionDto
+    public class TransactionDto
     {
         public double Amount { get; set; }
         public string Commitment { get; set; }

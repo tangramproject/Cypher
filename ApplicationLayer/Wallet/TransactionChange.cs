@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using TangramCypher.ApplicationLayer.Actor;
 
 namespace TangramCypher.ApplicationLayer.Wallet
 {
