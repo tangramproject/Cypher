@@ -46,7 +46,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
                 foreach (var transaction in transactions)
                 {
                     if (double.TryParse(transaction.Amount.ToString(), out double t))
-                        total += t;
+                        total = t;
                 }
             }
 

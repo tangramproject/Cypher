@@ -7,7 +7,9 @@ namespace TangramCypher.ApplicationLayer.Coin
 {
     public interface ICoinService
     {
-        CoinDto Build();
+        (ReceiverOutput, CoinDto) BuildReceiver();
+        CoinDto BuildSender();
+        void ClearCache();
         double? Change();
         (CoinDto, CoinDto) CoinSwap(SecureString password, CoinDto coin, RedemptionKeyDto redemptionKey);
         byte[] Commit(ulong amount, int version, string stamp, SecureString password);
@@ -18,9 +20,9 @@ namespace TangramCypher.ApplicationLayer.Coin
         string DeriveKey(int version, string stamp, SecureString password, int bytes = 32);
         byte[] DeriveKey(int bytes = 32);
         byte[] DeriveKey(double? value, int bytes = 32);
+        string GetNewStamp();
         byte[] Hash(CoinDto coin);
-        string HotRelease(int version, string stamp, string memo, SecureString password);
-        string HotRelease(string memo);
+        (string, string) HotRelease(int version, string stamp, SecureString password);
         double? Input();
         CoinService Input(double? value);
         IEnumerable<CoinDto> MakeMultipleCoins(IEnumerable<TransactionDto> transactions, SecureString password);

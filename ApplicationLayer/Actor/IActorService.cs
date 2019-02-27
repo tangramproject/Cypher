@@ -19,7 +19,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         Span<byte> DecodeAddress(string key);
         SecureString From();
         ActorService From(SecureString password);
-        byte[] GetCypher(string redemptionKey, byte[] pk);
+        byte[] GetCypher(RedemptionKeyDto redemptionKey, byte[] pk);
         Task<NotificationDto> GetMessageAsync(string address, CancellationToken cancellationToken);
         Task<byte[]> ToSharedKey(byte[] pk);
         Task<CoinDto> GetCoinAsync(string stamp, CancellationToken cancellationToken);

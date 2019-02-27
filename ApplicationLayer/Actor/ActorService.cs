@@ -49,16 +49,15 @@ namespace TangramCypher.ApplicationLayer.Actor
             apiRestSection = configuration.GetSection(Constant.ApiGateway);
             apiOnionSection = configuration.GetSection(Constant.Onion);
 
-            //var pass = "Beckett commented those blank things might trump their swag".ToSecureString();
-            //var id = "id_cdb4bd886ed56de8b28657e739627bb9".ToSecureString();
-            //var h = "7da16ee30a273db6b04a9e05dcdeed229f63e03cabc856de48726f6b9f1a9ac4";
+            //var pass = "the plastics yelled can an octagon kneel into your career".ToSecureString();
+            //var id = "id_b2e396d61be29365a4c3f9df9f4c94ff".ToSecureString();
 
             //var coin = coinService
             //      .Password(pass)
-            //      .Input(1000)
+            //      .Input(133445)
             //      .Output(300)
-            //      .Stamp(GetStamp())
-            //      .Build();
+            //      .Stamp(coinService.GetNewStamp())
+            //      .BuildSender();
 
             //change = coinService.Change();
 
@@ -183,9 +182,10 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <returns>The chiper.</returns>
         /// <param name="redemptionKey">Redemption key.</param>
         /// <param name="pk">Pk.</param>
-        public byte[] GetCypher(string redemptionKey, byte[] pk)
+        public byte[] GetCypher(RedemptionKeyDto redemptionKey, byte[] pk)
         {
-            return Cryptography.BoxSeal(Utilities.BinaryToHex(Encoding.UTF8.GetBytes(redemptionKey)), pk);
+            var message = JsonConvert.SerializeObject(redemptionKey);
+            return Cryptography.BoxSeal(Utilities.BinaryToHex(Encoding.UTF8.GetBytes(message)), pk);
         }
 
         /// <summary>
@@ -431,10 +431,32 @@ namespace TangramCypher.ApplicationLayer.Actor
             var spendCoins = await GetCoinsToSpend();
             var coins = await PostCoins(spendCoins);
 
+            if(coins == null)
+                return JObject.Parse(@"{success: false, message:'Coins failed to post!'}");
+
             await AddWalletTransactions(coins);
 
-            // TODO Return message(s)
-            return null;
+            var (receiverOutput, receiverCoin) = coinService.BuildReceiver();
+
+            coinService.ClearCache();
+
+            var result = await AddCoinAsync(receiverCoin.FormatCoinToBase64(), new CancellationToken());
+            receiverCoin = result.ToObject<CoinDto>().FormatCoinFromBase64();
+
+            if (receiverCoin == null)
+                return JObject.Parse(@"{success: false, message:'Receiver coin failed!'}");
+
+            var message = await BuildRedemptionKeyMessage(receiverOutput, receiverCoin);
+
+            JObject returnMessage;
+
+            if (sendMessage)
+                returnMessage = await AddMessageAsync(message, new CancellationToken());
+            else
+                returnMessage = JObject.Parse(JsonConvert.SerializeObject(message));
+
+
+            return returnMessage;
         }
 
         /// <summary>
@@ -491,15 +513,6 @@ namespace TangramCypher.ApplicationLayer.Actor
         }
 
         /// <summary>
-        /// Gets the stamp.
-        /// </summary>
-        /// <returns>The stamp.</returns>
-        private string GetStamp()
-        {
-            return Cryptography.GenericHashNoKey(Cryptography.RandomKey()).ToHex();
-        }
-
-        /// <summary>
         /// Returns provers password.
         /// </summary>
         /// <returns>The password.</returns>
@@ -507,6 +520,9 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <param name="version">Version.</param>
         public string ProverPassword(SecureString password, int version)
         {
+            if (password == null)
+                throw new ArgumentNullException(nameof(password));
+
             using (var insecurePassword = password.Insecure())
             {
                 var hash = Cryptography.GenericHashNoKey(string.Format("{0} {1}", version, insecurePassword.Value));
@@ -519,11 +535,28 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// </summary>
         /// <returns>The redemption key message.</returns>
         /// <param name="coin">Coin.</param>
-        private async Task<MessageDto> BuildRedemptionKeyMessage(CoinDto coin)
+        private async Task<MessageDto> BuildRedemptionKeyMessage(ReceiverOutput receiverOutput, CoinDto coin)
         {
-            var redemptionKey = coinService.HotRelease(coin.Version, coin.Stamp, Memo(), From());
+            if (receiverOutput == null)
+                throw new ArgumentNullException(nameof(receiverOutput));
+
+            if (coin == null)
+                throw new ArgumentNullException(nameof(coin));
+
+            var (key1, key2) = coinService.HotRelease(coin.Version, coin.Stamp, From());
             var pk = DecodeAddress(To()).ToArray();
-            var cypher = GetCypher(redemptionKey, pk);
+
+            var cypher = GetCypher(new RedemptionKeyDto
+            {
+                Amount = receiverOutput.Amount,
+                Blind = receiverOutput.Blind.ToHex(),
+                Hash = coin.Hash,
+                Key1 = key1,
+                Key2 = key2,
+                Memo = Memo(),
+                Stamp = coin.Stamp
+            }, pk);
+
             var sharedKey = await ToSharedKey(pk.ToArray());
             var notificationAddress = Cryptography.GenericHashWithKey(sharedKey.ToHex(), pk);
             var message = new MessageDto()
@@ -555,7 +588,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                   .Output(makeChange.AmountFor)
                   .Stamp(makeChange.Transaction.Stamp)
                   .Version(makeChange.Transaction.Version)
-                  .Build();
+                  .BuildSender();
             }
 
             return new List<CoinDto> { coin };
@@ -568,7 +601,9 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <param name="coins">Coins.</param>
         private async Task AddWalletTransactions(IEnumerable<CoinDto> coins)
         {
-            var tasks = coins.Select(async coin =>
+            List<Task> tasks = new List<Task>();
+
+            foreach (var coin in coins)
             {
                 var formattedCoin = coin.FormatCoinFromBase64();
                 var sumAmount = Math.Abs(await walletService.GetTransactionAmount(Identifier(), From(), formattedCoin.Stamp)) - Math.Abs(Amount().Value);
@@ -583,8 +618,8 @@ namespace TangramCypher.ApplicationLayer.Actor
                     Version = formattedCoin.Version
                 };
 
-                return walletService.AddTransaction(Identifier(), From(), transaction);
-            });
+                tasks.Add(walletService.AddTransaction(Identifier(), From(), transaction));
+            }
 
             await Task.WhenAll(tasks);
         }
