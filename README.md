@@ -2,7 +2,7 @@
 
 Official C# implementation of the Tangram CLi wallet.
 
-## Building the source
+## Building from source
 
 For prerequisites and detailed build instructions please read the [Installation Instructions (https://github.com/tangramproject/Cypher/wiki/Installing-CLi) on the wiki.
 
