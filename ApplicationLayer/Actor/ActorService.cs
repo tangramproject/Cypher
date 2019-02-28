@@ -85,7 +85,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <returns>The message async.</returns>
         /// <param name="message">Message.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        public async Task<JObject> AddMessageAsync(MessageDto message, CancellationToken cancellationToken)
+        public async Task<MessageDto> AddMessageAsync(MessageDto message, CancellationToken cancellationToken)
         {
             if (message == null)
                 throw new ArgumentNullException(nameof(message));
@@ -97,7 +97,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                 ? await onionService.ClientPostAsync(message, baseAddress, path, cancellationToken)
                 : await Client.PostAsync(message, baseAddress, path, cancellationToken);
 
-            return jObject;
+            return jObject.ToObject<MessageDto>();
         }
 
         /// <summary>
@@ -106,7 +106,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <returns>The coin async.</returns>
         /// <param name="coin">Coin.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        public async Task<JObject> AddCoinAsync(CoinDto coin, CancellationToken cancellationToken)
+        public async Task<CoinDto> AddCoinAsync(CoinDto coin, CancellationToken cancellationToken)
         {
             if (coin == null)
                 throw new ArgumentNullException(nameof(coin));
@@ -117,7 +117,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                 ? await onionService.ClientPostAsync(coin, baseAddress, path, cancellationToken)
                 : await Client.PostAsync(coin, baseAddress, path, cancellationToken);
 
-            return jObject;
+            return jObject.ToObject<CoinDto>();
         }
 
         /// <summary>
@@ -415,6 +415,26 @@ namespace TangramCypher.ApplicationLayer.Actor
             return this;
         }
 
+
+        /// <summary>
+        /// Sends the first contact pub key message.
+        /// </summary>
+        /// <returns>The first contact pub key message.</returns>
+        public async Task<MessageDto> SendFirstContactPubKeyMessage()
+        {
+            var pk = DecodeAddress(To()).ToArray();
+            var notificationAddress = Cryptography.GenericHashWithKey(pk.ToHex(), pk);
+            var innerMessage = JObject.Parse(@"{message: { isPayment: false, store:" + PublicKey().ToArray().ToHex() + "}}");
+            var message = await AddMessageAsync(new MessageDto
+            {
+                Address = notificationAddress.ToBase64(),
+                Body = Cryptography.BoxSeal(JsonConvert.SerializeObject(innerMessage), pk).ToBase64()
+            }, new CancellationToken());
+
+            return message;
+        }
+
+        ///TODO: Clean up code..
         /// <summary>
         /// Sends the payment.
         /// </summary>
@@ -431,7 +451,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             var spendCoins = await GetCoinsToSpend();
             var coins = await PostCoins(spendCoins);
 
-            if(coins == null)
+            if (coins == null)
                 return JObject.Parse(@"{success: false, message:'Coins failed to post!'}");
 
             await AddWalletTransactions(coins);
@@ -440,23 +460,17 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             coinService.ClearCache();
 
-            var result = await AddCoinAsync(receiverCoin.FormatCoinToBase64(), new CancellationToken());
-            receiverCoin = result.ToObject<CoinDto>().FormatCoinFromBase64();
+            receiverCoin = await AddCoinAsync(receiverCoin.FormatCoinToBase64(), new CancellationToken());
 
             if (receiverCoin == null)
                 return JObject.Parse(@"{success: false, message:'Receiver coin failed!'}");
 
-            var message = await BuildRedemptionKeyMessage(receiverOutput, receiverCoin);
-
-            JObject returnMessage;
+            var message = await BuildRedemptionKeyMessage(receiverOutput, receiverCoin.FormatCoinFromBase64());
 
             if (sendMessage)
-                returnMessage = await AddMessageAsync(message, new CancellationToken());
-            else
-                returnMessage = JObject.Parse(JsonConvert.SerializeObject(message));
+                return await SendMessage(message);
 
-
-            return returnMessage;
+            return JObject.Parse(JsonConvert.SerializeObject(message));
         }
 
         /// <summary>
@@ -636,6 +650,27 @@ namespace TangramCypher.ApplicationLayer.Actor
             var json = await results.AsJson().ReadAsStringAsync();
 
             return JToken.Parse(json).ToObject<IEnumerable<CoinDto>>();
+        }
+
+        /// <summary>
+        /// Sends the message.
+        /// </summary>
+        /// <returns>The message.</returns>
+        /// <param name="message">Message.</param>
+        private async Task<JObject> SendMessage(MessageDto message)
+        {
+            MessageDto msg = await SendFirstContactPubKeyMessage();
+
+            if (msg == null)
+                return JObject.Parse(@"{success: false, message:'First Message failed to send!'}");
+
+            Thread.Sleep(5000);
+            msg = await AddMessageAsync(message, new CancellationToken());
+
+            if (msg == null)
+                return JObject.Parse(@"{success: false, message:'Second message failed to send!'}");
+
+            return JObject.Parse(@"{success: true, message:'Message sent.'}");
         }
     }
 }

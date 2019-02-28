@@ -1,8 +1,6 @@
 using System.Collections.Generic;
 using System.Security;
 using System.Threading.Tasks;
-using TangramCypher.ApplicationLayer.Actor;
-using TangramCypher.ApplicationLayer.Coin;
 
 namespace TangramCypher.ApplicationLayer.Wallet
 {

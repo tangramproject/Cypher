@@ -10,8 +10,8 @@ namespace TangramCypher.ApplicationLayer.Actor
 {
     public interface IActorService
     {
-        Task<JObject> AddMessageAsync(MessageDto message, CancellationToken cancellationToken);
-        Task<JObject> AddCoinAsync(CoinDto coin, CancellationToken cancellationToken);
+        Task<MessageDto> AddMessageAsync(MessageDto message, CancellationToken cancellationToken);
+        Task<CoinDto> AddCoinAsync(CoinDto coin, CancellationToken cancellationToken);
         double? Amount();
         ActorService Amount(double? value);
         double? GetChange();
@@ -33,6 +33,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         Task ReceivePayment(string address, NotificationDto notification);
         SecureString SecretKey();
         ActorService SecretKey(SecureString sk);
+        Task<MessageDto> SendFirstContactPubKeyMessage();
         Task<JObject> SendPayment(bool sendMessage);
         string To();
         ActorService To(string address);

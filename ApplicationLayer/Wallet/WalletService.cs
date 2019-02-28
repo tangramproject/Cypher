@@ -99,13 +99,14 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <param name="passphrase">Passphrase.</param>
         public byte[] HashPassword(SecureString passphrase) => Cryptography.ArgonHashPassword(passphrase);
 
+
         /// <summary>
         /// Adds the transaction.
         /// </summary>
         /// <returns>The transaction.</returns>
         /// <param name="identifier">Identifier.</param>
         /// <param name="password">Password.</param>
-        /// <param name="coin">Coin.</param>
+        /// <param name="transaction">Transaction.</param>
         public async Task AddTransaction(SecureString identifier, SecureString password, TransactionDto transaction)
         {
             if (identifier == null)
@@ -294,7 +295,5 @@ namespace TangramCypher.ApplicationLayer.Wallet
 
             return transactionChange;
         }
-
-
     }
 }
