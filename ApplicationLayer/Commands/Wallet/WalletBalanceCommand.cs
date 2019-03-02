@@ -26,7 +26,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                 var identifier = Prompt.GetPassword("Identifier:", ConsoleColor.Yellow).ToSecureString();
                 var password = Prompt.GetPassword("Password:", ConsoleColor.Yellow).ToSecureString();
 
-                var total = await walletService.GetBalance(identifier, password);
+                var total = await walletService.AvailableBalance(identifier, password);
 
                 console.ForegroundColor = ConsoleColor.Magenta;
                 console.WriteLine($"\nWallet balance: {total}\n");

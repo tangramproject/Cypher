@@ -147,7 +147,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// Checks the balance.
         /// </summary>
         /// <returns>The balance.</returns>
-        public async Task<double> CheckBalance() => await walletService.GetBalance(Identifier(), From());
+        public async Task<double> CheckBalance() => await walletService.AvailableBalance(Identifier(), From());
 
         /// <summary>
         /// Decodes the address.
@@ -612,7 +612,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         {
             try
             {
-                SecretKey(await walletService.GetStoreKey(Identifier(), From(), "SecretKey"));
+                SecretKey(await walletService.StoreKey(Identifier(), From(), "SecretKey"));
             }
             catch (Exception ex)
             {
@@ -628,7 +628,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         {
             try
             {
-                PublicKey(await walletService.GetStoreKey(Identifier(), From(), "PublicKey"));
+                PublicKey(await walletService.StoreKey(Identifier(), From(), "PublicKey"));
             }
             catch (Exception ex)
             {
@@ -730,7 +730,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             foreach (var coin in coins)
             {
                 var formattedCoin = coin.FormatCoinFromBase64();
-                var sumAmount = Math.Abs(await walletService.GetTransactionAmount(Identifier(), From(), formattedCoin.Stamp)) - Math.Abs(Amount().Value);
+                var sumAmount = Math.Abs(await walletService.TransactionAmount(Identifier(), From(), formattedCoin.Stamp)) - Math.Abs(Amount().Value);
                 var isAmount = sumAmount.Equals(coinService.Change().Value) ? sumAmount : coinService.Change().Value;
 
                 var transaction = new TransactionDto
@@ -807,7 +807,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                 var message = Utilities.HexToBinary(Encoding.UTF8.GetString(Convert.FromBase64String(body)));
                 var opened = Cryptography.OpenBoxSeal(message, new KeyPair(pk, Utilities.HexToBinary(insecureSk.Value)));
 
-                return Encoding.UTF8.GetString(Utilities.HexToBinary(opened)); ;
+                return Encoding.UTF8.GetString(Utilities.HexToBinary(opened));
             }
         }
     }
