@@ -86,9 +86,39 @@ namespace TangramCypher.Helper
             using (var sr = new StreamReader(stream))
             using (var jtr = new JsonTextReader(sr))
             {
-                var js = new JsonSerializer();
-                var searchResult = js.Deserialize<T>(jtr);
-                return searchResult;
+                try
+                {
+                    var js = new JsonSerializer();
+                    var searchResult = js.Deserialize<T>(jtr);
+                    return searchResult;
+                }
+                catch (JsonSerializationException ex)
+                {
+                    throw ex;
+                }
+
+            }
+        }
+
+        public static IEnumerable<T> DeserializeJsonEnumerable<T>(Stream stream)
+        {
+            if (stream == null || stream.CanRead == false)
+                return default;
+
+            using (var sr = new StreamReader(stream))
+            using (var jtr = new JsonTextReader(sr))
+            {
+                try
+                {
+                    var js = new JsonSerializer();
+                    var searchResult = js.Deserialize<IEnumerable<T>>(jtr);
+                    return searchResult;
+                }
+                catch (JsonSerializationException ex)
+                {
+                    throw ex;
+                }
+
             }
         }
 

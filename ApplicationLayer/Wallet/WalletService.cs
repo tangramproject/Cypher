@@ -38,17 +38,11 @@ namespace TangramCypher.ApplicationLayer.Wallet
             if (password == null)
                 throw new ArgumentNullException(nameof(password));
 
-            var total = 0.0D;
             var transactions = await GetTransactions(identifier, password);
+            var total = 0.0d;
 
             if (transactions != null)
-            {
-                foreach (var transaction in transactions)
-                {
-                    if (double.TryParse(transaction.Amount.ToString(), out double t))
-                        total = t;
-                }
-            }
+                total = transactions.Last().Amount;
 
             return total;
         }
@@ -270,7 +264,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
                 throw new InvalidCastException();
 
             var transactions = await GetTransactions(identifier, password);
-            var coins = transactions.OrderByDescending(a => Math.Abs(a.Amount)).ToArray();
+            var coins = transactions.OrderBy(tx => tx.Version).ToArray();
             int count, i;
             var transactionChange = new TransactionChange();
 

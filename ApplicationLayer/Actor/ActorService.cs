@@ -49,32 +49,30 @@ namespace TangramCypher.ApplicationLayer.Actor
             apiRestSection = configuration.GetSection(Constant.ApiGateway);
             apiOnionSection = configuration.GetSection(Constant.Onion);
 
-            //var pass = "the plastics yelled can an octagon kneel into your career".ToSecureString();
-            //var id = "id_b2e396d61be29365a4c3f9df9f4c94ff".ToSecureString();
+            //var pass = "that youthful divorce will rehearse drowsily against the reticent asteroids after my dazed tentacle".ToSecureString();
+            //var id = "id_c21dab5ba5cfbf44a6d9f709dc2b4273".ToSecureString();
 
             //var coin = coinService
             //      .Password(pass)
-            //      .Input(133445)
-            //      .Output(300)
+            //      .Input(20000)
+            //      .Output(100)
             //      .Stamp(coinService.GetNewStamp())
             //      .BuildSender();
 
             //change = coinService.Change();
 
-            //var result = AddCoinAsync(coin.FormatCoinToBase64(), new CancellationToken()).GetAwaiter().GetResult();
+            //var coinResult = AddCoinAsync(coin.FormatCoinToBase64(), new CancellationToken()).GetAwaiter().GetResult().FormatCoinFromBase64();
 
             //From(pass);
             //Identifier(id);
 
-            //coin = result.ToObject<CoinDto>().FormatCoinFromBase64();
-
             //walletService.AddTransaction(Identifier(), From(), new TransactionDto
             //{
             //    Amount = change.Value,
-            //    Commitment = coin.Envelope.Commitment,
-            //    Hash = coin.Hash,
-            //    Stamp = coin.Stamp,
-            //    Version = coin.Version
+            //    Commitment = coinResult.Envelope.Commitment,
+            //    Hash = coinResult.Hash,
+            //    Stamp = coinResult.Stamp,
+            //    Version = coinResult.Version
             //});
 
         }
@@ -177,14 +175,19 @@ namespace TangramCypher.ApplicationLayer.Actor
         }
 
         /// <summary>
-        /// Gets the cypher.
+        /// Sets the cypher.
         /// </summary>
-        /// <returns>The chiper.</returns>
-        /// <param name="redemptionKey">Redemption key.</param>
+        /// <returns>The cypher.</returns>
+        /// <param name="message">Message.</param>
         /// <param name="pk">Pk.</param>
-        public byte[] GetCypher(RedemptionKeyDto redemptionKey, byte[] pk)
+        public byte[] Cypher(string message, byte[] pk)
         {
-            var message = JsonConvert.SerializeObject(redemptionKey);
+            if (string.IsNullOrEmpty(message))
+                throw new ArgumentException("message", nameof(message));
+
+            if ((pk == null) && (pk.Length > 32))
+                throw new ArgumentNullException(nameof(pk));
+
             return Cryptography.BoxSeal(Utilities.BinaryToHex(Encoding.UTF8.GetBytes(message)), pk);
         }
 
@@ -202,11 +205,30 @@ namespace TangramCypher.ApplicationLayer.Actor
             var baseAddress = new Uri(apiRestSection.GetValue<string>(Constant.Endpoint));
             var path = string.Format(apiRestSection.GetSection(Constant.Routing).GetValue<string>(Constant.GetMessages), address);
 
-            NotificationDto message = apiOnionSection.GetValue<int>(Constant.OnionEnabled) == 1
-                ? await onionService.ClientGetAsync<NotificationDto>(baseAddress, path, cancellationToken)
-                : await Client.GetAsync<NotificationDto>(baseAddress, path, cancellationToken);
+            var message = apiOnionSection.GetValue<int>(Constant.OnionEnabled) == 1
+                ? await onionService.ClientGetAsync<JObject>(baseAddress, path, cancellationToken)
+                : await Client.GetAsync<JObject>(baseAddress, path, cancellationToken);
 
-            return message;
+            return message.ToObject<NotificationDto>();
+        }
+
+        /// <summary>
+        /// Gets the messages async.
+        /// </summary>
+        /// <returns>The messages async.</returns>
+        /// <param name="address">Address.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        public async Task<IEnumerable<NotificationDto>> GetMessagesAsync(string address, int skip, int take, CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrEmpty(address))
+                throw new ArgumentException("Address is missing!", nameof(address));
+
+            var baseAddress = new Uri(apiRestSection.GetValue<string>(Constant.Endpoint));
+            var path = string.Format(apiRestSection.GetSection(Constant.Routing).GetValue<string>(Constant.GetMessageRange), address, skip, take);
+            var returnMessages = await Client.GetRangeAsync(baseAddress, path, cancellationToken);
+            var messages = returnMessages.Select(m => m.ToObject<NotificationDto>());
+
+            return Task.FromResult(messages).Result;
         }
 
         /// <summary>
@@ -216,6 +238,9 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <param name="pk">Pk.</param>
         public async Task<byte[]> ToSharedKey(byte[] pk)
         {
+            if ((pk == null) && (pk.Length > 32))
+                throw new ArgumentNullException(nameof(pk));
+
             await SetSecretKey();
 
             using (var insecure = SecretKey().Insecure())
@@ -238,11 +263,11 @@ namespace TangramCypher.ApplicationLayer.Actor
             var baseAddress = new Uri(apiRestSection.GetValue<string>(Constant.Endpoint));
             var path = string.Format(apiRestSection.GetSection(Constant.Routing).GetValue<string>(Constant.GetCoin), stamp);
 
-            CoinDto coin = apiOnionSection.GetValue<int>(Constant.OnionEnabled) == 1
-                ? await onionService.ClientGetAsync<CoinDto>(baseAddress, path, cancellationToken)
-                : await Client.GetAsync<CoinDto>(baseAddress, path, cancellationToken);
+            var coin = apiOnionSection.GetValue<int>(Constant.OnionEnabled) == 1
+                ? await onionService.ClientGetAsync<JObject>(baseAddress, path, cancellationToken)
+                : await Client.GetAsync<JObject>(baseAddress, path, cancellationToken);
 
-            return coin;
+            return coin.ToObject<CoinDto>();
         }
 
         /// <summary>
@@ -331,71 +356,153 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <param name="notification">Notification.</param>
         public async Task ReceivePayment(string address, NotificationDto notification)
         {
+            if (string.IsNullOrEmpty(address))
+                throw new ArgumentException("message", nameof(address));
+
             if (notification == null)
                 throw new ArgumentNullException(nameof(notification));
 
             var pk = DecodeAddress(address).ToArray();
+            var message = await ReadMessage(notification.Body, pk);
+            var (isPayment, store) = ParseMessage(message);
 
-            await SetSecretKey();
+            if (isPayment)
+                await CollectPayment(store);
+            else
+                await ReceiveSharedKeyPayment(pk, store.FromHex());
+        }
 
-            using (var insecureSk = SecretKey().Insecure())
+        private async Task CollectPayment(string message)
+        {
+            if (string.IsNullOrEmpty(message))
+                throw new ArgumentException("message", nameof(message));
+
+            var freeRedemptionKey = JsonConvert.DeserializeObject<RedemptionKeyDto>(message);
+            var coin = await GetCoinAsync(freeRedemptionKey.Hash, new CancellationToken());
+
+            if (coin != null)
             {
-                var message = Convert.FromBase64String(notification.Body);
-                var openMessage = Cryptography.OpenBoxSeal(Utilities.HexToBinary(Encoding.UTF8.GetString(message)),
-                    new KeyPair(pk, Utilities.HexToBinary(insecureSk.Value)));
+                coin = coin.FormatCoinFromBase64();
 
-                openMessage = Encoding.UTF8.GetString(Utilities.HexToBinary(openMessage));
+                var (swap1, swap2) = coinService.CoinSwap(From(), coin, freeRedemptionKey);
 
-                var freeRedemptionKey = JsonConvert.DeserializeObject<RedemptionKeyDto>(openMessage);
-                var coin = await GetCoinAsync(freeRedemptionKey.Stamp, new CancellationToken());
-                // TODO: Add chain of responsibility..
-                if (coin != null)
-                {
-                    coin = coin.FormatCoinFromBase64();
+                var keeperPass = await CoinKepperPass(swap1);
+                if (keeperPass != true)
+                    return;
 
-                    var swap = coinService.CoinSwap(From(), coin, freeRedemptionKey);
+                var fullPass = await CoinFullPass(swap2);
+                if (fullPass != true)
+                    return;
 
-                    var coinSwap1 = swap.Item1;
-
-                    var result = await AddCoinAsync(coinSwap1.FormatCoinToBase64(), new CancellationToken());
-
-                    if (result == null)
-                        return;
-
-                    var coinSwap2 = swap.Item2;
-                    result = await AddCoinAsync(coinSwap2.FormatCoinToBase64(), new CancellationToken());
-
-                    if (result == null)
-                        return;
-
-                    var coin1 = coinService.DeriveCoin(From(), coinSwap1);
-                    var status1 = coinService.VerifyCoin(coinSwap1, coin1);
-
-                    if (status1.Equals(4))
-                        return;
-
-                    var coin2 = coinService.DeriveCoin(From(), coinSwap2);
-                    var status2 = coinService.VerifyCoin(coinSwap2, coin2);
-
-                    if (status2.Equals(1))
-                    {
-                        result = await AddCoinAsync(coin2.FormatCoinToBase64(), new CancellationToken());
-
-                        if (result == null)
-                            return;
-
-                        await walletService.AddTransaction(Identifier(), From(),
-                            new TransactionDto
-                            {
-                                Amount = 0,
-                                Commitment = coin.Envelope.Commitment,
-                                Hash = coin2.Hash,
-                                Stamp = coin2.Stamp,
-                                Version = coin2.Version
-                            });
-                    }
-                }
+                await walletService.AddTransaction(Identifier(), From(),
+                      new TransactionDto
+                      {
+                          Amount = freeRedemptionKey.Amount,
+                          Commitment = coin.Envelope.Commitment,
+                          Hash = swap2.Hash,
+                          Stamp = swap2.Stamp,
+                          Version = swap2.Version
+                      });
             }
+        }
+
+        /// <summary>
+        /// Checks if the coin equals the kepper.
+        /// </summary>
+        /// <returns>The kepper pass.</returns>
+        /// <param name="swap">Swap.</param>
+        private async Task<bool> CoinKepperPass(CoinDto swap)
+        {
+            if (swap == null)
+                throw new ArgumentNullException(nameof(swap));
+
+            var canPass = false;
+            var coin = coinService.DeriveCoin(From(), swap);
+            var status = coinService.VerifyCoin(swap, coin);
+
+            coin.Hash = coinService.Hash(coin).ToHex();
+
+            if (status.Equals(3))
+            {
+                var returnCoin = await AddCoinAsync(coin.FormatCoinToBase64(), new CancellationToken());
+                if (returnCoin != null)
+                    canPass = true;
+            }
+
+            return canPass;
+        }
+
+        /// <summary>
+        /// Checks if the coin equals the kepper and the hint.
+        /// </summary>
+        /// <returns>The full pass.</returns>
+        /// <param name="swap">Swap.</param>
+        private async Task<bool> CoinFullPass(CoinDto swap)
+        {
+            if (swap == null)
+                throw new ArgumentNullException(nameof(swap));
+
+            var canPass = false;
+            var coin = coinService.DeriveCoin(From(), swap);
+            var status = coinService.VerifyCoin(swap, coin);
+
+            coin.Hash = coinService.Hash(coin).ToHex();
+
+            if (status.Equals(1))
+            {
+                var returnCoin = await AddCoinAsync(coin.FormatCoinToBase64(), new CancellationToken());
+                if (returnCoin != null)
+                    canPass = true;
+            }
+
+            return canPass;
+        }
+
+        /// <summary>
+        /// Receives the shared key payment.
+        /// </summary>
+        /// <returns>The shared key payment.</returns>
+        /// <param name="addressPublicKey">Address public key.</param>
+        /// <param name="senderPublicKey">Sender public key.</param>
+        private async Task ReceiveSharedKeyPayment(byte[] addressPublicKey, byte[] senderPublicKey)
+        {
+            if ((addressPublicKey == null) && (addressPublicKey.Length > 32))
+                throw new ArgumentNullException(nameof(addressPublicKey));
+
+            if ((senderPublicKey == null) && (senderPublicKey.Length > 32))
+                throw new ArgumentNullException(nameof(senderPublicKey));
+
+            var sharedKey = await ToSharedKey(senderPublicKey);
+            var notificationAddress = Cryptography.GenericHashWithKey(sharedKey.ToHex(), addressPublicKey);
+            var notifications = await GetMessagesAsync(notificationAddress.ToHex(), 0, 2, new CancellationToken());
+
+            foreach (var notification in notifications)
+            {
+                var message = await ReadMessage(notification.Body, addressPublicKey);
+                var (isPayment, store) = ParseMessage(message);
+
+                await CollectPayment(store);
+            }
+        }
+
+        /// <summary>
+        /// Parses the message.
+        /// </summary>
+        /// <returns>The message.</returns>
+        /// <param name="message">Message.</param>
+        private (bool, string) ParseMessage(string message)
+        {
+            if (string.IsNullOrEmpty(message))
+                throw new ArgumentException("message", nameof(message));
+
+            var jObject = JObject.Parse(message);
+            var isPayment = jObject.Value<bool>("payment");
+
+            string store = isPayment
+                ? JsonConvert.SerializeObject(jObject.SelectToken("store").ToObject<RedemptionKeyDto>())
+                : jObject.Value<string>("store");
+
+            return (jObject.Value<bool>("payment"), store);
         }
 
         /// <summary>
@@ -415,26 +522,29 @@ namespace TangramCypher.ApplicationLayer.Actor
             return this;
         }
 
-
         /// <summary>
-        /// Sends the first contact pub key message.
+        /// Establishes first time public key message.
         /// </summary>
-        /// <returns>The first contact pub key message.</returns>
-        public async Task<MessageDto> SendFirstContactPubKeyMessage()
+        /// <returns>The pub key message.</returns>
+        public async Task<MessageDto> EstablishPubKeyMessage()
         {
+            await SetPublicKey();
+
             var pk = DecodeAddress(To()).ToArray();
             var notificationAddress = Cryptography.GenericHashWithKey(pk.ToHex(), pk);
-            var innerMessage = JObject.Parse(@"{message: { isPayment: false, store:" + PublicKey().ToArray().ToHex() + "}}");
+            var senderPk = PublicKey().ToUnSecureString();
+            var innerMessage = JObject.Parse(@"{payment: false, store:'" + senderPk + "'}");
+            var cypher = Cypher(innerMessage.ToString(), pk);
             var message = await AddMessageAsync(new MessageDto
             {
                 Address = notificationAddress.ToBase64(),
-                Body = Cryptography.BoxSeal(JsonConvert.SerializeObject(innerMessage), pk).ToBase64()
+                Body = cypher.ToBase64()
             }, new CancellationToken());
 
             return message;
         }
 
-        ///TODO: Clean up code..
+        ///TODO: Clean up code.. Hiide the coin version and the stamp..
         /// <summary>
         /// Sends the payment.
         /// </summary>
@@ -559,8 +669,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             var (key1, key2) = coinService.HotRelease(coin.Version, coin.Stamp, From());
             var pk = DecodeAddress(To()).ToArray();
-
-            var cypher = GetCypher(new RedemptionKeyDto
+            var redemption = new RedemptionKeyDto
             {
                 Amount = receiverOutput.Amount,
                 Blind = receiverOutput.Blind.ToHex(),
@@ -569,8 +678,9 @@ namespace TangramCypher.ApplicationLayer.Actor
                 Key2 = key2,
                 Memo = Memo(),
                 Stamp = coin.Stamp
-            }, pk);
-
+            };
+            var innerMessage = JObject.Parse(@"{payment: true, store:" + JsonConvert.SerializeObject(redemption) + "}");
+            var cypher = Cypher(innerMessage.ToString(), pk);
             var sharedKey = await ToSharedKey(pk.ToArray());
             var notificationAddress = Cryptography.GenericHashWithKey(sharedKey.ToHex(), pk);
             var message = new MessageDto()
@@ -621,7 +731,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             {
                 var formattedCoin = coin.FormatCoinFromBase64();
                 var sumAmount = Math.Abs(await walletService.GetTransactionAmount(Identifier(), From(), formattedCoin.Stamp)) - Math.Abs(Amount().Value);
-                var isAmount = sumAmount.Equals(coinService.Change().Value) ? coinService.Change().Value : sumAmount;
+                var isAmount = sumAmount.Equals(coinService.Change().Value) ? sumAmount : coinService.Change().Value;
 
                 var transaction = new TransactionDto
                 {
@@ -659,18 +769,46 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <param name="message">Message.</param>
         private async Task<JObject> SendMessage(MessageDto message)
         {
-            MessageDto msg = await SendFirstContactPubKeyMessage();
+            if (message == null)
+                throw new ArgumentNullException(nameof(message));
+
+            var msg = await EstablishPubKeyMessage();
 
             if (msg == null)
-                return JObject.Parse(@"{success: false, message:'First Message failed to send!'}");
+                return JObject.Parse(@"{success: 'false', message:'First Message failed to send!'}");
 
-            Thread.Sleep(5000);
+            Thread.Sleep(3000);
             msg = await AddMessageAsync(message, new CancellationToken());
 
             if (msg == null)
                 return JObject.Parse(@"{success: false, message:'Second message failed to send!'}");
 
             return JObject.Parse(@"{success: true, message:'Message sent.'}");
+        }
+
+        /// <summary>
+        /// Reads the message.
+        /// </summary>
+        /// <returns>The message.</returns>
+        /// <param name="body">Body.</param>
+        /// <param name="pk">Pk.</param>
+        private async Task<string> ReadMessage(string body, byte[] pk)
+        {
+            if (string.IsNullOrEmpty(body))
+                throw new ArgumentException("message", nameof(body));
+
+            if ((pk == null) && (pk.Length > 32))
+                throw new ArgumentNullException(nameof(pk));
+
+            await SetSecretKey();
+
+            using (var insecureSk = SecretKey().Insecure())
+            {
+                var message = Utilities.HexToBinary(Encoding.UTF8.GetString(Convert.FromBase64String(body)));
+                var opened = Cryptography.OpenBoxSeal(message, new KeyPair(pk, Utilities.HexToBinary(insecureSk.Value)));
+
+                return Encoding.UTF8.GetString(Utilities.HexToBinary(opened)); ;
+            }
         }
     }
 }
