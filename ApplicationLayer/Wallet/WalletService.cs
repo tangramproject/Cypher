@@ -14,9 +14,6 @@ namespace TangramCypher.ApplicationLayer.Wallet
 {
     public class WalletService : IWalletService
     {
-        private const string Transactions = "transactions";
-        private const string Hash = "Hash";
-
         private readonly IVaultService vaultService;
 
         public WalletService(IVaultService vaultService)
@@ -30,7 +27,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <returns>The balance.</returns>
         /// <param name="identifier">Identifier.</param>
         /// <param name="password">Password.</param>
-        public async Task<double> GetBalance(SecureString identifier, SecureString password)
+        public async Task<double> AvailableBalance(SecureString identifier, SecureString password)
         {
             if (identifier == null)
                 throw new ArgumentNullException(nameof(identifier));
@@ -38,7 +35,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
             if (password == null)
                 throw new ArgumentNullException(nameof(password));
 
-            var transactions = await GetTransactions(identifier, password);
+            var transactions = await Transactions(identifier, password);
             var total = 0.0d;
 
             if (transactions != null)
@@ -118,18 +115,18 @@ namespace TangramCypher.ApplicationLayer.Wallet
                 var found = false;
                 var data = await vaultService.GetDataAsync(insecureIdentifier.Value, insecurePassword.Value, $"wallets/{insecureIdentifier.Value}/wallet");
 
-                if (data.Data.TryGetValue(Transactions, out object txs))
+                if (data.Data.TryGetValue("transactions", out object txs))
                 {
                     foreach (JObject item in ((JArray)txs).Children().ToList())
                     {
-                        var hash = item.GetValue(Hash);
+                        var hash = item.GetValue("Hash");
                         found = hash.Value<string>().Equals(transaction.Hash);
                     }
                     if (!found)
                         ((JArray)txs).Add(JObject.FromObject(transaction));
                 }
                 else
-                    data.Data.Add(Transactions, new List<TransactionDto> { transaction });
+                    data.Data.Add("transactions", new List<TransactionDto> { transaction });
 
                 await vaultService.SaveDataAsync(insecureIdentifier.Value, insecurePassword.Value, $"wallets/{insecureIdentifier.Value}/wallet", data.Data);
             }
@@ -142,7 +139,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <param name="identifier">Identifier.</param>
         /// <param name="password">Password.</param>
         /// <param name="hash">Hash.</param>
-        public async Task<TransactionDto> GetTransaction(SecureString identifier, SecureString password, string hash)
+        public async Task<TransactionDto> Transaction(SecureString identifier, SecureString password, string hash)
         {
             if (identifier == null)
                 throw new ArgumentNullException(nameof(identifier));
@@ -153,7 +150,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
             if (string.IsNullOrEmpty(hash))
                 throw new ArgumentException("Hash is missing!", nameof(hash));
 
-            var transactions = await GetTransactions(identifier, password);
+            var transactions = await Transactions(identifier, password);
 
             return transactions.FirstOrDefault(t => t.Hash.Equals(hash));
         }
@@ -165,7 +162,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <param name="identifier">Identifier.</param>
         /// <param name="password">Password.</param>
         /// <param name="stamp">Stamp.</param>
-        public async Task<double> GetTransactionAmount(SecureString identifier, SecureString password, string stamp)
+        public async Task<double> TransactionAmount(SecureString identifier, SecureString password, string stamp)
         {
             if (identifier == null)
                 throw new ArgumentNullException(nameof(identifier));
@@ -177,7 +174,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
                 throw new ArgumentException("Stamp is missing!", nameof(stamp));
 
             var total = 0.0D;
-            var transactions = await GetTransactions(identifier, password);
+            var transactions = await Transactions(identifier, password);
             var transaction = transactions.Select(tx =>
             {
                 if (tx.Stamp.Equals(stamp))
@@ -196,7 +193,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <returns>The envelope.</returns>
         /// <param name="identifier">Identifier.</param>
         /// <param name="password">Password.</param>
-        public async Task<List<TransactionDto>> GetTransactions(SecureString identifier, SecureString password)
+        public async Task<List<TransactionDto>> Transactions(SecureString identifier, SecureString password)
         {
             if (identifier == null)
                 throw new ArgumentNullException(nameof(identifier));
@@ -210,11 +207,34 @@ namespace TangramCypher.ApplicationLayer.Wallet
             using (var insecurePassword = password.Insecure())
             {
                 var data = await vaultService.GetDataAsync(insecureIdentifier.Value, insecurePassword.Value, $"wallets/{insecureIdentifier.Value}/wallet");
-                if (data.Data.TryGetValue(Transactions, out object txs))
+                if (data.Data.TryGetValue("transactions", out object txs))
                 {
                     transactions = ((JArray)txs).ToObject<List<TransactionDto>>();
                 }
             }
+
+            return transactions;
+        }
+
+        /// <summary>
+        /// Gets the transactions by stamp.
+        /// </summary>
+        /// <returns>The transactions.</returns>
+        /// <param name="identifier">Identifier.</param>
+        /// <param name="password">Password.</param>
+        /// <param name="stamp">Stamp.</param>
+        public async Task<List<TransactionDto>> Transactions(SecureString identifier, SecureString password, string stamp)
+        {
+            if (identifier == null)
+                throw new ArgumentNullException(nameof(identifier));
+
+            if (password == null)
+                throw new ArgumentNullException(nameof(password));
+
+            var transactions = await Transactions(identifier, password);
+
+            if (transactions != null)
+                transactions = transactions.Where(tx => tx.Stamp == stamp).ToList();
 
             return transactions;
         }
@@ -226,7 +246,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <param name="identifier">Identifier.</param>
         /// <param name="password">Password.</param>
         /// <param name="storeKey">Store key.</param>
-        public async Task<SecureString> GetStoreKey(SecureString identifier, SecureString password, string storeKey)
+        public async Task<SecureString> StoreKey(SecureString identifier, SecureString password, string storeKey)
         {
             if (identifier == null)
                 throw new ArgumentNullException(nameof(identifier));
@@ -263,7 +283,44 @@ namespace TangramCypher.ApplicationLayer.Wallet
             if (!double.TryParse(amount.ToString(), out double t))
                 throw new InvalidCastException();
 
-            var transactions = await GetTransactions(identifier, password);
+            var transactions = await Transactions(identifier, password);
+            var coins = transactions.OrderBy(tx => tx.Version).ToArray();
+            var transactionChange = CalculateChange(amount, ref t, transactions);
+
+            return transactionChange;
+        }
+
+        /// <summary>
+        /// Makes the change.
+        /// </summary>
+        /// <returns>The change.</returns>
+        /// <param name="identifier">Identifier.</param>
+        /// <param name="password">Password.</param>
+        /// <param name="amount">Amount.</param>
+        /// <param name="stamp">Stamp.</param>
+        public async Task<TransactionChange> MakeChange(SecureString identifier, SecureString password, double amount, string stamp)
+        {
+            if (!double.TryParse(amount.ToString(), out double t))
+                throw new InvalidCastException();
+
+            if (string.IsNullOrEmpty(stamp))
+                throw new ArgumentException("message", nameof(stamp));
+
+            var transactions = await Transactions(identifier, password, stamp);
+            var transactionChange = CalculateChange(amount, ref t, transactions);
+
+            return transactionChange;
+        }
+
+        /// <summary>
+        /// Calculates the change.
+        /// </summary>
+        /// <returns>The change.</returns>
+        /// <param name="amount">Amount.</param>
+        /// <param name="t">T.</param>
+        /// <param name="transactions">Transactions.</param>
+        private static TransactionChange CalculateChange(double amount, ref double t, List<TransactionDto> transactions)
+        {
             var coins = transactions.OrderBy(tx => tx.Version).ToArray();
             int count, i;
             var transactionChange = new TransactionChange();
