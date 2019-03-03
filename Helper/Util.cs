@@ -12,6 +12,8 @@ using Newtonsoft.Json;
 using System.Threading.Tasks;
 using System.Numerics;
 using System.Dynamic;
+using McMaster.Extensions.CommandLineUtils;
+using Microsoft.Extensions.Logging;
 
 namespace TangramCypher.Helper
 {
@@ -155,6 +157,15 @@ namespace TangramCypher.Helper
                 expandoDict[propertyName] = propertyValue;
             else
                 expandoDict.Add(propertyName, propertyValue);
+        }
+
+        public static void LogException(IConsole console, ILogger logger, Exception e)
+        {
+            console.BackgroundColor = ConsoleColor.Red;
+            console.ForegroundColor = ConsoleColor.White;
+            console.WriteLine(e.ToString());
+            logger.LogError(e, Environment.NewLine);
+            console.ResetColor();
         }
     }
 }

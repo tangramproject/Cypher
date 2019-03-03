@@ -60,7 +60,7 @@ namespace TangramCypher
 
                     var logger = new LoggerFactory()
                                                 .AddDebug()
-                                                //.AddFile("cypher.log")
+                                                .AddFile("cypher.log")
                                                 .CreateLogger("cypher");
 
                     services.Add(new ServiceDescriptor(typeof(ILogger),
