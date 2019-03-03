@@ -1,4 +1,4 @@
-﻿// Cypher (c) by Tangram LLC
+﻿// Cypher (c) by Tangram Inc
 // 
 // Cypher is licensed under a
 // Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International License.
