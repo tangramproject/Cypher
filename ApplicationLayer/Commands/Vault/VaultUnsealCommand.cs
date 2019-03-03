@@ -18,7 +18,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Vault
 
         public override async Task Execute()
         {
-            var vaultShard = Prompt.GetPassword("Vault Shard:", ConsoleColor.Yellow);
+            var vaultShard = Prompt.GetPassword("Vault Key:", ConsoleColor.Yellow);
             await vaultService.Unseal(vaultShard);
         }
     }

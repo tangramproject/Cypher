@@ -24,7 +24,7 @@ using VaultSharp.V1.SystemBackend;
 
 namespace TangramCypher.ApplicationLayer.Vault
 {
-    public class VaultService : HostedService, IVaultService
+    public class VaultService : HostedService, IVaultService, IDisposable
     {
         private static readonly DirectoryInfo userDirectory = new DirectoryInfo(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
         private static readonly DirectoryInfo tangramDirectory = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
@@ -123,6 +123,12 @@ namespace TangramCypher.ApplicationLayer.Vault
                 logger.LogInformation("Vault not Initialized... Initializing");
 
                 await Init();
+
+                //  TODO: Find a better way, this is necessary because the VaultProcess is outputting to the console.
+                //  However, without this hack the user won't know they can start typing.
+                console.ForegroundColor = ConsoleColor.Cyan;
+                console.Write("tangram$ ");
+                console.ResetColor();
             }
             else
             {
@@ -266,6 +272,9 @@ namespace TangramCypher.ApplicationLayer.Vault
 
             //  Partially unseal using the stored shard
             await Unseal(serviceShard);
+            console.ForegroundColor = ConsoleColor.DarkRed;
+            console.WriteLine("Plase type `vault unseal` to unseal the vault.");
+            console.ResetColor();
         }
 
         private async Task EnableUserpassAuth()
@@ -620,7 +629,19 @@ namespace TangramCypher.ApplicationLayer.Vault
 
         protected override async Task ExecuteAsync(CancellationToken cancellationToken)
         {
-            await Task.Run(()=>StartVaultServiceAsync());
+            await Task.Run(() => StartVaultServiceAsync());
+        }
+
+        public override Task StopAsync(CancellationToken cancellationToken)
+        {
+            if (vaultProcess != null)
+            {
+                vaultProcess.Kill();
+                vaultProcess.Dispose();
+                vaultProcess = null;
+            }
+
+            return base.StopAsync(cancellationToken);
         }
     }
 }
