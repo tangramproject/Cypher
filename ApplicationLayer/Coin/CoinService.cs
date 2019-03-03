@@ -34,6 +34,9 @@ namespace TangramCypher.ApplicationLayer.Coin
                 var commitPos = Commit((ulong)Output().Value, blind);
                 var commitNeg = Commit(0, blind);
 
+                Stamp(GetNewStamp());
+                Version(-1);
+
                 coin = BuildCoin(blindSum, commitPos, commitNeg, true);
                 receiver = new ReceiverOutput(Output().Value, commitPos, blindSum);
             }
@@ -377,6 +380,8 @@ namespace TangramCypher.ApplicationLayer.Coin
                 Hint = DeriveKey(v2, redemptionKey.Stamp, redemptionKey.Key2.ToSecureString())
             };
 
+            c1.Hash = Hash(c1).ToHex();
+
             var c2 = new CoinDto()
             {
                 Keeper = DeriveKey(v3, redemptionKey.Stamp, DeriveKey(v4, redemptionKey.Stamp, DeriveKey(v4, redemptionKey.Stamp, password).ToSecureString()).ToSecureString()),
@@ -386,6 +391,8 @@ namespace TangramCypher.ApplicationLayer.Coin
                 Envelope = coin.Envelope,
                 Hint = DeriveKey(v3, redemptionKey.Stamp, DeriveKey(v3, redemptionKey.Stamp, password).ToSecureString())
             };
+
+            c2.Hash = Hash(c2).ToHex();
 
             return (c1, c2);
         }

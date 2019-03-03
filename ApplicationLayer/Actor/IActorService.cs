@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Security;
 using System.Threading;
 using System.Threading.Tasks;
@@ -19,8 +20,9 @@ namespace TangramCypher.ApplicationLayer.Actor
         Span<byte> DecodeAddress(string key);
         SecureString From();
         ActorService From(SecureString password);
-        byte[] GetCypher(RedemptionKeyDto redemptionKey, byte[] pk);
+        byte[] Cypher(string message, byte[] pk);
         Task<NotificationDto> GetMessageAsync(string address, CancellationToken cancellationToken);
+        Task<IEnumerable<NotificationDto>> GetMessagesAsync(string address, int skip, int take, CancellationToken cancellationToken);
         Task<byte[]> ToSharedKey(byte[] pk);
         Task<CoinDto> GetCoinAsync(string stamp, CancellationToken cancellationToken);
         SecureString Identifier();
@@ -33,7 +35,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         Task ReceivePayment(string address, NotificationDto notification);
         SecureString SecretKey();
         ActorService SecretKey(SecureString sk);
-        Task<MessageDto> SendFirstContactPubKeyMessage();
+        Task<MessageDto> EstablishPubKeyMessage();
         Task<JObject> SendPayment(bool sendMessage);
         string To();
         ActorService To(string address);

@@ -19,5 +19,6 @@
         public const string GetMessage = "getMessage";
         public const string PostMessage = "postMessage";
         public const string GetMessages = "getMessages";
+        public const string GetMessageRange = "getMessageRange";
     }
 }

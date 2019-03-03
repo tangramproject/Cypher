@@ -4,13 +4,7 @@ Official C# implementation of the Tangram CLi wallet.
 
 ## Building from source
 
-For prerequisites and detailed build instructions please read the [Installation Instructions (https://github.com/tangramproject/Cypher/wiki/Installing-CLi) on the wiki.
-
-Building Tangram Bamboo (CLi) requires both a xxx (version xxx or later) and a C compiler.
-You can install them using your favourite package manager.
-Once the dependencies are installed, run
-
-xxx
+For prerequisites and detailed build instructions please read the [Installation Instructions](https://github.com/tangramproject/Cypher/wiki/Installing-CLi) on the wiki.
 
 ## Contribution
 
