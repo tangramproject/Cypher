@@ -23,6 +23,8 @@ namespace TangramCypher.ApplicationLayer.Commands
         readonly IDictionary<string[], Type> commands;
         private bool prompt = true;
 
+        private Thread _t;
+
         public CommandService(IConsole cnsl, IServiceProvider provider, ILogger lgr)
         {
             console = cnsl;
@@ -128,6 +130,8 @@ namespace TangramCypher.ApplicationLayer.Commands
 
         public async Task InteractiveCliLoop()
         {
+            await StartAllHostedProviders();
+
             while (prompt)
             {
                 var args = Prompt.GetString("tangram$", promptColor: ConsoleColor.Cyan)?.TrimEnd()?.Split(' ');
@@ -148,11 +152,80 @@ namespace TangramCypher.ApplicationLayer.Commands
                     console.ResetColor();
                 }
             }
+
+            console.WriteLine("Exiting...");
+
+            Environment.Exit(0);
+        }
+
+        private IEnumerable<Type> FindAllHostedServiceTypes()
+        {
+            //  Concrete Service Types
+
+            var type = typeof(HostedService);
+            var concreteServiceTypes = AppDomain.CurrentDomain.GetAssemblies()
+                .SelectMany(s => s.GetTypes())
+                .Where(p => type.IsAssignableFrom(p) && p != GetType() && p != typeof(HostedService));
+
+            //  Find interfaces that implement IHostedService
+            foreach (var concreteServiceType in concreteServiceTypes)
+            {
+                var interfaces = concreteServiceType.GetInterfaces();
+
+                foreach (var inf in interfaces)
+                {
+                    if (inf == typeof(IHostedService))
+                    {
+                        continue;
+                    }
+
+                    var implements = inf.GetInterfaces().Any(x => x == typeof(IHostedService));
+
+                    if (implements)
+                    {
+                        yield return inf;
+                    }
+                }
+            }
+        }
+
+        private async Task StartAllHostedProviders()
+        {
+            var hostedProviders = FindAllHostedServiceTypes();
+
+            foreach (var hostedProvider in hostedProviders)
+            {
+                var serviceInstance = serviceProvider.GetService(hostedProvider) as IHostedService;
+
+                if (serviceInstance != null)
+                {
+                    await serviceInstance.StartAsync(new CancellationToken());
+                }
+            }
+        }
+
+        private async Task StopAllHostedProviders()
+        {
+            var hostedProviders = FindAllHostedServiceTypes();
+
+            foreach (var hostedProvider in hostedProviders)
+            {
+                var serviceInstance = serviceProvider.GetService(hostedProvider) as IHostedService;
+
+                if (serviceInstance != null)
+                {
+                    await serviceInstance.StopAsync(new CancellationToken());
+                }
+            }
         }
 
         protected override async Task ExecuteAsync(CancellationToken cancellationToken)
         {
-            await InteractiveCliLoop();
+            await Task.Run(() =>
+            {
+                _t = new Thread(async () => { await InteractiveCliLoop(); });
+                _t.Start();
+            });
         }
     }
 

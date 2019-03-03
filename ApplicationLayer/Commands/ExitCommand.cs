@@ -17,8 +17,15 @@ namespace TangramCypher.ApplicationLayer.Commands.Vault
             commandService = provider.GetService<ICommandService>();
         }
 
+        public Task<bool> asdasd()
+        {
+            return Task.FromResult(true);
+        }
+
         public override async Task Execute()
         {
+            await asdasd();
+
             commandService.Exit();
         }
     }

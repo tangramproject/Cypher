@@ -353,17 +353,13 @@ namespace Cypher.ApplicationLayer.Onion
                 {
                     int.TryParse(Util.Pop(File.ReadAllText(controlPortPath, Encoding.UTF8), ":"), out port);
                 }
-#pragma warning disable RECS0022 // A catch clause that catches System.Exception and has an empty body
                 catch { }
-#pragma warning restore RECS0022 // A catch clause that catches System.Exception and has an empty body
             }
 
             return port == 0 ? controlPort : port;
         }
 
-#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
         async Task StartTorProcess()
-#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
         {
             TorProcess = new Process();
             TorProcess.StartInfo.FileName = GetTorFileName();
@@ -371,11 +367,7 @@ namespace Cypher.ApplicationLayer.Onion
             TorProcess.StartInfo.UseShellExecute = false;
             TorProcess.StartInfo.CreateNoWindow = true;
             TorProcess.StartInfo.RedirectStandardOutput = true;
-#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
-#pragma warning disable RECS0165 // Asynchronous methods should return a Task instead of void
-            TorProcess.OutputDataReceived += async (sender, e) =>
-#pragma warning restore RECS0165 // Asynchronous methods should return a Task instead of void
-#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
+            TorProcess.OutputDataReceived += (sender, e) =>
             {
                 if (!string.IsNullOrEmpty(e.Data))
                 {
@@ -392,12 +384,11 @@ namespace Cypher.ApplicationLayer.Onion
             };
 
             TorProcess.Start();
-            TorProcess.BeginOutputReadLine();
+
+            await Task.Run(() => TorProcess.BeginOutputReadLine());
         }
 
-#pragma warning disable CS0114 // Member hides inherited member; missing override keyword
-        public void Dispose()
-#pragma warning restore CS0114 // Member hides inherited member; missing override keyword
+        public override void Dispose()
         {
             try
             {
@@ -409,18 +400,14 @@ namespace Cypher.ApplicationLayer.Onion
             }
         }
 
-#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
-#pragma warning disable RECS0133 // Parameter name differs in base declaration
         protected override async Task ExecuteAsync(CancellationToken cancellationToken)
-#pragma warning restore RECS0133 // Parameter name differs in base declaration
-#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
         {
             if (onionEnabled == 1)
             {
                 console.WriteLine("Starting Onion Service");
                 logger.LogInformation("Starting Onion Service");
                 GenerateHashPassword("ILoveTangram".ToSecureString());
-                StartOnion();
+                await Task.Run(() => StartOnion());
             }
             return;
         }

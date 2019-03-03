@@ -12,6 +12,7 @@ using System.IO;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Hosting;
 using TangramCypher.ApplicationLayer.Coin;
+using System;
 
 namespace TangramCypher
 {
@@ -59,7 +60,7 @@ namespace TangramCypher
 
                     var logger = new LoggerFactory()
                                                 .AddDebug()
-                                                .AddFile("cypher.log")
+                                                //.AddFile("cypher.log")
                                                 .CreateLogger("cypher");
 
                     services.Add(new ServiceDescriptor(typeof(ILogger),
@@ -69,7 +70,7 @@ namespace TangramCypher
                 })
                 .UseConsoleLifetime();
 
-            await builder.RunConsoleAsync();
+            await builder.RunConsoleAsync().ConfigureAwait(false);
         }
     }
 }

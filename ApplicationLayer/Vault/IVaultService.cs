@@ -8,7 +8,7 @@ namespace TangramCypher.ApplicationLayer.Vault
 {
     public interface IVaultService
     {
-        Task StartVaultServiceAsync();
+        void StartVaultServiceAsync();
         Task Unseal(string shard, bool skipPrint = false);
         Task CreateUserAsync(string username, string password);
         Task SaveDataAsync(string username, string password, string path, IDictionary<string, object> data);
