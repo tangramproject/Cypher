@@ -40,12 +40,12 @@ namespace TangramCypher.ApplicationLayer.Commands
 
         private void Console_CancelKeyPress(object sender, ConsoleCancelEventArgs e)
         {
-            //throw new CancelKeyPressException();
+            ExitCleanly().GetAwaiter().GetResult();
         }
 
-        public void Exit()
+        public async Task Exit()
         {
-            prompt = false;
+            await ExitCleanly();
         }
 
         public void RegisterCommand<T>(string[] name) where T : ICommand
@@ -153,7 +153,16 @@ namespace TangramCypher.ApplicationLayer.Commands
                 }
             }
 
+            await ExitCleanly();
+        }
+
+        private async Task ExitCleanly()
+        {
+            prompt = false;
+
             console.WriteLine("Exiting...");
+
+            await StopAllHostedProviders();
 
             Environment.Exit(0);
         }

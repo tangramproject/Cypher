@@ -24,9 +24,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Vault
 
         public override async Task Execute()
         {
-            await asdasd();
-
-            commandService.Exit();
+            await commandService.Exit();
         }
     }
 }
