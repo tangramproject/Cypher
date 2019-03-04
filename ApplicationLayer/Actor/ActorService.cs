@@ -494,7 +494,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                               Hash = swap2.Hash,
                               Stamp = swap2.Stamp,
                               Version = swap2.Version,
-                              TransactionType = TransactionType.Reveive
+                              TransactionType = TransactionType.Receive
                           });
                 }
                 catch (Exception)
