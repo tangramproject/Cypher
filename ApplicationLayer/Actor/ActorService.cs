@@ -255,7 +255,11 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             var baseAddress = new Uri(apiRestSection.GetValue<string>(Constant.Endpoint));
             var path = string.Format(apiRestSection.GetSection(Constant.Routing).GetValue<string>(Constant.GetMessageRange), address, skip, take);
-            var returnMessages = await Client.GetRangeAsync(baseAddress, path, cancellationToken);
+
+            var returnMessages = apiOnionSection.GetValue<int>(Constant.OnionEnabled) == 1
+                ? await onionService.GetRangeAsync(baseAddress, path, cancellationToken)
+                : await Client.GetRangeAsync(baseAddress, path, cancellationToken);
+
             var messages = returnMessages.Select(m => m.ToObject<NotificationDto>());
 
             return Task.FromResult(messages).Result;
@@ -432,7 +436,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                     var decode = DecodeAddress(address).ToArray();
 
                     await ReceivePayment(notificationAddress, true, decode);
-                    
+
                     break;
                 }
 
@@ -761,7 +765,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             var cypher = Cypher(innerMessage.ToString(), pk);
             var sharedKey = await ToSharedKey(pk.ToArray());
             var notificationAddress = Cryptography.GenericHashWithKey(sharedKey.ToHex(), pk);
-            var message = new MessageDto()
+            var message = new MessageDto
             {
                 Address = notificationAddress.ToBase64(),
                 Body = cypher.ToBase64()
