@@ -1,3 +1,11 @@
+// Cypher (c) by Tangram Inc
+// 
+// Cypher is licensed under a
+// Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International License.
+// 
+// You should have received a copy of the license along with this
+// work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,6 +20,7 @@ using TangramCypher.ApplicationLayer.Commands.Exceptions;
 using TangramCypher.ApplicationLayer.Commands.Vault;
 using TangramCypher.ApplicationLayer.Commands.Wallet;
 using TangramCypher.ApplicationLayer.Vault;
+using TangramCypher.Helper;
 
 namespace TangramCypher.ApplicationLayer.Commands
 {
@@ -88,7 +97,17 @@ namespace TangramCypher.ApplicationLayer.Commands
             if (commands.ContainsKey(cmd))
             {
                 var commandType = commands[cmd];
-                command = Activator.CreateInstance(commandType, serviceProvider) as ICommand;
+
+                var cstr = commandType.GetConstructor(new Type[] { typeof(IServiceProvider) });
+
+                if (cstr != null)
+                {
+                    command = Activator.CreateInstance(commandType, serviceProvider) as ICommand;
+                }
+                else
+                {
+                    command = Activator.CreateInstance(commandType) as ICommand;
+                }
             }
 
             return command;
@@ -100,32 +119,25 @@ namespace TangramCypher.ApplicationLayer.Commands
 
             if (command == null)
             {
-                console.WriteLine();
-                console.WriteLine("  Commands");
-
-                foreach (var cmd in commands)
-                {
-                    var commandDescriptor = cmd.Value.GetCustomAttribute<CommandDescriptorAttribute>();
-                    var name = string.Join(' ', commandDescriptor.Name);
-
-                    var cstr = cmd.Value.GetConstructor(new Type[] { typeof(IServiceProvider) });
-
-                    if (cstr != null)
-                    {
-                        command = Activator.CreateInstance(cmd.Value, serviceProvider) as ICommand;
-                    }
-                    else
-                    {
-                        command = Activator.CreateInstance(cmd.Value) as ICommand;
-                    }
-
-                    console.WriteLine($"    {name}".PadRight(25) + $"{commandDescriptor.Description}");
-                }
-
+                PrintHelp();
                 return;
             }
 
             await command.Execute();
+        }
+
+        private void PrintHelp()
+        {
+            console.WriteLine();
+            console.WriteLine("  Commands");
+
+            foreach (var cmd in commands)
+            {
+                var commandDescriptor = cmd.Value.GetCustomAttribute<CommandDescriptorAttribute>();
+                var name = string.Join(' ', commandDescriptor.Name);
+
+                console.WriteLine($"    {name}".PadRight(25) + $"{commandDescriptor.Description}");
+            }
         }
 
         public async Task InteractiveCliLoop()
@@ -145,11 +157,7 @@ namespace TangramCypher.ApplicationLayer.Commands
                 }
                 catch (Exception e)
                 {
-                    console.BackgroundColor = ConsoleColor.Red;
-                    console.ForegroundColor = ConsoleColor.White;
-                    console.WriteLine(e.ToString());
-                    logger.LogError(e, Environment.NewLine);
-                    console.ResetColor();
+                    Util.LogException(console, logger, e);
                 }
             }
 

@@ -1,4 +1,12 @@
-﻿using System;
+﻿// Cypher (c) by Tangram Inc
+// 
+// Cypher is licensed under a
+// Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International License.
+// 
+// You should have received a copy of the license along with this
+// work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
+
+using System;
 using SimpleBase;
 using System.Collections.Generic;
 using TangramCypher.ApplicationLayer.Actor;
@@ -12,6 +20,8 @@ using Newtonsoft.Json;
 using System.Threading.Tasks;
 using System.Numerics;
 using System.Dynamic;
+using McMaster.Extensions.CommandLineUtils;
+using Microsoft.Extensions.Logging;
 
 namespace TangramCypher.Helper
 {
@@ -155,6 +165,15 @@ namespace TangramCypher.Helper
                 expandoDict[propertyName] = propertyValue;
             else
                 expandoDict.Add(propertyName, propertyValue);
+        }
+
+        public static void LogException(IConsole console, ILogger logger, Exception e)
+        {
+            console.BackgroundColor = ConsoleColor.Red;
+            console.ForegroundColor = ConsoleColor.White;
+            console.WriteLine(e.ToString());
+            logger.LogError(e, Environment.NewLine);
+            console.ResetColor();
         }
     }
 }

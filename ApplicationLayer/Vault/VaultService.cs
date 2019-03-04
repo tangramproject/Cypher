@@ -1,3 +1,11 @@
+// Cypher (c) by Tangram Inc
+// 
+// Cypher is licensed under a
+// Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International License.
+// 
+// You should have received a copy of the license along with this
+// work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
+
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -16,6 +24,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using TangramCypher.ApplicationLayer.Vault.Models;
+using TangramCypher.Helper;
 using VaultSharp;
 using VaultSharp.V1.AuthMethods.Token;
 using VaultSharp.V1.AuthMethods.UserPass;
@@ -67,7 +76,7 @@ namespace TangramCypher.ApplicationLayer.Vault
             vaultClient = new VaultClient(vaultClientSettings);
         }
 
-        public void StartVaultServiceAsync()
+        public void StartVaultService()
         {
             //  Find Vault Executable
             FileInfo[] fileInfo = null;
@@ -461,59 +470,27 @@ namespace TangramCypher.ApplicationLayer.Vault
             console.ResetColor();
             console.WriteLine("Creating Vault Service Policy");
 
-            //dynamic policy = new JObject();
+            dynamic policy = new JObject();
 
-            //policy.path = new JObject();
-            //policy.path["auth/userpass/users/*"] = new JObject();
-            //policy.path["auth/userpass/users/*"]["capabilities"] = new JArray(new string[] { "create", "list" });
+            policy.path = new JObject();
+            policy.path["auth/userpass/users/*"] = new JObject();
+            policy.path["auth/userpass/users/*"]["capabilities"] = new JArray(new string[] { "create", "list" });
 
-            //policy.path["identity/*"] = new JObject();
-            //policy.path["identity/*"]["capabilities"] = new JArray(new string[] { "create", "update" });
+            policy.path["identity/*"] = new JObject();
+            policy.path["identity/*"]["capabilities"] = new JArray(new string[] { "create", "update" });
 
-            //policy.path["secret/wallets/*"] = new JObject();
-            //policy.path["secret/wallets/*"]["capabilities"] = new JArray(new string[] { "list" });
+            policy.path["secret/wallets/*"] = new JObject();
+            policy.path["secret/wallets/*"]["capabilities"] = new JArray(new string[] { "list" });
 
-            //policy.path["secret/data/wallets/*"] = new JObject();
-            //policy.path["secret/data/wallets/*"]["capabilities"] = new JArray(new string[] { "list" });
+            policy.path["secret/data/wallets/*"] = new JObject();
+            policy.path["secret/data/wallets/*"]["capabilities"] = new JArray(new string[] { "list" });
 
-            //policy.path["sys/auth"] = new JObject();
-            //policy.path["sys/auth"]["capabilities"] = new JArray(new string[] { "read" });
+            policy.path["sys/auth"] = new JObject();
+            policy.path["sys/auth"]["capabilities"] = new JArray(new string[] { "read" });
 
             logger.LogInformation("Creating Policy object");
 
-            var p = "{" +
-                "\r\n  \"path\": {" +
-                "\r\n    \"auth/userpass/users/*\": {" +
-                "\r\n      \"capabilities\": [" +
-                "\r\n        \"create\"," +
-                "\r\n        \"list\"" +
-                "\r\n      ]" +
-                "\r\n    }," +
-                "\r\n    \"identity/*\": {" +
-                "\r\n      \"capabilities\": [" +
-                "\r\n        \"create\"," +
-                "\r\n        \"update\"" +
-                "\r\n      ]" +
-                "\r\n    }," +
-                "\r\n    \"secret/wallets/*\": {" +
-                "\r\n      \"capabilities\": [" +
-                "\r\n        \"list\"" +
-                "\r\n      ]" +
-                "\r\n    }," +
-                "\r\n    \"secret/data/wallets/*\": {" +
-                "\r\n      \"capabilities\": [" +
-                "\r\n        \"list\"" +
-                "\r\n      ]" +
-                "\r\n    }," +
-                "\r\n    \"sys/auth\": {" +
-                "\r\n      \"capabilities\": [" +
-                "\r\n        \"read\"" +
-                "\r\n      ]" +
-                "\r\n    }" +
-                "\r\n  }" +
-                "\r\n}";
-
-            var data = new VaultPolicyCreateRequest { policy = p };
+            var data = new VaultPolicyCreateRequest { policy = policy.ToString() };
 
             logger.LogInformation("Created Policy object");
 
@@ -526,39 +503,16 @@ namespace TangramCypher.ApplicationLayer.Vault
             logger.LogInformation("Creating Templated Wallet Policy");
             console.WriteLine("Creating Templated Wallet Policy");
 
-            //dynamic policy = new JObject();
+            dynamic policy = new JObject();
 
-            //policy.path = new JObject();
-            //policy.path["secret/wallets/{{identity.entity.name}}/*"] = new JObject();
-            //policy.path["secret/wallets/{{identity.entity.name}}/*"]["capabilities"] = new JArray(new string[] { "create", "read", "update", "delete", "list" });
+            policy.path = new JObject();
+            policy.path["secret/wallets/{{identity.entity.name}}/*"] = new JObject();
+            policy.path["secret/wallets/{{identity.entity.name}}/*"]["capabilities"] = new JArray(new string[] { "create", "read", "update", "delete", "list" });
 
-            //policy.path["secret/data/wallets/{{identity.entity.name}}/*"] = new JObject();
-            //policy.path["secret/data/wallets/{{identity.entity.name}}/*"]["capabilities"] = new JArray(new string[] { "create", "read", "update", "delete", "list" }); ;
+            policy.path["secret/data/wallets/{{identity.entity.name}}/*"] = new JObject();
+            policy.path["secret/data/wallets/{{identity.entity.name}}/*"]["capabilities"] = new JArray(new string[] { "create", "read", "update", "delete", "list" }); ;
 
-            var p = "{" +
-                "\r\n  \"path\": {" +
-                "\r\n    \"secret/wallets/{{identity.entity.name}}/*\": {" +
-                "\r\n      \"capabilities\": [" +
-                "\r\n        \"create\"," +
-                "\r\n        \"read\"," +
-                "\r\n        \"update\"," +
-                "\r\n        \"delete\"," +
-                "\r\n        \"list\"" +
-                "\r\n      ]" +
-                "\r\n    }," +
-                "\r\n    \"secret/data/wallets/{{identity.entity.name}}/*\": {" +
-                "\r\n      \"capabilities\": [" +
-                "\r\n        \"create\"," +
-                "\r\n        \"read\"," +
-                "\r\n        \"update\"," +
-                "\r\n        \"delete\"," +
-                "\r\n        \"list\"" +
-                "\r\n      ]" +
-                "\r\n    }" +
-                "\r\n  }" +
-                "\r\n}";
-
-            var data = new VaultPolicyCreateRequest { policy = p };
+            var data = new VaultPolicyCreateRequest { policy = policy.ToString() };
 
             var response = await PutAsJsonAsync<string>(data, "/v1/sys/policy/walletpolicy", rootToken);
         }
@@ -577,14 +531,16 @@ namespace TangramCypher.ApplicationLayer.Vault
 
             await PostAsJsonAsync<object>(new VaultUserCreateRequest { password = password }, $"v1/auth/userpass/users/{username}", serviceToken.client_token);
 
-            var identityCreateResponse = await PostAsJsonAsync<VaultIdentityEntityCreateResponse>(
+            var identityCreateResponse = await PostAsJsonAsync<VaultIdentityEntityCreateResponse>
+            (
                 new VaultIdentityEntityCreateRequest
                 {
                     name = username,
                     policies = new string[] { "walletpolicy" }
                 },
                 $"v1/identity/entity",
-                serviceToken.client_token);
+                serviceToken.client_token
+            );
 
             var authResponse = await GetAsJsonAsync<JObject>($"v1/sys/auth", serviceToken.client_token);
 
@@ -592,14 +548,17 @@ namespace TangramCypher.ApplicationLayer.Vault
 
             var entityId = identityCreateResponse.data.id;
 
-            var identityAliasCreateResponse = await PostAsJsonAsync<object>(new VaultCreateEntityAliasRequest
-            {
-                name = username,
-                canonical_id = entityId,
-                mount_accessor = accesor
-            },
-                                                                            $"v1/identity/entity-alias",
-                                                                            serviceToken.client_token);
+            var identityAliasCreateResponse = await PostAsJsonAsync<object>
+            (
+                new VaultCreateEntityAliasRequest
+                {
+                    name = username,
+                    canonical_id = entityId,
+                    mount_accessor = accesor
+                },
+                $"v1/identity/entity-alias",
+                serviceToken.client_token
+            );
         }
 
         public async Task SaveDataAsync(string username, string password, string path, IDictionary<string, object> data)
@@ -629,7 +588,14 @@ namespace TangramCypher.ApplicationLayer.Vault
 
         protected override async Task ExecuteAsync(CancellationToken cancellationToken)
         {
-            await Task.Run(() => StartVaultServiceAsync());
+            try
+            {
+                await Task.Run(() => StartVaultService());
+            }
+            catch(Exception e)
+            {
+                Util.LogException(console, logger, e);
+            }
         }
 
         public override Task StopAsync(CancellationToken cancellationToken)
