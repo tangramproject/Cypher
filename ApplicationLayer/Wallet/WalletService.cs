@@ -53,7 +53,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
 
                 try
                 {
-                    pocket = transactions.Where(tx => tx.TransactionType == TransactionType.Reveive).Skip(1).Sum(p => p.Amount);
+                    pocket = transactions.Where(tx => tx.TransactionType == TransactionType.Receive).Skip(1).Sum(p => p.Amount);
                     burnt = transactions.Last(tx => tx.TransactionType == TransactionType.Send);
                 }
                 catch { }
@@ -62,7 +62,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
                     switch (burnt)
                     {
                         case null:
-                            total = transactions.Where(tx => tx.TransactionType == TransactionType.Reveive).Sum(p => p.Amount);
+                            total = transactions.Where(tx => tx.TransactionType == TransactionType.Receive).Sum(p => p.Amount);
                             break;
                         default:
                             {
