@@ -49,8 +49,8 @@ namespace TangramCypher.ApplicationLayer.Actor
             apiRestSection = configuration.GetSection(Constant.ApiGateway);
             apiOnionSection = configuration.GetSection(Constant.Onion);
 
-            //var pass = "that youthful divorce will rehearse drowsily against the reticent asteroids after my dazed tentacle".ToSecureString();
-            //var id = "id_c21dab5ba5cfbf44a6d9f709dc2b4273".ToSecureString();
+            //var pass = "why do these 788 brambles roast out my headline glass and even that lofty broiler".ToSecureString();
+            //var id = "id_803e2bbf5da820f15100d988ad024fa8".ToSecureString();
 
             //var coin = coinService
             //      .Password(pass)
@@ -72,7 +72,8 @@ namespace TangramCypher.ApplicationLayer.Actor
             //    Commitment = coinResult.Envelope.Commitment,
             //    Hash = coinResult.Hash,
             //    Stamp = coinResult.Stamp,
-            //    Version = coinResult.Version
+            //    Version = coinResult.Version,
+            //    TransactionType = TransactionType.Reveive
             //});
 
         }
@@ -210,6 +211,27 @@ namespace TangramCypher.ApplicationLayer.Actor
                 : await Client.GetAsync<JObject>(baseAddress, path, cancellationToken);
 
             return message.ToObject<NotificationDto>();
+        }
+
+        /// <summary>
+        /// Gets the message count async.
+        /// </summary>
+        /// <returns>The message count async.</returns>
+        /// <param name="address">Address.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        public async Task<JObject> GetMessageCountAsync(string address, CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrEmpty(address))
+                throw new ArgumentException("Address is missing!", nameof(address));
+
+            var baseAddress = new Uri(apiRestSection.GetValue<string>(Constant.Endpoint));
+            var path = string.Format(apiRestSection.GetSection(Constant.Routing).GetValue<string>(Constant.GetMessageCount), address);
+
+            var message = apiOnionSection.GetValue<int>(Constant.OnionEnabled) == 1
+                ? await onionService.ClientGetAsync<JObject>(baseAddress, path, cancellationToken)
+                : await Client.GetAsync<JObject>(baseAddress, path, cancellationToken);
+
+            return message.ToObject<JObject>();
         }
 
         /// <summary>
@@ -353,26 +375,86 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// Receives the payment.
         /// </summary>
         /// <returns>The payment.</returns>
-        /// <param name="notification">Notification.</param>
-        public async Task ReceivePayment(string address, NotificationDto notification)
+        /// <param name="address">Address.</param>
+        public async Task ReceivePayment(string address, bool sharedKey = false, byte[] receiverPk = null)
         {
             if (string.IsNullOrEmpty(address))
                 throw new ArgumentException("message", nameof(address));
 
-            if (notification == null)
-                throw new ArgumentNullException(nameof(notification));
+            IEnumerable<NotificationDto> notifications;
+            var notificationAddress = string.Empty;
 
             var pk = DecodeAddress(address).ToArray();
-            var message = await ReadMessage(notification.Body, pk);
-            var (isPayment, store) = ParseMessage(message);
 
-            if (isPayment)
-                await CollectPayment(store);
-            else
-                await ReceiveSharedKeyPayment(pk, store.FromHex());
+            notificationAddress = sharedKey ? pk.ToHex() : Cryptography.GenericHashWithKey(pk.ToHex(), pk).ToHex();
+
+            var messageTrack = await walletService.MessageTrack(Identifier(), From(), pk.ToHex());
+            var count = await GetMessageCountAsync(notificationAddress, new CancellationToken());
+            var countValue = count.Value<int>("count");
+
+            notifications = messageTrack == null
+                ? await GetMessagesAsync(notificationAddress, 0, countValue, new CancellationToken())
+                : await GetMessagesAsync(notificationAddress, messageTrack.Skip, messageTrack.Take, new CancellationToken());
+
+            if (sharedKey)
+                pk = receiverPk;
+
+            await CheckNotifications(address, notifications, pk, countValue);
         }
 
-        private async Task CollectPayment(string message)
+        /// <summary>
+        /// Checks the notifications.
+        /// </summary>
+        /// <returns>The notifications.</returns>
+        /// <param name="address">Address.</param>
+        /// <param name="notifications">Notifications.</param>
+        /// <param name="pk">Pk.</param>
+        /// <param name="countValue">Count value.</param>
+        private async Task CheckNotifications(string address, IEnumerable<NotificationDto> notifications, byte[] pk, int countValue)
+        {
+            foreach (var notification in notifications)
+            {
+                var message = await ReadMessage(notification.Body, pk);
+                var (isPayment, store) = ParseMessage(message);
+
+                if (!isPayment)
+                {
+                    var sharedKey = await ToSharedKey(DecodeAddress(store).ToArray());
+                    var notificationAddress = EncodeAddress(Cryptography.GenericHashWithKey(sharedKey.ToHex(), pk).ToHex());
+                    var decode = DecodeAddress(address).ToArray();
+
+                    await ReceivePayment(notificationAddress, true, decode);
+                    
+                    break;
+                }
+
+                var payment = await Payment(store);
+
+                if (payment)
+                {
+                    var track = new MessageTrackDto
+                    {
+                        Count = countValue,
+                        PublicKey = pk.ToHex(),
+                        Skip = countValue
+                    };
+
+                    track.Take = track.Skip - countValue;
+
+                    if (track.Take.Equals(0))
+                        track.Take = 1;
+
+                    await walletService.AddMessageTracking(Identifier(), From(), track);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Payment.
+        /// </summary>
+        /// <returns>The payment.</returns>
+        /// <param name="message">Message.</param>
+        private async Task<bool> Payment(string message)
         {
             if (string.IsNullOrEmpty(message))
                 throw new ArgumentException("message", nameof(message));
@@ -382,28 +464,38 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             if (coin != null)
             {
-                coin = coin.FormatCoinFromBase64();
+                try
+                {
+                    coin = coin.FormatCoinFromBase64();
 
-                var (swap1, swap2) = coinService.CoinSwap(From(), coin, freeRedemptionKey);
+                    var (swap1, swap2) = coinService.CoinSwap(From(), coin, freeRedemptionKey);
 
-                var keeperPass = await CoinKepperPass(swap1);
-                if (keeperPass != true)
-                    return;
+                    var keeperPass = await CoinKepperPass(swap1);
+                    if (keeperPass != true)
+                        return false;
 
-                var fullPass = await CoinFullPass(swap2);
-                if (fullPass != true)
-                    return;
+                    var fullPass = await CoinFullPass(swap2);
+                    if (fullPass != true)
+                        return false;
 
-                await walletService.AddTransaction(Identifier(), From(),
-                      new TransactionDto
-                      {
-                          Amount = freeRedemptionKey.Amount,
-                          Commitment = coin.Envelope.Commitment,
-                          Hash = swap2.Hash,
-                          Stamp = swap2.Stamp,
-                          Version = swap2.Version
-                      });
+                    await walletService.AddTransaction(Identifier(), From(),
+                          new TransactionDto
+                          {
+                              Amount = freeRedemptionKey.Amount,
+                              Commitment = coin.Envelope.Commitment,
+                              Hash = swap2.Hash,
+                              Stamp = swap2.Stamp,
+                              Version = swap2.Version,
+                              TransactionType = TransactionType.Reveive
+                          });
+                }
+                catch (Exception)
+                {
+                    return false;
+                }
             }
+
+            return true;
         }
 
         /// <summary>
@@ -459,33 +551,6 @@ namespace TangramCypher.ApplicationLayer.Actor
         }
 
         /// <summary>
-        /// Receives the shared key payment.
-        /// </summary>
-        /// <returns>The shared key payment.</returns>
-        /// <param name="addressPublicKey">Address public key.</param>
-        /// <param name="senderPublicKey">Sender public key.</param>
-        private async Task ReceiveSharedKeyPayment(byte[] addressPublicKey, byte[] senderPublicKey)
-        {
-            if ((addressPublicKey == null) && (addressPublicKey.Length > 32))
-                throw new ArgumentNullException(nameof(addressPublicKey));
-
-            if ((senderPublicKey == null) && (senderPublicKey.Length > 32))
-                throw new ArgumentNullException(nameof(senderPublicKey));
-
-            var sharedKey = await ToSharedKey(senderPublicKey);
-            var notificationAddress = Cryptography.GenericHashWithKey(sharedKey.ToHex(), addressPublicKey);
-            var notifications = await GetMessagesAsync(notificationAddress.ToHex(), 0, 2, new CancellationToken());
-
-            foreach (var notification in notifications)
-            {
-                var message = await ReadMessage(notification.Body, addressPublicKey);
-                var (isPayment, store) = ParseMessage(message);
-
-                await CollectPayment(store);
-            }
-        }
-
-        /// <summary>
         /// Parses the message.
         /// </summary>
         /// <returns>The message.</returns>
@@ -533,7 +598,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             var pk = DecodeAddress(To()).ToArray();
             var notificationAddress = Cryptography.GenericHashWithKey(pk.ToHex(), pk);
             var senderPk = PublicKey().ToUnSecureString();
-            var innerMessage = JObject.Parse(@"{payment: false, store:'" + senderPk + "'}");
+            var innerMessage = JObject.Parse(@"{payment: false, store:'" + EncodeAddress(senderPk) + "'}");
             var cypher = Cypher(innerMessage.ToString(), pk);
             var message = await AddMessageAsync(new MessageDto
             {
@@ -544,7 +609,12 @@ namespace TangramCypher.ApplicationLayer.Actor
             return message;
         }
 
-        ///TODO: Clean up code.. Hiide the coin version and the stamp..
+        private static string EncodeAddress(string pk)
+        {
+            return Base58.Bitcoin.Encode(Utilities.HexToBinary(pk));
+        }
+
+        ///TODO: Clean up code.. Hide the coin version and the stamp..
         /// <summary>
         /// Sends the payment.
         /// </summary>
@@ -739,7 +809,8 @@ namespace TangramCypher.ApplicationLayer.Actor
                     Commitment = formattedCoin.Envelope.Commitment,
                     Hash = formattedCoin.Hash,
                     Stamp = formattedCoin.Stamp,
-                    Version = formattedCoin.Version
+                    Version = formattedCoin.Version,
+                    TransactionType = TransactionType.Send
                 };
 
                 tasks.Add(walletService.AddTransaction(Identifier(), From(), transaction));

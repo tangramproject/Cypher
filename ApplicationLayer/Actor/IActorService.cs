@@ -22,6 +22,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         ActorService From(SecureString password);
         byte[] Cypher(string message, byte[] pk);
         Task<NotificationDto> GetMessageAsync(string address, CancellationToken cancellationToken);
+        Task<JObject> GetMessageCountAsync(string address, CancellationToken cancellationToken);
         Task<IEnumerable<NotificationDto>> GetMessagesAsync(string address, int skip, int take, CancellationToken cancellationToken);
         Task<byte[]> ToSharedKey(byte[] pk);
         Task<CoinDto> GetCoinAsync(string stamp, CancellationToken cancellationToken);
@@ -32,7 +33,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         string OpenBoxSeal(string cypher, PkSkDto pkSkDto);
         SecureString PublicKey();
         ActorService PublicKey(SecureString pk);
-        Task ReceivePayment(string address, NotificationDto notification);
+        Task ReceivePayment(string address, bool sharedKey = false, byte[] receiverPk = null);
         SecureString SecretKey();
         ActorService SecretKey(SecureString sk);
         Task<MessageDto> EstablishPubKeyMessage();

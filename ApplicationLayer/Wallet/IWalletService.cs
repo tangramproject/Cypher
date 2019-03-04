@@ -19,5 +19,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
         Task<SecureString> StoreKey(SecureString identifier, SecureString password, string storeKey);
         Task<TransactionChange> MakeChange(SecureString identifier, SecureString password, double amount);
         Task<TransactionChange> MakeChange(SecureString identifier, SecureString password, double amount, string stamp);
+        Task AddMessageTracking(SecureString identifier, SecureString password, MessageTrackDto messageTrack);
+        Task<MessageTrackDto> MessageTrack(SecureString identifier, SecureString password, string pk);
     }
 }

@@ -20,5 +20,6 @@
         public const string PostMessage = "postMessage";
         public const string GetMessages = "getMessages";
         public const string GetMessageRange = "getMessageRange";
+        public const string GetMessageCount = "getMessageCount";
     }
 }
