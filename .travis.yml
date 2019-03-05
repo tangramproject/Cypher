@@ -1,16 +1,11 @@
-os:
-  - windows
-  - linux
-  - osx
-
 language: csharp
-solution: Cypher.sln
 mono: none
+sudo: required
+dist: xenial
 dotnet: 2.2
-
-before_install:
- - sudo apt-get update
- - sudo apt-get install -y dpkg apt-transport-https software-properties-common curl
-
 script:
- - dotnet restore
+    - dotnet restore
+    - dotnet build
+global:
+    - DOTNET_SKIP_FIRST_TIME_EXPERIENCE=true
+    - DOTNET_CLI_TELEMETRY_OPTOUT=1
