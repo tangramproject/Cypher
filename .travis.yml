@@ -1,6 +1,16 @@
+os:
+  - windows
+  - linux
+  - osx
+
 language: csharp
 solution: Cypher.sln
 mono: none
 dotnet: 2.2.104
+
+before_install:
+ - sudo apt-get update
+ - sudo apt-get install -y dpkg apt-transport-https software-properties-common curl
+
 script:
  - dotnet restore
