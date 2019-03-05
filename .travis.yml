@@ -9,3 +9,11 @@ script:
 global:
     - DOTNET_SKIP_FIRST_TIME_EXPERIENCE=true
     - DOTNET_CLI_TELEMETRY_OPTOUT=1
+after_success:
+    - wget https://raw.githubusercontent.com/DiscordHooks/travis-ci-discord-webhook/master/send.sh
+    - chmod +x send.sh
+    - ./send.sh success $WEBHOOK_URL
+after_failure:
+    - wget https://raw.githubusercontent.com/DiscordHooks/travis-ci-discord-webhook/master/send.sh
+    - chmod +x send.sh
+    - ./send.sh failure $WEBHOOK_URL
