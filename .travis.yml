@@ -6,7 +6,7 @@ os:
 language: csharp
 solution: Cypher.sln
 mono: none
-dotnet: 2.2.104
+dotnet: latest
 
 before_install:
  - sudo apt-get update
