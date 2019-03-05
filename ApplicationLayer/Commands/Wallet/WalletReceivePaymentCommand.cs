@@ -13,33 +13,35 @@ using TangramCypher.ApplicationLayer.Vault;
 using Microsoft.Extensions.DependencyInjection;
 using TangramCypher.ApplicationLayer.Actor;
 using TangramCypher.Helper;
-using Newtonsoft.Json;
+using TangramCypher.ApplicationLayer.Wallet;
+using TangramCypher.Helper.LibSodium;
+using System.Collections.Generic;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
 {
-    [CommandDescriptor(new string[] { "wallet", "transfer" }, "Transfer funds")]
-    public class WalletTransferCommand : Command
+    [CommandDescriptor(new string[] { "wallet", "receive" }, "Receive payment")]
+    public class WalletReceivePaymentCommand : Command
     {
         readonly IActorService actorService;
         readonly IConsole console;
         readonly IVaultService vaultService;
+        readonly IWalletService walletService;
 
-        public WalletTransferCommand(IServiceProvider serviceProvider)
+        public WalletReceivePaymentCommand(IServiceProvider serviceProvider)
         {
             actorService = serviceProvider.GetService<IActorService>();
             console = serviceProvider.GetService<IConsole>();
             vaultService = serviceProvider.GetService<IVaultService>();
+            walletService = serviceProvider.GetService<IWalletService>();
         }
+
         public override async Task Execute()
         {
             try
             {
                 var identifier = Prompt.GetPassword("Identifier:", ConsoleColor.Yellow).ToSecureString();
                 var password = Prompt.GetPassword("Password:", ConsoleColor.Yellow).ToSecureString();
-                var amount = Prompt.GetString("Amount:", null, ConsoleColor.Red);
-                var address = Prompt.GetString("To:", null, ConsoleColor.Red);
-                var memo = Prompt.GetString("Memo:", null, ConsoleColor.Green);
-                var yesNo = Prompt.GetYesNo("Send redemption key to message pool?", true, ConsoleColor.Yellow);
+                var address = Prompt.GetString("Address:", null, ConsoleColor.Red);
 
                 using (var insecureIdentifier = identifier.Insecure())
                 using (var insecurePassword = password.Insecure())
@@ -47,18 +49,18 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                     await vaultService.GetDataAsync(insecureIdentifier.Value, insecurePassword.Value, $"wallets/{insecureIdentifier.Value}/wallet");
                 }
 
-                if (double.TryParse(amount, out double t))
+                if (!string.IsNullOrEmpty(address))
                 {
-                    var message =
-                        await actorService
-                                .From(password)
-                                .Identifier(identifier)
-                                .Amount(t)
-                                .To(address)
-                                .Memo(memo)
-                                .SendPayment(yesNo);
+                    await actorService
+                      .From(password)
+                      .Identifier(identifier)
+                      .ReceivePayment(address);
 
-                    console.WriteLine(JsonConvert.SerializeObject(message));
+                    var total = await walletService.AvailableBalance(identifier, password);
+
+                    console.ForegroundColor = ConsoleColor.Magenta;
+                    console.WriteLine($"\nWallet balance: {total}\n");
+                    console.ForegroundColor = ConsoleColor.White;
                 }
             }
             catch (Exception ex)

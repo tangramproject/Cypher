@@ -1,3 +1,11 @@
+// Cypher (c) by Tangram Inc
+// 
+// Cypher is licensed under a
+// Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International License.
+// 
+// You should have received a copy of the license along with this
+// work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
+
 using System;
 using System.Collections.Generic;
 using System.Security;
@@ -22,6 +30,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         ActorService From(SecureString password);
         byte[] Cypher(string message, byte[] pk);
         Task<NotificationDto> GetMessageAsync(string address, CancellationToken cancellationToken);
+        Task<JObject> GetMessageCountAsync(string address, CancellationToken cancellationToken);
         Task<IEnumerable<NotificationDto>> GetMessagesAsync(string address, int skip, int take, CancellationToken cancellationToken);
         Task<byte[]> ToSharedKey(byte[] pk);
         Task<CoinDto> GetCoinAsync(string stamp, CancellationToken cancellationToken);
@@ -32,7 +41,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         string OpenBoxSeal(string cypher, PkSkDto pkSkDto);
         SecureString PublicKey();
         ActorService PublicKey(SecureString pk);
-        Task ReceivePayment(string address, NotificationDto notification);
+        Task ReceivePayment(string address, bool sharedKey = false, byte[] receiverPk = null);
         SecureString SecretKey();
         ActorService SecretKey(SecureString sk);
         Task<MessageDto> EstablishPubKeyMessage();

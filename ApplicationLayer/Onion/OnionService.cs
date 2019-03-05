@@ -1,4 +1,13 @@
+// Cypher (c) by Tangram Inc
+// 
+// Cypher is licensed under a
+// Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International License.
+// 
+// You should have received a copy of the license along with this
+// work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
+
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -77,6 +86,7 @@ namespace Cypher.ApplicationLayer.Onion
             hiddenServicePath = Path.Combine(onionDirectory, "hidden_service");
         }
 
+        ///TODO: Create base class for all HttpClient calls..
         public async Task<T> ClientGetAsync<T>(Uri baseAddress, string path, CancellationToken cancellationToken)
         {
             if (baseAddress == null)
@@ -108,6 +118,45 @@ namespace Cypher.ApplicationLayer.Onion
 
                     if (response.IsSuccessStatusCode)
                         return Util.DeserializeJsonFromStream<T>(stream);
+
+                    var content = await Util.StreamToStringAsync(stream);
+                    throw new ApiException
+                    {
+                        StatusCode = (int)response.StatusCode,
+                        Content = content
+                    };
+                }
+            }
+        }
+
+        public async Task<IEnumerable<JObject>> GetRangeAsync(Uri baseAddress, string path, CancellationToken cancellationToken)
+        {
+            if (baseAddress == null)
+                throw new ArgumentNullException(nameof(baseAddress));
+
+            if (string.IsNullOrEmpty(path))
+                throw new ArgumentException("Path is missing!", nameof(path));
+
+            using (var client = new HttpClient())
+            {
+                // ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
+
+                client.BaseAddress = baseAddress;
+                client.DefaultRequestHeaders.Accept.Clear();
+                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+                using (var request = new HttpRequestMessage(HttpMethod.Get, path))
+                using (var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
+                {
+                    ChangeCircuit("ILoveTangram".ToSecureString());
+
+                    var stream = await response.Content.ReadAsStreamAsync();
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var result = Util.DeserializeJsonEnumerable<JObject>(stream);
+                        return Task.FromResult(result).Result;
+                    }
 
                     var content = await Util.StreamToStringAsync(stream);
                     throw new ApiException

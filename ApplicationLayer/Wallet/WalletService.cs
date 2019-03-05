@@ -1,3 +1,11 @@
+// Cypher (c) by Tangram Inc
+// 
+// Cypher is licensed under a
+// Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International License.
+// 
+// You should have received a copy of the license along with this
+// work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
+
 using System;
 using System.Linq;
 using System.Collections.Generic;
@@ -22,7 +30,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
         }
 
         /// <summary>
-        /// Gets the balance.
+        /// Gets the available balance.
         /// </summary>
         /// <returns>The balance.</returns>
         /// <param name="identifier">Identifier.</param>
@@ -35,11 +43,35 @@ namespace TangramCypher.ApplicationLayer.Wallet
             if (password == null)
                 throw new ArgumentNullException(nameof(password));
 
-            var transactions = await Transactions(identifier, password);
             var total = 0.0d;
+            var transactions = await Transactions(identifier, password);
 
             if (transactions != null)
-                total = transactions.Last().Amount;
+            {
+                double? pocket = null;
+                TransactionDto burnt = null;
+
+                try
+                {
+                    pocket = transactions.Where(tx => tx.TransactionType == TransactionType.Receive).Skip(1).Sum(p => p.Amount);
+                    burnt = transactions.Last(tx => tx.TransactionType == TransactionType.Send);
+                }
+                catch { }
+                finally
+                {
+                    switch (burnt)
+                    {
+                        case null:
+                            total = transactions.Where(tx => tx.TransactionType == TransactionType.Receive).Sum(p => p.Amount);
+                            break;
+                        default:
+                            {
+                                total = burnt.Amount + pocket.Value;
+                                break;
+                            }
+                    }
+                }
+            }
 
             return total;
         }
@@ -130,6 +162,80 @@ namespace TangramCypher.ApplicationLayer.Wallet
 
                 await vaultService.SaveDataAsync(insecureIdentifier.Value, insecurePassword.Value, $"wallets/{insecureIdentifier.Value}/wallet", data.Data);
             }
+        }
+
+        /// <summary>
+        /// Adds if not found or updates message tracking.
+        /// </summary>
+        /// <returns>The message tracking.</returns>
+        /// <param name="identifier">Identifier.</param>
+        /// <param name="password">Password.</param>
+        /// <param name="messageTrack">Message track.</param>
+        public async Task AddMessageTracking(SecureString identifier, SecureString password, MessageTrackDto messageTrack)
+        {
+            if (identifier == null)
+                throw new ArgumentNullException(nameof(identifier));
+
+            if (password == null)
+                throw new ArgumentNullException(nameof(password));
+
+            if (messageTrack == null)
+                throw new ArgumentNullException(nameof(messageTrack));
+
+            using (var insecureIdentifier = identifier.Insecure())
+            using (var insecurePassword = password.Insecure())
+            {
+                var found = false;
+                var data = await vaultService.GetDataAsync(insecureIdentifier.Value, insecurePassword.Value, $"wallets/{insecureIdentifier.Value}/wallet");
+
+                if (data.Data.TryGetValue("messages", out object msgs))
+                {
+                    foreach (JObject item in ((JArray)msgs).Children().ToList())
+                    {
+                        var pk = item.GetValue("PublicKey");
+                        found = pk.Value<string>().Equals(messageTrack.PublicKey);
+                    }
+
+                    if (!found)
+                        ((JArray)msgs).Add(JObject.FromObject(messageTrack));
+                    else
+                        ((JArray)msgs).Replace(JObject.FromObject(messageTrack));
+                }
+                else
+                    data.Data.Add("messages", new List<MessageTrackDto> { messageTrack });
+
+                await vaultService.SaveDataAsync(insecureIdentifier.Value, insecurePassword.Value, $"wallets/{insecureIdentifier.Value}/wallet", data.Data);
+            }
+        }
+
+        /// <summary>
+        /// Gets the stored message track.
+        /// </summary>
+        /// <returns>The track.</returns>
+        /// <param name="identifier">Identifier.</param>
+        /// <param name="password">Password.</param>
+        /// <param name="pk">Pk.</param>
+        public async Task<MessageTrackDto> MessageTrack(SecureString identifier, SecureString password, string pk)
+        {
+            if (identifier == null)
+                throw new ArgumentNullException(nameof(identifier));
+
+            if (password == null)
+                throw new ArgumentNullException(nameof(password));
+
+            MessageTrackDto messageTrack = null;
+
+            using (var insecureIdentifier = identifier.Insecure())
+            using (var insecurePassword = password.Insecure())
+            {
+                var data = await vaultService.GetDataAsync(insecureIdentifier.Value, insecurePassword.Value, $"wallets/{insecureIdentifier.Value}/wallet");
+                if (data.Data.TryGetValue("messages", out object msgs))
+                {
+                    messageTrack = ((JArray)msgs).ToObject<List<MessageTrackDto>>().FirstOrDefault(msg => msg.PublicKey.Equals(pk));
+                }
+            }
+
+            return messageTrack;
         }
 
         /// <summary>

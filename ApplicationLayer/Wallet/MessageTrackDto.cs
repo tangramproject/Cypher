@@ -6,11 +6,14 @@
 // You should have received a copy of the license along with this
 // work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
 
-namespace TangramCypher.ApplicationLayer.Actor
+using System;
+namespace TangramCypher.ApplicationLayer.Wallet
 {
-    public class MessageDto
+    public class MessageTrackDto
     {
-        public string Address { get; set; }
-        public string Body { get; set; }
+        public int Count { get; set; }
+        public string PublicKey { get; set; }
+        public int Skip { get; set; }
+        public int Take { get; set; }
     }
 }
