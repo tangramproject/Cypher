@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.com/tangramproject/Cypher.svg?token=TfmEpefP1gANcpXRgTiq&branch=master)](https://travis-ci.com/tangramproject/Cypher)
+
 ## Tangram Bamboo CLi Wallet (code name Cypher).
 
 Official C# implementation of the Tangram CLi wallet.
