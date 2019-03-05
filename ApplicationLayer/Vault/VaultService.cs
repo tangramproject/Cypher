@@ -116,6 +116,8 @@ namespace TangramCypher.ApplicationLayer.Vault
                 console.ResetColor();
                 logger.LogWarning($"Existing Vault Process Detected.{Environment.NewLine}" +
                     $"Please be sure to type `exit` to close the wallet properly.");
+
+                RestartVaultProcess(vaultProcess);
             }
             else
             {
@@ -132,12 +134,6 @@ namespace TangramCypher.ApplicationLayer.Vault
                 logger.LogInformation("Vault not Initialized... Initializing");
 
                 await Init();
-
-                //  TODO: Find a better way, this is necessary because the VaultProcess is outputting to the console.
-                //  However, without this hack the user won't know they can start typing.
-                console.ForegroundColor = ConsoleColor.Cyan;
-                console.Write("tangram$ ");
-                console.ResetColor();
             }
             else
             {
@@ -167,6 +163,25 @@ namespace TangramCypher.ApplicationLayer.Vault
                     throw new Exception("Error: Vault is initialized but required service token is missing.");
                 }
             }
+
+            await AskForVaultUnseal();
+        }
+
+        private void RestartVaultProcess(Process vaultProcess)
+        {
+            if(vaultProcess == null)
+            {
+                throw new ArgumentNullException(nameof(vaultProcess));
+            }
+
+            console.ForegroundColor = ConsoleColor.Yellow;
+            console.WriteLine($"Restarting Vault Process.");
+            console.ResetColor();
+            logger.LogWarning($"Restarting Vault Process.");
+
+            vaultProcess.Kill();
+
+            StartVaultProcess();
         }
 
         private void StartVaultProcess()
@@ -281,8 +296,25 @@ namespace TangramCypher.ApplicationLayer.Vault
 
             //  Partially unseal using the stored shard
             await Unseal(serviceShard);
-            console.ForegroundColor = ConsoleColor.DarkRed;
-            console.WriteLine("Plase type `vault unseal` to unseal the vault.");
+        }
+
+        private async Task AskForVaultUnseal()
+        {
+            var healthStatus = await vaultClient.V1.System.GetHealthStatusAsync();
+
+            if (healthStatus.Sealed && healthStatus.Initialized)
+            {
+                console.ForegroundColor = ConsoleColor.Yellow;
+
+                console.WriteLine("Vault is currently sealed.");
+                console.WriteLine("Please type `vault unseal` to begin unsealing the vault.");
+                console.ResetColor();
+            }
+
+            //  TODO: Find a better way, this is necessary because the VaultProcess is outputting to the console.
+            //  However, without this hack the user won't know they can start typing.
+            console.ForegroundColor = ConsoleColor.Cyan;
+            console.Write($"{Environment.NewLine}tangram$ ");
             console.ResetColor();
         }
 

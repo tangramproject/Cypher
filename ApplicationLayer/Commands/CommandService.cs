@@ -140,9 +140,21 @@ namespace TangramCypher.ApplicationLayer.Commands
             }
         }
 
+        public static void ClearCurrentConsoleLine()
+        {
+            int currentLineCursor = Console.CursorTop;
+            Console.SetCursorPosition(0, Console.CursorTop);
+            Console.Write(new string(' ', Console.WindowWidth));
+            Console.SetCursorPosition(0, currentLineCursor);
+        }
+
         public async Task InteractiveCliLoop()
         {
             await StartAllHostedProviders();
+
+            Thread.Sleep(1500);
+
+            ClearCurrentConsoleLine();
 
             while (prompt)
             {
