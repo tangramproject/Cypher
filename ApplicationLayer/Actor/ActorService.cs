@@ -56,34 +56,6 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             apiRestSection = configuration.GetSection(Constant.ApiGateway);
             apiOnionSection = configuration.GetSection(Constant.Onion);
-
-            //var pass = "why do these 788 brambles roast out my headline glass and even that lofty broiler".ToSecureString();
-            //var id = "id_803e2bbf5da820f15100d988ad024fa8".ToSecureString();
-
-            //var coin = coinService
-            //      .Password(pass)
-            //      .Input(20000)
-            //      .Output(100)
-            //      .Stamp(coinService.GetNewStamp())
-            //      .BuildSender();
-
-            //change = coinService.Change();
-
-            //var coinResult = AddCoinAsync(coin.FormatCoinToBase64(), new CancellationToken()).GetAwaiter().GetResult().FormatCoinFromBase64();
-
-            //From(pass);
-            //Identifier(id);
-
-            //walletService.AddTransaction(Identifier(), From(), new TransactionDto
-            //{
-            //    Amount = change.Value,
-            //    Commitment = coinResult.Envelope.Commitment,
-            //    Hash = coinResult.Hash,
-            //    Stamp = coinResult.Stamp,
-            //    Version = coinResult.Version,
-            //    TransactionType = TransactionType.Reveive
-            //});
-
         }
 
         /// <summary>
