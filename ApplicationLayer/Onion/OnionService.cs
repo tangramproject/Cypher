@@ -112,7 +112,7 @@ namespace Cypher.ApplicationLayer.Onion
                 using (var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
                 {
 
-                    ChangeCircuit("ILoveTangram".ToSecureString());
+                   //ChangeCircuit("ILoveTangram".ToSecureString());
 
                     var stream = await response.Content.ReadAsStreamAsync();
 
@@ -148,7 +148,7 @@ namespace Cypher.ApplicationLayer.Onion
                 using (var request = new HttpRequestMessage(HttpMethod.Get, path))
                 using (var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
                 {
-                    ChangeCircuit("ILoveTangram".ToSecureString());
+                    //ChangeCircuit("ILoveTangram".ToSecureString());
 
                     var stream = await response.Content.ReadAsStreamAsync();
 
@@ -295,7 +295,7 @@ namespace Cypher.ApplicationLayer.Onion
 
                     using (var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
                     {
-                        ChangeCircuit("ILoveTangram".ToSecureString());
+                        // ChangeCircuit("ILoveTangram".ToSecureString());
 
                         var stream = await response.Content.ReadAsStreamAsync();
 
@@ -369,7 +369,7 @@ namespace Cypher.ApplicationLayer.Onion
                 "CircuitBuildTimeout 10",
                 "KeepalivePeriod 60",
                 "NumEntryGuards 8",
-                "SocksPort 9050",
+                $"SocksPort {socksPort}",
                 "Log notice stdout",
                 $"DataDirectory {onionDirectory}",
                 $"ControlPortWriteToFile {controlPortPath}"
