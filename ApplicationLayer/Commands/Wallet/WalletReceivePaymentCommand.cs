@@ -39,28 +39,30 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
         {
             try
             {
-                var identifier = Prompt.GetPassword("Identifier:", ConsoleColor.Yellow).ToSecureString();
-                var password = Prompt.GetPassword("Password:", ConsoleColor.Yellow).ToSecureString();
-                var address = Prompt.GetString("Address:", null, ConsoleColor.Red);
-
-                using (var insecureIdentifier = identifier.Insecure())
-                using (var insecurePassword = password.Insecure())
+                using (var identifier = Prompt.GetPasswordAsSecureString("Identifier:", ConsoleColor.Yellow))
+                using (var password = Prompt.GetPasswordAsSecureString("Password:", ConsoleColor.Yellow))
                 {
-                    await vaultService.GetDataAsync(insecureIdentifier.Value, insecurePassword.Value, $"wallets/{insecureIdentifier.Value}/wallet");
-                }
+                    var address = Prompt.GetString("Address:", null, ConsoleColor.Red);
 
-                if (!string.IsNullOrEmpty(address))
-                {
-                    await actorService
-                      .From(password)
-                      .Identifier(identifier)
-                      .ReceivePayment(address);
+                    using (var insecureIdentifier = identifier.Insecure())
+                    using (var insecurePassword = password.Insecure())
+                    {
+                        await vaultService.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
+                    }
 
-                    var total = await walletService.AvailableBalance(identifier, password);
+                    if (!string.IsNullOrEmpty(address))
+                    {
+                        await actorService
+                          .From(password)
+                          .Identifier(identifier)
+                          .ReceivePayment(address);
 
-                    console.ForegroundColor = ConsoleColor.Magenta;
-                    console.WriteLine($"\nWallet balance: {total}\n");
-                    console.ForegroundColor = ConsoleColor.White;
+                        var total = await walletService.AvailableBalance(identifier, password);
+
+                        console.ForegroundColor = ConsoleColor.Magenta;
+                        console.WriteLine($"\nWallet balance: {total}\n");
+                        console.ForegroundColor = ConsoleColor.White;
+                    }
                 }
             }
             catch (Exception ex)

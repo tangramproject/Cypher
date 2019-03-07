@@ -78,7 +78,7 @@ namespace TangramCypher
                 })
                 .UseConsoleLifetime();
 
-            await builder.RunConsoleAsync().ConfigureAwait(false);
+            await builder.RunConsoleAsync();
         }
     }
 }

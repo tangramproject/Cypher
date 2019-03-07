@@ -142,10 +142,9 @@ namespace TangramCypher.ApplicationLayer.Wallet
                 throw new ArgumentNullException(nameof(transaction));
 
             using (var insecureIdentifier = identifier.Insecure())
-            using (var insecurePassword = password.Insecure())
             {
                 var found = false;
-                var data = await vaultService.GetDataAsync(insecureIdentifier.Value, insecurePassword.Value, $"wallets/{insecureIdentifier.Value}/wallet");
+                var data = await vaultService.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
 
                 if (data.Data.TryGetValue("transactions", out object txs))
                 {
@@ -160,7 +159,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
                 else
                     data.Data.Add("transactions", new List<TransactionDto> { transaction });
 
-                await vaultService.SaveDataAsync(insecureIdentifier.Value, insecurePassword.Value, $"wallets/{insecureIdentifier.Value}/wallet", data.Data);
+                await vaultService.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", data.Data);
             }
         }
 
@@ -183,10 +182,9 @@ namespace TangramCypher.ApplicationLayer.Wallet
                 throw new ArgumentNullException(nameof(messageTrack));
 
             using (var insecureIdentifier = identifier.Insecure())
-            using (var insecurePassword = password.Insecure())
             {
                 var found = false;
-                var data = await vaultService.GetDataAsync(insecureIdentifier.Value, insecurePassword.Value, $"wallets/{insecureIdentifier.Value}/wallet");
+                var data = await vaultService.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
 
                 if (data.Data.TryGetValue("messages", out object msgs))
                 {
@@ -204,7 +202,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
                 else
                     data.Data.Add("messages", new List<MessageTrackDto> { messageTrack });
 
-                await vaultService.SaveDataAsync(insecureIdentifier.Value, insecurePassword.Value, $"wallets/{insecureIdentifier.Value}/wallet", data.Data);
+                await vaultService.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", data.Data);
             }
         }
 
@@ -226,9 +224,8 @@ namespace TangramCypher.ApplicationLayer.Wallet
             MessageTrackDto messageTrack = null;
 
             using (var insecureIdentifier = identifier.Insecure())
-            using (var insecurePassword = password.Insecure())
             {
-                var data = await vaultService.GetDataAsync(insecureIdentifier.Value, insecurePassword.Value, $"wallets/{insecureIdentifier.Value}/wallet");
+                var data = await vaultService.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
                 if (data.Data.TryGetValue("messages", out object msgs))
                 {
                     messageTrack = ((JArray)msgs).ToObject<List<MessageTrackDto>>().FirstOrDefault(msg => msg.PublicKey.Equals(pk));
@@ -310,9 +307,8 @@ namespace TangramCypher.ApplicationLayer.Wallet
             List<TransactionDto> transactions = null;
 
             using (var insecureIdentifier = identifier.Insecure())
-            using (var insecurePassword = password.Insecure())
             {
-                var data = await vaultService.GetDataAsync(insecureIdentifier.Value, insecurePassword.Value, $"wallets/{insecureIdentifier.Value}/wallet");
+                var data = await vaultService.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
                 if (data.Data.TryGetValue("transactions", out object txs))
                 {
                     transactions = ((JArray)txs).ToObject<List<TransactionDto>>();
@@ -364,9 +360,8 @@ namespace TangramCypher.ApplicationLayer.Wallet
                 throw new ArgumentException("Store key is missing!", nameof(storeKey));
 
             using (var insecureIdentifier = identifier.Insecure())
-            using (var insecurePassword = password.Insecure())
             {
-                var data = await vaultService.GetDataAsync(insecureIdentifier.Value, insecurePassword.Value, $"wallets/{insecureIdentifier.Value}/wallet");
+                var data = await vaultService.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
                 var storeKeys = JObject.FromObject(data.Data["storeKeys"]);
                 var key = storeKeys.GetValue(storeKey).Value<string>();
                 var secureString = new SecureString();
