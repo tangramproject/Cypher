@@ -15,6 +15,7 @@ using Microsoft.Extensions.DependencyInjection;
 using McMaster.Extensions.CommandLineUtils;
 using Newtonsoft.Json;
 using Microsoft.Extensions.Logging;
+using TangramCypher.Helper;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
 {
@@ -42,11 +43,14 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
 
                     using (var rng = System.Security.Cryptography.RandomNumberGenerator.Create())
                     {
-                        var data = await vaultService.GetDataAsync(identifier, password, $"wallets/{identifier}/wallet");
+                        using (var id = identifier.Insecure())
+                        {
+                            var data = await vaultService.GetDataAsync(identifier, password, $"wallets/{id.Value}/wallet");
 
-                        var w = JsonConvert.SerializeObject(data);
+                            var w = JsonConvert.SerializeObject(data);
 
-                        console.WriteLine(w);
+                            console.WriteLine(w);
+                        }
                     }
                 }
             }
