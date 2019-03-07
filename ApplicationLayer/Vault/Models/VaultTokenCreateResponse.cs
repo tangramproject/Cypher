@@ -8,6 +8,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Security;
 using System.Text;
 
 namespace TangramCypher.ApplicationLayer.Vault.Models

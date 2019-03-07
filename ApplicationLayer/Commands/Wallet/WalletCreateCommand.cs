@@ -42,7 +42,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
 
             try
             {
-                await vaultService.CreateUserAsync(walletId.ToUnSecureString(), passphrase.ToUnSecureString());
+                await vaultService.CreateUserAsync(walletId, passphrase);
 
                 // TODO: Add list for multiple store keys.
                 //var dic = new Dictionary<string, object>
@@ -51,28 +51,28 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                 //};
 
                 var dic = new Dictionary<string, object>
-                {
-                    { "storeKeys", pkSk  }
-                };
+                    {
+                        { "storeKeys", pkSk  }
+                    };
 
                 await vaultService.SaveDataAsync(
-                    walletId.ToUnSecureString(),
-                    passphrase.ToUnSecureString(),
+                    walletId,
+                    passphrase,
                     $"wallets/{walletId.ToUnSecureString()}/wallet",
                     dic);
 
                 console.WriteLine($"Created Wallet {walletId.ToUnSecureString()} with password: {passphrase.ToUnSecureString()}");
             }
-            catch (Exception ex)
+            catch (Exception e)
             {
-                throw ex;
+                console.WriteLine("Failed to create wallet. Is the vault unsealed?");
+                throw;
             }
             finally
             {
                 walletId.Dispose();
                 passphrase.Dispose();
             }
-
         }
     }
 }

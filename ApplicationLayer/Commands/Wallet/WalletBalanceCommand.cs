@@ -31,15 +31,15 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
         {
             try
             {
-                var identifier = Prompt.GetPassword("Identifier:", ConsoleColor.Yellow).ToSecureString();
-                var password = Prompt.GetPassword("Password:", ConsoleColor.Yellow).ToSecureString();
+                using (var identifier = Prompt.GetPasswordAsSecureString("Identifier:", ConsoleColor.Yellow))
+                using (var password = Prompt.GetPasswordAsSecureString("Password:", ConsoleColor.Yellow))
+                {
+                    var total = await walletService.AvailableBalance(identifier, password);
 
-                var total = await walletService.AvailableBalance(identifier, password);
-
-                console.ForegroundColor = ConsoleColor.Magenta;
-                console.WriteLine($"\nWallet balance: {total}\n");
-                console.ForegroundColor = ConsoleColor.White;
-
+                    console.ForegroundColor = ConsoleColor.Magenta;
+                    console.WriteLine($"\nWallet balance: {total}\n");
+                    console.ForegroundColor = ConsoleColor.White;
+                }
             }
             catch (Exception ex)
             {

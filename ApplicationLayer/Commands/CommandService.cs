@@ -165,7 +165,7 @@ namespace TangramCypher.ApplicationLayer.Commands
 
                 try
                 {
-                    await Execute(args);
+                    await Execute(args).ConfigureAwait(false);
                 }
                 catch (Exception e)
                 {

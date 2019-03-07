@@ -34,31 +34,32 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
         {
             try
             {
-                var identifier = Prompt.GetPassword("Identifier:", ConsoleColor.Yellow).ToSecureString();
-                var password = Prompt.GetPassword("Password:", ConsoleColor.Yellow).ToSecureString();
-                var amount = Prompt.GetString("Amount:", null, ConsoleColor.Red);
-                var address = Prompt.GetString("To:", null, ConsoleColor.Red);
-                var memo = Prompt.GetString("Memo:", null, ConsoleColor.Green);
-                var yesNo = Prompt.GetYesNo("Send redemption key to message pool?", true, ConsoleColor.Yellow);
-
-                using (var insecureIdentifier = identifier.Insecure())
-                using (var insecurePassword = password.Insecure())
+                using (var identifier = Prompt.GetPasswordAsSecureString("Identifier:", ConsoleColor.Yellow))
+                using (var password = Prompt.GetPasswordAsSecureString("Password:", ConsoleColor.Yellow))
                 {
-                    await vaultService.GetDataAsync(insecureIdentifier.Value, insecurePassword.Value, $"wallets/{insecureIdentifier.Value}/wallet");
-                }
+                    var amount = Prompt.GetString("Amount:", null, ConsoleColor.Red);
+                    var address = Prompt.GetString("To:", null, ConsoleColor.Red);
+                    var memo = Prompt.GetString("Memo:", null, ConsoleColor.Green);
+                    var yesNo = Prompt.GetYesNo("Send redemption key to message pool?", true, ConsoleColor.Yellow);
 
-                if (double.TryParse(amount, out double t))
-                {
-                    var message =
-                        await actorService
-                                .From(password)
-                                .Identifier(identifier)
-                                .Amount(t)
-                                .To(address)
-                                .Memo(memo)
-                                .SendPayment(yesNo);
+                    using (var insecureIdentifier = identifier.Insecure())
+                    {
+                        await vaultService.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
+                    }
 
-                    console.WriteLine(JsonConvert.SerializeObject(message));
+                    if (double.TryParse(amount, out double t))
+                    {
+                        var message =
+                            await actorService
+                                    .From(password)
+                                    .Identifier(identifier)
+                                    .Amount(t)
+                                    .To(address)
+                                    .Memo(memo)
+                                    .SendPayment(yesNo);
+
+                        console.WriteLine(JsonConvert.SerializeObject(message));
+                    }
                 }
             }
             catch (Exception ex)
