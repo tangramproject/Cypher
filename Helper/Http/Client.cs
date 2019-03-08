@@ -13,14 +13,33 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using DotNetTor.SocksPort;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace TangramCypher.Helper.Http
 {
-    public static class Client
+    public class Client
     {
-        public static async Task<JObject> GetAsync<T>(Uri baseAddress, string path, CancellationToken cancellationToken)
+        private readonly SocksPortHandler socksPortHandler;
+
+        public Client()
+        { }
+
+        public Client(SocksPortHandler socksPortHandler)
+        {
+            this.socksPortHandler = socksPortHandler;
+        }
+
+        /// <summary>
+        /// Get async.
+        /// </summary>
+        /// <returns>The async.</returns>
+        /// <param name="baseAddress">Base address.</param>
+        /// <param name="path">Path.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <typeparam name="T">The 1st type parameter.</typeparam>
+        public async Task<JObject> GetAsync<T>(Uri baseAddress, string path, CancellationToken cancellationToken)
         {
             if (baseAddress == null)
                 throw new ArgumentNullException(nameof(baseAddress));
@@ -28,10 +47,8 @@ namespace TangramCypher.Helper.Http
             if (string.IsNullOrEmpty(path))
                 throw new ArgumentException("Path is missing!", nameof(path));
 
-            using (var client = new HttpClient())
+            using (var client = socksPortHandler == null ? new HttpClient() : new HttpClient(socksPortHandler))
             {
-                // ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
-
                 client.BaseAddress = baseAddress;
                 client.DefaultRequestHeaders.Accept.Clear();
                 client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
@@ -57,8 +74,14 @@ namespace TangramCypher.Helper.Http
             }
         }
 
-
-        public static async Task<IEnumerable<JObject>> GetRangeAsync(Uri baseAddress, string path, CancellationToken cancellationToken)
+        /// <summary>
+        /// Get range async.
+        /// </summary>
+        /// <returns>The range async.</returns>
+        /// <param name="baseAddress">Base address.</param>
+        /// <param name="path">Path.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        public async Task<IEnumerable<JObject>> GetRangeAsync(Uri baseAddress, string path, CancellationToken cancellationToken)
         {
             if (baseAddress == null)
                 throw new ArgumentNullException(nameof(baseAddress));
@@ -66,10 +89,8 @@ namespace TangramCypher.Helper.Http
             if (string.IsNullOrEmpty(path))
                 throw new ArgumentException("Path is missing!", nameof(path));
 
-            using (var client = new HttpClient())
+            using (var client = socksPortHandler == null ? new HttpClient() : new HttpClient(socksPortHandler))
             {
-                // ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
-
                 client.BaseAddress = baseAddress;
                 client.DefaultRequestHeaders.Accept.Clear();
                 client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
@@ -95,7 +116,16 @@ namespace TangramCypher.Helper.Http
             }
         }
 
-        public static async Task<JObject> PostAsync<T>(T payload, Uri baseAddress, string path, CancellationToken cancellationToken)
+        /// <summary>
+        /// Post async.
+        /// </summary>
+        /// <returns>The async.</returns>
+        /// <param name="payload">Payload.</param>
+        /// <param name="baseAddress">Base address.</param>
+        /// <param name="path">Path.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <typeparam name="T">The 1st type parameter.</typeparam>
+        public async Task<JObject> PostAsync<T>(T payload, Uri baseAddress, string path, CancellationToken cancellationToken)
         {
             if (baseAddress == null)
                 throw new ArgumentNullException(nameof(baseAddress));
@@ -103,10 +133,8 @@ namespace TangramCypher.Helper.Http
             if (string.IsNullOrEmpty(path))
                 throw new ArgumentException("Path is missing!", nameof(path));
 
-            using (var client = new HttpClient())
+            using (var client = socksPortHandler == null ? new HttpClient() : new HttpClient(socksPortHandler))
             {
-                // ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
-
                 client.BaseAddress = baseAddress;
                 client.DefaultRequestHeaders.Accept.Clear();
                 client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));

@@ -29,6 +29,10 @@ namespace TangramCypher.ApplicationLayer.Coin
         private string stamp;
         private SecureString password;
 
+        /// <summary>
+        /// Builds the receiver.
+        /// </summary>
+        /// <returns>The receiver.</returns>
         public (ReceiverOutput, CoinDto) BuildReceiver()
         {
             ReceiverOutput receiver = null;
@@ -52,6 +56,10 @@ namespace TangramCypher.ApplicationLayer.Coin
             return (receiver, coin);
         }
 
+        /// <summary>
+        /// Builds the sender.
+        /// </summary>
+        /// <returns>The sender.</returns>
         public CoinDto BuildSender()
         {
             CoinDto coin = null;
@@ -597,6 +605,7 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// </summary>
         /// <returns>The inputs.</returns>
         public double? Input() => input;
+
         /// <summary>
         /// Input the specified value.
         /// </summary>
@@ -606,10 +615,12 @@ namespace TangramCypher.ApplicationLayer.Coin
         {
             if (value == null)
                 throw new Exception("Value can not be null!");
+
             if (Math.Abs(value.GetValueOrDefault()) < 0)
                 throw new Exception("Value can not be less than zero!");
 
             input = value;
+
             return this;
         }
 
@@ -618,6 +629,7 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// </summary>
         /// <returns>The outputs.</returns>
         public double? Output() => output;
+
         /// <summary>
         /// Output the specified value.
         /// </summary>
@@ -664,6 +676,7 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// </summary>
         /// <returns>The version.</returns>
         public int Version() => version;
+
         /// <summary>
         /// Version the specified version.
         /// </summary>
@@ -680,6 +693,7 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// </summary>
         /// <returns>The stamp.</returns>
         public string Stamp() => stamp;
+
         /// <summary>
         /// Stamp the specified stamp.
         /// </summary>
@@ -696,6 +710,7 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// </summary>
         /// <returns>The password.</returns>
         public SecureString Password() => password;
+
         /// <summary>
         /// Password the specified password.
         /// </summary>

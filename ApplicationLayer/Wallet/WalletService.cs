@@ -56,7 +56,9 @@ namespace TangramCypher.ApplicationLayer.Wallet
                     pocket = transactions.Where(tx => tx.TransactionType == TransactionType.Receive).Skip(1).Sum(p => p.Amount);
                     burnt = transactions.Last(tx => tx.TransactionType == TransactionType.Send);
                 }
+#pragma warning disable RECS0022 // A catch clause that catches System.Exception and has an empty body
                 catch { }
+#pragma warning restore RECS0022 // A catch clause that catches System.Exception and has an empty body
                 finally
                 {
                     switch (burnt)

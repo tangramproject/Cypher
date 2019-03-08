@@ -7,21 +7,19 @@
 // work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
 
 using Microsoft.Extensions.Hosting;
-using Newtonsoft.Json.Linq;
-using System;
-using System.Collections.Generic;
 using System.Security;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Cypher.ApplicationLayer.Onion
 {
     public interface IOnionService : IHostedService
     {
-        Task<T> ClientGetAsync<T>(Uri baseAddress, string path, CancellationToken cancellationToken);
-        Task<IEnumerable<JObject>> GetRangeAsync(Uri baseAddress, string path, CancellationToken cancellationToken);
-        Task<JObject> ClientPostAsync<T>(T payload, Uri baseAddress, string path, CancellationToken cancellationToken);
+        bool OnionStarted { get; }
+        string SocksHost { get; }
+        int SocksPort { get; }
+        int OnionEnabled { get; }
+
         void ChangeCircuit(SecureString password);
+        void Dispose();
         void GenerateHashPassword(SecureString password);
         void SendCommands(string command, SecureString password);
         void StartOnion();

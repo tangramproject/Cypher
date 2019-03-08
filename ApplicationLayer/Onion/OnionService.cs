@@ -7,28 +7,20 @@
 // work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
 
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Net;
-using System.Net.Http;
-using System.Net.Http.Headers;
 using System.Runtime.InteropServices;
 using System.Security;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using DotNetTor.SocksPort;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using TangramCypher.ApplicationLayer;
 using TangramCypher.Helper;
-using TangramCypher.Helper.LibSodium;
 
 namespace Cypher.ApplicationLayer.Onion
 {
@@ -49,8 +41,6 @@ namespace Cypher.ApplicationLayer.Onion
         readonly IConfigurationSection onionSection;
         readonly ILogger logger;
         readonly IConsole console;
-        readonly string socksHost;
-        readonly int socksPort;
         readonly string controlHost;
         readonly int controlPort;
         readonly string onionDirectory;
@@ -58,13 +48,13 @@ namespace Cypher.ApplicationLayer.Onion
         readonly string controlPortPath;
         readonly string hiddenServicePath;
         readonly string hiddenServicePort;
-        readonly int onionEnabled;
-
         string hashedPassword;
 
         Process TorProcess { get; set; }
-
         public bool OnionStarted { get; private set; }
+        public string SocksHost { get; }
+        public int SocksPort { get; }
+        public int OnionEnabled { get; }
 
         public OnionService(IConfiguration configuration, ILogger logger, IConsole console)
         {
@@ -73,12 +63,12 @@ namespace Cypher.ApplicationLayer.Onion
             this.logger = logger;
             this.console = console;
 
-            socksHost = onionSection.GetValue<string>(SOCKS_HOST);
-            socksPort = onionSection.GetValue<int>(SOCKS_PORT);
+            SocksHost = onionSection.GetValue<string>(SOCKS_HOST);
+            SocksPort = onionSection.GetValue<int>(SOCKS_PORT);
             controlHost = onionSection.GetValue<string>(CONTROL_HOST);
             controlPort = onionSection.GetValue<int>(CONTROL_PORT);
             hiddenServicePort = onionSection.GetValue<string>(HIDDEN_SERVICE_PORT);
-            onionEnabled = onionSection.GetValue<int>(ONION_ENABLED);
+            OnionEnabled = onionSection.GetValue<int>(ONION_ENABLED);
 
             onionDirectory = Path.Combine(Path.GetDirectoryName(AppDomain.CurrentDomain.BaseDirectory), ONION);
             torrcPath = Path.Combine(onionDirectory, TORRC);
@@ -86,94 +76,10 @@ namespace Cypher.ApplicationLayer.Onion
             hiddenServicePath = Path.Combine(onionDirectory, "hidden_service");
         }
 
-        ///TODO: Create base class for all HttpClient calls..
-        public async Task<T> ClientGetAsync<T>(Uri baseAddress, string path, CancellationToken cancellationToken)
-        {
-            if (baseAddress == null)
-            {
-                throw new ArgumentNullException(nameof(baseAddress));
-            }
-
-            if (string.IsNullOrEmpty(path))
-            {
-                throw new ArgumentException("Path is missing!", nameof(path));
-            }
-
-            using (var client = new HttpClient(new SocksPortHandler(socksHost, socksPort)))
-            {
-                //ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
-
-                client.BaseAddress = baseAddress;
-                client.DefaultRequestHeaders.Accept.Clear();
-                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-
-
-                using (var request = new HttpRequestMessage(HttpMethod.Get, string.Format("{0}{1}", baseAddress, path)))
-                using (var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
-                {
-
-                   //ChangeCircuit("ILoveTangram".ToSecureString());
-
-                    var stream = await response.Content.ReadAsStreamAsync();
-
-                    if (response.IsSuccessStatusCode)
-                        return Util.DeserializeJsonFromStream<T>(stream);
-
-                    var content = await Util.StreamToStringAsync(stream);
-                    throw new ApiException
-                    {
-                        StatusCode = (int)response.StatusCode,
-                        Content = content
-                    };
-                }
-            }
-        }
-
-        public async Task<IEnumerable<JObject>> GetRangeAsync(Uri baseAddress, string path, CancellationToken cancellationToken)
-        {
-            if (baseAddress == null)
-                throw new ArgumentNullException(nameof(baseAddress));
-
-            if (string.IsNullOrEmpty(path))
-                throw new ArgumentException("Path is missing!", nameof(path));
-
-            using (var client = new HttpClient())
-            {
-                // ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
-
-                client.BaseAddress = baseAddress;
-                client.DefaultRequestHeaders.Accept.Clear();
-                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-
-                using (var request = new HttpRequestMessage(HttpMethod.Get, path))
-                using (var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
-                {
-                    //ChangeCircuit("ILoveTangram".ToSecureString());
-
-                    var stream = await response.Content.ReadAsStreamAsync();
-
-                    if (response.IsSuccessStatusCode)
-                    {
-                        var result = Util.DeserializeJsonEnumerable<JObject>(stream);
-                        return Task.FromResult(result).Result;
-                    }
-
-                    var content = await Util.StreamToStringAsync(stream);
-                    throw new ApiException
-                    {
-                        StatusCode = (int)response.StatusCode,
-                        Content = content
-                    };
-                }
-            }
-        }
-
         public void ChangeCircuit(SecureString password)
         {
             if (password == null)
-            {
                 throw new ArgumentNullException(nameof(password));
-            }
 
             try
             {
@@ -243,14 +149,10 @@ namespace Cypher.ApplicationLayer.Onion
         public void SendCommands(string command, SecureString password)
         {
             if (string.IsNullOrEmpty(command))
-            {
                 throw new ArgumentException("Command cannot be null or empty!", nameof(command));
-            }
 
             if (password == null)
-            {
                 throw new ArgumentNullException(nameof(password));
-            }
 
             try
             {
@@ -263,56 +165,6 @@ namespace Cypher.ApplicationLayer.Onion
             catch (DotNetTor.TorException ex)
             {
                 console.WriteLine(ex.Message);
-            }
-        }
-
-        public async Task<JObject> ClientPostAsync<T>(T payload, Uri baseAddress, string path, CancellationToken cancellationToken)
-        {
-            if (baseAddress == null)
-            {
-                throw new ArgumentNullException(nameof(baseAddress));
-            }
-
-            if (string.IsNullOrEmpty(path))
-            {
-                throw new ArgumentException("Path is missing!", nameof(path));
-            }
-
-            using (var client = new HttpClient(new SocksPortHandler(socksHost, socksPort)))
-            {
-                // ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
-
-                client.BaseAddress = baseAddress;
-                client.DefaultRequestHeaders.Accept.Clear();
-                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-
-                using (var request = new HttpRequestMessage(HttpMethod.Post, path))
-                {
-                    var content = JsonConvert.SerializeObject(payload, Formatting.Indented);
-                    var buffer = Encoding.UTF8.GetBytes(content);
-
-                    request.Content = new StringContent(content, Encoding.UTF8, "application/json");
-
-                    using (var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
-                    {
-                        // ChangeCircuit("ILoveTangram".ToSecureString());
-
-                        var stream = await response.Content.ReadAsStreamAsync();
-
-                        if (response.IsSuccessStatusCode)
-                        {
-                            var result = Util.DeserializeJsonFromStream<JObject>(stream);
-                            return Task.FromResult(result).Result;
-                        }
-
-                        var contentResult = await Util.StreamToStringAsync(stream);
-                        throw new ApiException
-                        {
-                            StatusCode = (int)response.StatusCode,
-                            Content = contentResult
-                        };
-                    }
-                }
             }
         }
 
@@ -337,9 +189,7 @@ namespace Cypher.ApplicationLayer.Onion
         void CreateTorrc()
         {
             if (string.IsNullOrEmpty(hashedPassword))
-            {
                 throw new ArgumentException("Hashed control password is not set.", nameof(hashedPassword));
-            }
 
             if (!Directory.Exists(onionDirectory))
             {
@@ -359,7 +209,7 @@ namespace Cypher.ApplicationLayer.Onion
 
             var torrcContent = new string[] {
                 "AvoidDiskWrites 1",
-                string.Format("HashedControlPassword {0}", hashedPassword),
+                $"HashedControlPassword {hashedPassword}",
                 "SocksPort auto IPv6Traffic PreferIPv6 KeepAliveIsolateSOCKSAuth",
                 "ControlPort auto",
                 "CookieAuthentication 1",
@@ -369,7 +219,7 @@ namespace Cypher.ApplicationLayer.Onion
                 "CircuitBuildTimeout 10",
                 "KeepalivePeriod 60",
                 "NumEntryGuards 8",
-                $"SocksPort {socksPort}",
+                $"SocksPort {SocksPort}",
                 "Log notice stdout",
                 $"DataDirectory {onionDirectory}",
                 $"ControlPortWriteToFile {controlPortPath}"
@@ -449,15 +299,16 @@ namespace Cypher.ApplicationLayer.Onion
             }
         }
 
-        protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            if (onionEnabled == 1)
+            if (OnionEnabled == 1)
             {
                 console.WriteLine("Starting Onion Service");
                 logger.LogInformation("Starting Onion Service");
                 GenerateHashPassword("ILoveTangram".ToSecureString());
                 await Task.Run(() => StartOnion());
             }
+
             return;
         }
     }

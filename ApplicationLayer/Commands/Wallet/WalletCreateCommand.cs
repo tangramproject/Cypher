@@ -63,7 +63,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
 
                 console.WriteLine($"Created Wallet {walletId.ToUnSecureString()} with password: {passphrase.ToUnSecureString()}");
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 console.WriteLine("Failed to create wallet. Is the vault unsealed?");
                 throw;

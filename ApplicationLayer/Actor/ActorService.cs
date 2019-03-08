@@ -29,7 +29,7 @@ using TangramCypher.ApplicationLayer.Coin;
 
 namespace TangramCypher.ApplicationLayer.Actor
 {
-    public class ActorService : IActorService
+    public class ActorService: IActorService
     {
         protected SecureString masterKey;
         protected string toAdress;
@@ -46,6 +46,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         private readonly IOnionService onionService;
         private readonly IWalletService walletService;
         private readonly ICoinService coinService;
+        private readonly Client client;
 
         public ActorService(IOnionService onionService, IWalletService walletService, ICoinService coinService, IConfiguration configuration, ILogger logger)
         {
@@ -54,49 +55,72 @@ namespace TangramCypher.ApplicationLayer.Actor
             this.coinService = coinService;
             this.logger = logger;
 
+            client = onionService.OnionEnabled.Equals(1) ?
+                new Client(new DotNetTor.SocksPort.SocksPortHandler(onionService.SocksHost, onionService.SocksPort)) :
+                new Client();
+
             apiRestSection = configuration.GetSection(Constant.ApiGateway);
             apiOnionSection = configuration.GetSection(Constant.Onion);
         }
 
         /// <summary>
-        /// Adds the message async.
+        /// Add async.
         /// </summary>
-        /// <returns>The message async.</returns>
-        /// <param name="message">Message.</param>
-        /// <param name="cancellationToken">Cancellation token.</param>
-        public async Task<MessageDto> AddMessageAsync(MessageDto message, CancellationToken cancellationToken)
+        /// <returns>The async.</returns>
+        /// <param name="payload">Payload.</param>
+        /// <param name="apiMethod">API method.</param>
+        /// <typeparam name="T">The 1st type parameter.</typeparam>
+        public async Task<T> AddAsync<T>(T payload, RestApiMethod apiMethod)
         {
-            if (message == null)
-                throw new ArgumentNullException(nameof(message));
+            if (payload.Equals(null))
+                throw new ArgumentNullException(nameof(payload));
 
-            var baseAddress = new Uri(apiRestSection.GetValue<string>(Constant.Endpoint));
-            var path = apiRestSection.GetSection(Constant.Routing).GetValue<string>(Constant.PostMessage);
+            var baseAddress = GetBaseAddress();
+            var path = apiRestSection.GetSection(Constant.Routing).GetValue<string>(apiMethod.ToString());
+            var jObject = await client.PostAsync(payload, baseAddress, path, new CancellationToken());
 
-            JObject jObject = apiOnionSection.GetValue<int>(Constant.OnionEnabled) == 1
-                ? await onionService.ClientPostAsync(message, baseAddress, path, cancellationToken)
-                : await Client.PostAsync(message, baseAddress, path, cancellationToken);
-
-            return jObject.ToObject<MessageDto>();
+            return jObject.ToObject<T>();
         }
 
         /// <summary>
-        /// Adds the coin async.
+        /// Get async.
         /// </summary>
-        /// <returns>The coin async.</returns>
-        /// <param name="coin">Coin.</param>
-        /// <param name="cancellationToken">Cancellation token.</param>
-        public async Task<CoinDto> AddCoinAsync(CoinDto coin, CancellationToken cancellationToken)
+        /// <returns>The async.</returns>
+        /// <param name="address">Address.</param>
+        /// <param name="apiMethod">API method.</param>
+        /// <typeparam name="T">The 1st type parameter.</typeparam>
+        public async Task<T> GetAsync<T>(string address, RestApiMethod apiMethod)
         {
-            if (coin == null)
-                throw new ArgumentNullException(nameof(coin));
-            var baseAddress = new Uri(apiRestSection.GetValue<string>(Constant.Endpoint));
-            var path = apiRestSection.GetSection(Constant.Routing).GetValue<string>(Constant.PostCoin);
+            if (string.IsNullOrEmpty(address))
+                throw new ArgumentException("Address is missing!", nameof(address));
 
-            JObject jObject = apiOnionSection.GetValue<int>(Constant.OnionEnabled) == 1
-                ? await onionService.ClientPostAsync(coin, baseAddress, path, cancellationToken)
-                : await Client.PostAsync(coin, baseAddress, path, cancellationToken);
+            var baseAddress = GetBaseAddress();
+            var path = string.Format(apiRestSection.GetSection(Constant.Routing).GetValue<string>(apiMethod.ToString()), address);
+            var message = await client.GetAsync<T>(baseAddress, path, new CancellationToken());
 
-            return jObject.ToObject<CoinDto>();
+            return message.ToObject<T>();
+        }
+
+        /// <summary>
+        /// Get range async.
+        /// </summary>
+        /// <returns>The range async.</returns>
+        /// <param name="address">Address.</param>
+        /// <param name="skip">Skip.</param>
+        /// <param name="take">Take.</param>
+        /// <param name="apiMethod">API method.</param>
+        /// <typeparam name="T">The 1st type parameter.</typeparam>
+        public async Task<IEnumerable<T>> GetRangeAsync<T>(string address, int skip, int take, RestApiMethod apiMethod)
+        {
+            if (string.IsNullOrEmpty(address))
+                throw new ArgumentException("Address is missing!", nameof(address));
+
+            var baseAddress = GetBaseAddress();
+            var path = string.Format(apiRestSection.GetSection(Constant.Routing).GetValue<string>(apiMethod.ToString()), address, skip, take);
+            var returnMessages = await client.GetRangeAsync(baseAddress, path, new CancellationToken());
+            var messages = returnMessages.Select(m => m.ToObject<T>());
+
+            return Task.FromResult(messages).Result;
         }
 
         /// <summary>
@@ -114,6 +138,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         {
             if (value == null)
                 throw new Exception("Value can not be null!");
+
             if (Math.Abs(value.GetValueOrDefault()) < 0)
                 throw new Exception("Value can not be less than zero!");
 
@@ -122,6 +147,10 @@ namespace TangramCypher.ApplicationLayer.Actor
             return this;
         }
 
+        /// <summary>
+        /// Gets the change.
+        /// </summary>
+        /// <returns>The change.</returns>
         public double? GetChange() => change;
 
         /// <summary>
@@ -136,7 +165,6 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <returns>The address.</returns>
         /// <param name="key">Key.</param>
         public Span<byte> DecodeAddress(string key) => Base58.Bitcoin.Decode(key);
-
 
         /// <summary>
         /// Gets the master key instance.
@@ -173,71 +201,6 @@ namespace TangramCypher.ApplicationLayer.Actor
         }
 
         /// <summary>
-        /// Gets the message async.
-        /// </summary>
-        /// <returns>The message async.</returns>
-        /// <param name="address">Address.</param>
-        /// <param name="cancellationToken">Cancellation token.</param>
-        public async Task<NotificationDto> GetMessageAsync(string address, CancellationToken cancellationToken)
-        {
-            if (string.IsNullOrEmpty(address))
-                throw new ArgumentException("Address is missing!", nameof(address));
-
-            var baseAddress = new Uri(apiRestSection.GetValue<string>(Constant.Endpoint));
-            var path = string.Format(apiRestSection.GetSection(Constant.Routing).GetValue<string>(Constant.GetMessages), address);
-
-            var message = apiOnionSection.GetValue<int>(Constant.OnionEnabled) == 1
-                ? await onionService.ClientGetAsync<JObject>(baseAddress, path, cancellationToken)
-                : await Client.GetAsync<JObject>(baseAddress, path, cancellationToken);
-
-            return message.ToObject<NotificationDto>();
-        }
-
-        /// <summary>
-        /// Gets the message count async.
-        /// </summary>
-        /// <returns>The message count async.</returns>
-        /// <param name="address">Address.</param>
-        /// <param name="cancellationToken">Cancellation token.</param>
-        public async Task<JObject> GetMessageCountAsync(string address, CancellationToken cancellationToken)
-        {
-            if (string.IsNullOrEmpty(address))
-                throw new ArgumentException("Address is missing!", nameof(address));
-
-            var baseAddress = new Uri(apiRestSection.GetValue<string>(Constant.Endpoint));
-            var path = string.Format(apiRestSection.GetSection(Constant.Routing).GetValue<string>(Constant.GetMessageCount), address);
-
-            var message = apiOnionSection.GetValue<int>(Constant.OnionEnabled) == 1
-                ? await onionService.ClientGetAsync<JObject>(baseAddress, path, cancellationToken)
-                : await Client.GetAsync<JObject>(baseAddress, path, cancellationToken);
-
-            return message.ToObject<JObject>();
-        }
-
-        /// <summary>
-        /// Gets the messages async.
-        /// </summary>
-        /// <returns>The messages async.</returns>
-        /// <param name="address">Address.</param>
-        /// <param name="cancellationToken">Cancellation token.</param>
-        public async Task<IEnumerable<NotificationDto>> GetMessagesAsync(string address, int skip, int take, CancellationToken cancellationToken)
-        {
-            if (string.IsNullOrEmpty(address))
-                throw new ArgumentException("Address is missing!", nameof(address));
-
-            var baseAddress = new Uri(apiRestSection.GetValue<string>(Constant.Endpoint));
-            var path = string.Format(apiRestSection.GetSection(Constant.Routing).GetValue<string>(Constant.GetMessageRange), address, skip, take);
-
-            var returnMessages = apiOnionSection.GetValue<int>(Constant.OnionEnabled) == 1
-                ? await onionService.GetRangeAsync(baseAddress, path, cancellationToken)
-                : await Client.GetRangeAsync(baseAddress, path, cancellationToken);
-
-            var messages = returnMessages.Select(m => m.ToObject<NotificationDto>());
-
-            return Task.FromResult(messages).Result;
-        }
-
-        /// <summary>
         /// Gets the shared key.
         /// </summary>
         /// <returns>The shared key.</returns>
@@ -253,27 +216,6 @@ namespace TangramCypher.ApplicationLayer.Actor
             {
                 return Cryptography.ScalarMult(Utilities.HexToBinary(insecure.Value), pk);
             }
-        }
-
-        /// <summary>
-        /// Gets the coin async.
-        /// </summary>
-        /// <returns>The coin async.</returns>
-        /// <param name="stamp">Stamp.</param>
-        /// <param name="cancellationToken">Cancellation token.</param>
-        public async Task<CoinDto> GetCoinAsync(string stamp, CancellationToken cancellationToken)
-        {
-            if (string.IsNullOrEmpty(stamp))
-                throw new ArgumentException("Stamp is missing!", nameof(stamp));
-
-            var baseAddress = new Uri(apiRestSection.GetValue<string>(Constant.Endpoint));
-            var path = string.Format(apiRestSection.GetSection(Constant.Routing).GetValue<string>(Constant.GetCoin), stamp);
-
-            var coin = apiOnionSection.GetValue<int>(Constant.OnionEnabled) == 1
-                ? await onionService.ClientGetAsync<JObject>(baseAddress, path, cancellationToken)
-                : await Client.GetAsync<JObject>(baseAddress, path, cancellationToken);
-
-            return coin.ToObject<CoinDto>();
         }
 
         /// <summary>
@@ -373,12 +315,12 @@ namespace TangramCypher.ApplicationLayer.Actor
             notificationAddress = sharedKey ? pk.ToHex() : Cryptography.GenericHashWithKey(pk.ToHex(), pk).ToHex();
 
             var messageTrack = await walletService.MessageTrack(Identifier(), From(), pk.ToHex());
-            var count = await GetMessageCountAsync(notificationAddress, new CancellationToken());
+            var count = await GetAsync<JObject>(notificationAddress, RestApiMethod.MessageCount);
             var countValue = count.Value<int>("count");
 
             notifications = messageTrack == null
-                ? await GetMessagesAsync(notificationAddress, 0, countValue, new CancellationToken())
-                : await GetMessagesAsync(notificationAddress, messageTrack.Skip, messageTrack.Take, new CancellationToken());
+                ? await GetRangeAsync<NotificationDto>(notificationAddress, 0, countValue, RestApiMethod.MessageRange)
+                : await GetRangeAsync<NotificationDto>(notificationAddress, messageTrack.Skip, messageTrack.Take, RestApiMethod.MessageRange);
 
             if (sharedKey)
                 pk = receiverPk;
@@ -444,7 +386,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                 throw new ArgumentException("message", nameof(message));
 
             var freeRedemptionKey = JsonConvert.DeserializeObject<RedemptionKeyDto>(message);
-            var coin = await GetCoinAsync(freeRedemptionKey.Hash, new CancellationToken());
+            var coin = await GetAsync<CoinDto>(freeRedemptionKey.Hash, RestApiMethod.Coin);
 
             if (coin != null)
             {
@@ -454,11 +396,11 @@ namespace TangramCypher.ApplicationLayer.Actor
 
                     var (swap1, swap2) = coinService.CoinSwap(From(), coin, freeRedemptionKey);
 
-                    var keeperPass = await CoinKepperPass(swap1);
+                    var keeperPass = await CoinPass(swap1, 3);
                     if (keeperPass != true)
                         return false;
 
-                    var fullPass = await CoinFullPass(swap2);
+                    var fullPass = await CoinPass(swap2, 1);
                     if (fullPass != true)
                         return false;
 
@@ -483,11 +425,12 @@ namespace TangramCypher.ApplicationLayer.Actor
         }
 
         /// <summary>
-        /// Checks if the coin equals the kepper.
+        ///  Checks if the coin equals the mode.
         /// </summary>
-        /// <returns>The kepper pass.</returns>
+        /// <returns>The pass.</returns>
         /// <param name="swap">Swap.</param>
-        private async Task<bool> CoinKepperPass(CoinDto swap)
+        /// <param name="mode">Mode.</param>
+        private async Task<bool> CoinPass(CoinDto swap, int mode)
         {
             if (swap == null)
                 throw new ArgumentNullException(nameof(swap));
@@ -498,35 +441,9 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             coin.Hash = coinService.Hash(coin).ToHex();
 
-            if (status.Equals(3))
+            if (status.Equals(mode))
             {
-                var returnCoin = await AddCoinAsync(coin.FormatCoinToBase64(), new CancellationToken());
-                if (returnCoin != null)
-                    canPass = true;
-            }
-
-            return canPass;
-        }
-
-        /// <summary>
-        /// Checks if the coin equals the kepper and the hint.
-        /// </summary>
-        /// <returns>The full pass.</returns>
-        /// <param name="swap">Swap.</param>
-        private async Task<bool> CoinFullPass(CoinDto swap)
-        {
-            if (swap == null)
-                throw new ArgumentNullException(nameof(swap));
-
-            var canPass = false;
-            var coin = coinService.DeriveCoin(From(), swap);
-            var status = coinService.VerifyCoin(swap, coin);
-
-            coin.Hash = coinService.Hash(coin).ToHex();
-
-            if (status.Equals(1))
-            {
-                var returnCoin = await AddCoinAsync(coin.FormatCoinToBase64(), new CancellationToken());
+                var returnCoin = await AddAsync(coin.FormatCoinToBase64(), RestApiMethod.PostCoin);
                 if (returnCoin != null)
                     canPass = true;
             }
@@ -584,21 +501,26 @@ namespace TangramCypher.ApplicationLayer.Actor
             var senderPk = PublicKey().ToUnSecureString();
             var innerMessage = JObject.Parse(@"{payment: false, store:'" + EncodeAddress(senderPk) + "'}");
             var cypher = Cypher(innerMessage.ToString(), pk);
-            var message = await AddMessageAsync(new MessageDto
+            var message = await AddAsync(new MessageDto
             {
                 Address = notificationAddress.ToBase64(),
                 Body = cypher.ToBase64()
-            }, new CancellationToken());
+            }, RestApiMethod.PostMessage);
 
             return message;
         }
 
+        /// <summary>
+        /// Encodes the address.
+        /// </summary>
+        /// <returns>The address.</returns>
+        /// <param name="pk">Pk.</param>
         private static string EncodeAddress(string pk)
         {
             return Base58.Bitcoin.Encode(Utilities.HexToBinary(pk));
         }
 
-        ///TODO: Clean up code.. Hide the coin version and the stamp..
+        ///TODO: Clean up code..
         /// <summary>
         /// Sends the payment.
         /// </summary>
@@ -613,7 +535,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             await SetSecretKey();
 
             var spendCoins = await GetCoinsToSpend();
-            var coins = await PostCoins(spendCoins);
+            var coins = await PostCoinsAsync(spendCoins);
 
             if (coins == null)
                 return JObject.Parse(@"{success: false, message:'Coins failed to post!'}");
@@ -624,7 +546,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             coinService.ClearCache();
 
-            receiverCoin = await AddCoinAsync(receiverCoin.FormatCoinToBase64(), new CancellationToken());
+            receiverCoin = await AddAsync(receiverCoin.FormatCoinToBase64(), RestApiMethod.PostCoin);
 
             if (receiverCoin == null)
                 return JObject.Parse(@"{success: false, message:'Receiver coin failed!'}");
@@ -704,6 +626,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             using (var insecurePassword = password.Insecure())
             {
                 var hash = Cryptography.GenericHashNoKey(string.Format("{0} {1}", version, insecurePassword.Value));
+
                 return Prover.GetHashStringNumber(hash).ToByteArray().ToHex();
             }
         }
@@ -808,9 +731,9 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// </summary>
         /// <returns>The coins.</returns>
         /// <param name="coins">Coins.</param>
-        private async Task<IEnumerable<CoinDto>> PostCoins(IEnumerable<CoinDto> coins)
+        private async Task<IEnumerable<CoinDto>> PostCoinsAsync(IEnumerable<CoinDto> coins)
         {
-            var tasks = coins.Select(coin => AddCoinAsync(coin.FormatCoinToBase64(), new CancellationToken()));
+            var tasks = coins.Select(coin => AddAsync(coin.FormatCoinToBase64(), RestApiMethod.PostCoin));
             var results = await Task.WhenAll(tasks);
             var json = await results.AsJson().ReadAsStringAsync();
 
@@ -832,8 +755,9 @@ namespace TangramCypher.ApplicationLayer.Actor
             if (msg == null)
                 return JObject.Parse(@"{success: 'false', message:'First Message failed to send!'}");
 
-            Thread.Sleep(3000);
-            msg = await AddMessageAsync(message, new CancellationToken());
+            await Task.Delay(3000);
+
+            msg = await AddAsync(message, RestApiMethod.PostMessage);
 
             if (msg == null)
                 return JObject.Parse(@"{success: false, message:'Second message failed to send!'}");
@@ -864,6 +788,15 @@ namespace TangramCypher.ApplicationLayer.Actor
 
                 return Encoding.UTF8.GetString(Utilities.HexToBinary(opened));
             }
+        }
+
+        /// <summary>
+        /// Get the base address.
+        /// </summary>
+        /// <returns>The base address.</returns>
+        private Uri GetBaseAddress()
+        {
+            return new Uri(apiRestSection.GetValue<string>(Constant.Endpoint));
         }
     }
 }

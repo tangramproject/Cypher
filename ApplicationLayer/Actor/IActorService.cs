@@ -9,31 +9,26 @@
 using System;
 using System.Collections.Generic;
 using System.Security;
-using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
-using TangramCypher.ApplicationLayer.Coin;
 using TangramCypher.ApplicationLayer.Wallet;
 
 namespace TangramCypher.ApplicationLayer.Actor
 {
     public interface IActorService
     {
-        Task<MessageDto> AddMessageAsync(MessageDto message, CancellationToken cancellationToken);
-        Task<CoinDto> AddCoinAsync(CoinDto coin, CancellationToken cancellationToken);
+        Task<T> AddAsync<T>(T payload, RestApiMethod apiMethod);
         double? Amount();
         ActorService Amount(double? value);
-        double? GetChange();
+        Task<T> GetAsync<T>(string address, RestApiMethod apiMethod);
         Task<double> CheckBalance();
+        double? GetChange();
+        Task<IEnumerable<T>> GetRangeAsync<T>(string address, int skip, int take, RestApiMethod apiMethod);
         Span<byte> DecodeAddress(string key);
         SecureString From();
         ActorService From(SecureString password);
         byte[] Cypher(string message, byte[] pk);
-        Task<NotificationDto> GetMessageAsync(string address, CancellationToken cancellationToken);
-        Task<JObject> GetMessageCountAsync(string address, CancellationToken cancellationToken);
-        Task<IEnumerable<NotificationDto>> GetMessagesAsync(string address, int skip, int take, CancellationToken cancellationToken);
         Task<byte[]> ToSharedKey(byte[] pk);
-        Task<CoinDto> GetCoinAsync(string stamp, CancellationToken cancellationToken);
         SecureString Identifier();
         ActorService Identifier(SecureString walletId);
         string Memo();

@@ -7,17 +7,16 @@
 // work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
 
 using System;
-using System.Collections.Generic;
-using System.Text;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace TangramCypher.ApplicationLayer.Commands.Vault
 {
     [CommandDescriptor(new string[] { "setnodeendpoint" }, "Set contact endpoint")]
     public class SetNodeEndpointCommand : Command
     {
+#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
         public override async Task Execute()
+#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
         {
             throw new NotImplementedException();
         }
