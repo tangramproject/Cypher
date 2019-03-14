@@ -29,7 +29,7 @@ using TangramCypher.ApplicationLayer.Coin;
 
 namespace TangramCypher.ApplicationLayer.Actor
 {
-    public class ActorService: IActorService
+    public class ActorService : IActorService
     {
         protected SecureString masterKey;
         protected string toAdress;
@@ -500,12 +500,14 @@ namespace TangramCypher.ApplicationLayer.Actor
             var notificationAddress = Cryptography.GenericHashWithKey(pk.ToHex(), pk);
             var senderPk = PublicKey().ToUnSecureString();
             var innerMessage = JObject.Parse(@"{payment: false, store:'" + EncodeAddress(senderPk) + "'}");
-            var cypher = Cypher(innerMessage.ToString(), pk);
-            var message = await AddAsync(new MessageDto
+            var paddedBuf = Cryptography.Pad(innerMessage.ToString());
+            var cypher = Cypher(Encoding.UTF8.GetString(paddedBuf), pk);
+            var payload = new MessageDto
             {
                 Address = notificationAddress.ToBase64(),
                 Body = cypher.ToBase64()
-            }, RestApiMethod.PostMessage);
+            };
+            var message = await AddAsync(payload, RestApiMethod.PostMessage);
 
             return message;
         }
@@ -657,7 +659,8 @@ namespace TangramCypher.ApplicationLayer.Actor
                 Stamp = coin.Stamp
             };
             var innerMessage = JObject.Parse(@"{payment: true, store:" + JsonConvert.SerializeObject(redemption) + "}");
-            var cypher = Cypher(innerMessage.ToString(), pk);
+            var paddedBuf = Cryptography.Pad(innerMessage.ToString());
+            var cypher = Cypher(Encoding.UTF8.GetString(paddedBuf), pk);
             var sharedKey = await ToSharedKey(pk.ToArray());
             var notificationAddress = Cryptography.GenericHashWithKey(sharedKey.ToHex(), pk);
             var message = new MessageDto
@@ -785,8 +788,9 @@ namespace TangramCypher.ApplicationLayer.Actor
             {
                 var message = Utilities.HexToBinary(Encoding.UTF8.GetString(Convert.FromBase64String(body)));
                 var opened = Cryptography.OpenBoxSeal(message, new KeyPair(pk, Utilities.HexToBinary(insecureSk.Value)));
+                var unpadded = Cryptography.Unpad(Encoding.UTF8.GetBytes(opened));
 
-                return Encoding.UTF8.GetString(Utilities.HexToBinary(opened));
+                return Encoding.UTF8.GetString(Utilities.HexToBinary(Encoding.UTF8.GetString(unpadded)));
             }
         }
 

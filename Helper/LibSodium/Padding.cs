@@ -14,10 +14,10 @@ namespace TangramCypher.Helper.LibSodium
 
         [SuppressUnmanagedCodeSecurity]
         [DllImport(nativeLibrary, CallingConvention = CallingConvention.Cdecl, EntryPoint = "sodium_pad")]
-        internal static extern int Pad(ulong padded_buflen_p, byte buf, ulong unpadded_buflen, ulong blocksize, ulong max_buflen);
+        internal static extern int Pad(ref ulong padded_buflen_p, byte[] buf, ulong unpadded_buflen, ulong blocksize, ulong max_buflen);
 
         [SuppressUnmanagedCodeSecurity]
         [DllImport(nativeLibrary, CallingConvention = CallingConvention.Cdecl, EntryPoint = "sodium_unpad")]
-        internal static extern int Unpad(ulong unpadded_buflen_p, byte buf, ulong padded_buflen, ulong blocksize);
+        internal static extern int Unpad(ref ulong unpadded_buflen_p, byte[] buf, ulong padded_buflen, ulong blocksize);
     }
 }

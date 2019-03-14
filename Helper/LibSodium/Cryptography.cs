@@ -201,5 +201,34 @@ namespace TangramCypher.Helper.LibSodium
             return PasswordHash.ArgonHashStringVerify(hash, pwd);
         }
 
+        /// <summary>
+        /// Adds padding data to a buffer buf whose original size 
+        /// is unpadded_buflen in order to extend its total length 
+        /// to a multiple of blocksize.
+        /// </summary>
+        /// <returns>The pad.</returns>
+        /// <param name="text">Text.</param>
+        public static byte[] Pad(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+                throw new ArgumentException("message", nameof(text));
+
+            var buf = Encoding.UTF8.GetBytes(text);             var bufOrigialSize = buf.Length;             ulong paddedBufLenp = 0;              Array.Resize(ref buf, 1024);              for (int i = bufOrigialSize; i < buf.Length; i++)             {                 var p = SodiumPadding.Pad(ref paddedBufLenp, buf, (ulong)i, 256, int.MaxValue);             }              return buf;
+        }
+
+        /// <summary>
+        /// Computes the original, unpadded length of a message previously padded
+        /// using sodium_pad(). The original length is put into unpadded_buflen_p
+        /// </summary>
+        /// <returns>The pad.</returns>
+        /// <param name="data">Data.</param>
+        public static byte[] Unpad(byte[] data)
+        {
+            if (data == null)
+                throw new ArgumentNullException(nameof(data));
+
+            ulong unpaddedBuflenp = 0;              for (int i = 0; i < data.Length; i++)             {                 var u = SodiumPadding.Unpad(ref unpaddedBuflenp, data, 1024, 256);                 if (u.Equals(0))                     Array.Resize(ref data, data.Length - 1);             }              return data;
+        }
+
     }
 }
