@@ -37,6 +37,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         SecureString PublicKey();
         ActorService PublicKey(SecureString pk);
         Task ReceivePayment(string address, bool sharedKey = false, byte[] receiverPk = null);
+        Task<JObject> ReceivePaymentRedemptionKey(string address, string cypher);
         SecureString SecretKey();
         ActorService SecretKey(SecureString sk);
         Task<MessageDto> EstablishPubKeyMessage();

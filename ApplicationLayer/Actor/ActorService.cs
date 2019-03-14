@@ -329,6 +329,35 @@ namespace TangramCypher.ApplicationLayer.Actor
         }
 
         /// <summary>
+        /// Receives payment from redemption key.
+        /// </summary>
+        /// <returns>The payment redemption key.</returns>
+        /// <param name="address">Address.</param>
+        /// <param name="cypher">Cypher.</param>
+        public async Task<JObject> ReceivePaymentRedemptionKey(string address, string cypher)
+        {
+            if (string.IsNullOrEmpty(address))
+                throw new ArgumentException("message", nameof(address));
+
+            if (string.IsNullOrEmpty(cypher))
+                throw new ArgumentException("message", nameof(cypher));
+
+            var pk = DecodeAddress(address).ToArray();
+            var message = await ReadMessage(cypher, pk);
+            var (isPayment, store) = ParseMessage(message);
+            var previousBal = await CheckBalance();
+            var payment = await Payment(store);
+
+            if (payment)
+            {
+                var availableBal = await CheckBalance();
+                return JObject.Parse(@"{success: true, message: { previous:" + previousBal + ", available:" + availableBal + "}}");
+            }
+
+            return JObject.Parse(@"{success: false, message: { available:" + previousBal + "}}");
+        }
+
+        /// <summary>
         /// Checks the notifications.
         /// </summary>
         /// <returns>The notifications.</returns>
