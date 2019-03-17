@@ -33,9 +33,9 @@ namespace TangramCypher.ApplicationLayer.Actor
     {
         protected SecureString masterKey;
         protected string toAdress;
-        protected double? amount;
+        protected double amount;
         protected string memo;
-        protected double? change;
+        protected double change;
         protected SecureString secretKey;
         protected SecureString publicKey;
         protected SecureString identifier;
@@ -127,22 +127,19 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// Gets the Amount instance.
         /// </summary>
         /// <returns>The amount.</returns>
-        public double? Amount() => amount;
+        public double Amount() => amount;
 
         /// <summary>
         /// Sets the specified Amount value.
         /// </summary>
         /// <returns>The amount.</returns>
         /// <param name="value">Value.</param>
-        public ActorService Amount(double? value)
+        public ActorService Amount(double value)
         {
-            if (value == null)
-                throw new Exception("Value can not be null!");
-
-            if (Math.Abs(value.GetValueOrDefault()) < 0)
+            if (value < 0)
                 throw new Exception("Value can not be less than zero!");
 
-            amount = Math.Abs(value.Value);
+            amount = Math.Abs(value);
 
             return this;
         }
@@ -151,7 +148,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// Gets the change.
         /// </summary>
         /// <returns>The change.</returns>
-        public double? GetChange() => change;
+        public double GetChange() => change;
 
         /// <summary>
         /// Checks the balance.
@@ -711,7 +708,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         private async Task<IEnumerable<CoinDto>> GetCoinsToSpend()
         {
             CoinDto coin = null;
-            var makeChange = await walletService.MakeChange(Identifier(), From(), Amount().Value);
+            var makeChange = await walletService.MakeChange(Identifier(), From(), Amount());
 
             if ((makeChange != null) && (makeChange.Transaction != null))
             {
@@ -739,8 +736,8 @@ namespace TangramCypher.ApplicationLayer.Actor
             foreach (var coin in coins)
             {
                 var formattedCoin = coin.FormatCoinFromBase64();
-                var sumAmount = Math.Abs(await walletService.TransactionAmount(Identifier(), From(), formattedCoin.Stamp)) - Math.Abs(Amount().Value);
-                var isAmount = sumAmount.Equals(coinService.Change().Value) ? sumAmount : coinService.Change().Value;
+                var sumAmount = Math.Abs(await walletService.TransactionAmount(Identifier(), From(), formattedCoin.Stamp)) - Math.Abs(Amount());
+                var isAmount = sumAmount.Equals(coinService.Change()) ? sumAmount : coinService.Change();
 
                 var transaction = new TransactionDto
                 {

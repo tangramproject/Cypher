@@ -22,9 +22,9 @@ namespace TangramCypher.ApplicationLayer.Coin
 {
     public class CoinService : ICoinService
     {
-        private double? input;
-        private double? output;
-        private double? change;
+        private double input;
+        private double output;
+        private double change;
         private int version;
         private string stamp;
         private SecureString password;
@@ -43,14 +43,14 @@ namespace TangramCypher.ApplicationLayer.Coin
             {
                 var blind = DeriveKey(Output());
                 var blindSum = pedersen.BlindSum(new List<byte[]> { blind, blind }, new List<byte[]> { });
-                var commitPos = Commit((ulong)Output().Value, blind);
+                var commitPos = Commit((ulong)Output(), blind);
                 var commitNeg = Commit(0, blind);
 
                 Stamp(GetNewStamp());
                 Version(-1);
 
                 coin = BuildCoin(blindSum, commitPos, commitNeg, true);
-                receiver = new ReceiverOutput(Output().Value, commitPos, blindSum);
+                receiver = new ReceiverOutput(Output(), commitPos, blindSum);
             }
 
             return (receiver, coin);
@@ -67,11 +67,11 @@ namespace TangramCypher.ApplicationLayer.Coin
             using (var secp256k1 = new Secp256k1())
             using (var pedersen = new Pedersen())
             {
-                var blindPos = pedersen.BlindSwitch((ulong)Input().Value, DeriveKey(Input()));
-                var blindNeg = pedersen.BlindSwitch((ulong)Output().Value, DeriveKey(Output()));
+                var blindPos = pedersen.BlindSwitch((ulong)Input(), DeriveKey(Input()));
+                var blindNeg = pedersen.BlindSwitch((ulong)Output(), DeriveKey(Output()));
                 var blindSum = pedersen.BlindSum(new List<byte[]> { blindPos }, new List<byte[]> { blindNeg });
-                var commitPos = Commit((ulong)Input().Value, blindPos);
-                var commitNeg = Commit((ulong)Output().Value, blindNeg);
+                var commitPos = Commit((ulong)Input(), blindPos);
+                var commitNeg = Commit((ulong)Output(), blindNeg);
 
                 coin = BuildCoin(blindSum, commitPos, commitNeg);
             }
@@ -83,7 +83,7 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// Change this instance.
         /// </summary>
         /// <returns>The change.</returns>
-        public double? Change() => change = Math.Abs(input.Value) - Math.Abs(output.Value);
+        public double Change() => change = Math.Abs(input) - Math.Abs(output);
 
         /// <summary>
         /// Clears the change, imputs, outputs and version cache.
@@ -268,17 +268,17 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// <returns>The key.</returns>
         /// <param name="value">Value.</param>
         /// <param name="bytes">Bytes.</param>
-        public byte[] DeriveKey(double? value, int bytes = 32)
+        public byte[] DeriveKey(double value, int bytes = 32)
         {
             if (value == null)
                 throw new Exception("Value can not be null!");
 
-            if (Math.Abs(value.GetValueOrDefault()) < 0)
+            if (value < 0)
                 throw new Exception("Value can not be less than zero!");
 
             using (var insecurePassword = Password().Insecure())
             {
-                return Cryptography.GenericHashNoKey(string.Format("{0} {1} {2}", Version(), value.Value, insecurePassword.Value), bytes);
+                return Cryptography.GenericHashNoKey(string.Format("{0} {1} {2}", Version(), value, insecurePassword.Value), bytes);
             }
         }
 
@@ -529,7 +529,7 @@ namespace TangramCypher.ApplicationLayer.Coin
 
             using (var pedersen = new Pedersen())
             {
-                var skey1 = DeriveKey(Change().Value);
+                var skey1 = DeriveKey(Change());
                 var skey2 = pedersen.BlindSum(new List<byte[]> { blinding }, new List<byte[]> { skey1 });
 
                 return (skey1, skey2);
@@ -604,19 +604,19 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// Inputs this instance.
         /// </summary>
         /// <returns>The inputs.</returns>
-        public double? Input() => input;
+        public double Input() => input;
 
         /// <summary>
         /// Input the specified value.
         /// </summary>
         /// <returns>The input.</returns>
         /// <param name="value">Value.</param>
-        public CoinService Input(double? value)
+        public CoinService Input(double value)
         {
             if (value == null)
                 throw new Exception("Value can not be null!");
 
-            if (Math.Abs(value.GetValueOrDefault()) < 0)
+            if (value < 0)
                 throw new Exception("Value can not be less than zero!");
 
             input = value;
@@ -628,19 +628,19 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// Outputs this instance.
         /// </summary>
         /// <returns>The outputs.</returns>
-        public double? Output() => output;
+        public double Output() => output;
 
         /// <summary>
         /// Output the specified value.
         /// </summary>
         /// <returns>The output.</returns>
         /// <param name="value">Value.</param>
-        public CoinService Output(double? value)
+        public CoinService Output(double value)
         {
             if (value == null)
                 throw new Exception("Value can not be null!");
 
-            if (Math.Abs(value.GetValueOrDefault()) < 0)
+            if (value < 0)
                 throw new Exception("Value can not be less than zero!");
 
             output = value;
@@ -749,7 +749,7 @@ namespace TangramCypher.ApplicationLayer.Coin
                 var commitSum = pedersen.CommitSum(new List<byte[]> { commitPos }, new List<byte[]> { commitNeg });
 
                 isVerified = receiver
-                    ? pedersen.VerifyCommitSum(new List<byte[]> { commitPos, commitNeg }, new List<byte[]> { Commit((ulong)Output().Value, blindSum) })
+                    ? pedersen.VerifyCommitSum(new List<byte[]> { commitPos, commitNeg }, new List<byte[]> { Commit((ulong)Output(), blindSum) })
                     : pedersen.VerifyCommitSum(new List<byte[]> { commitPos }, new List<byte[]> { commitNeg, commitSum });
 
                 if (!isVerified)

@@ -18,11 +18,11 @@ namespace TangramCypher.ApplicationLayer.Actor
     public interface IActorService
     {
         Task<T> AddAsync<T>(T payload, RestApiMethod apiMethod);
-        double? Amount();
-        ActorService Amount(double? value);
+        double Amount();
+        ActorService Amount(double value);
         Task<T> GetAsync<T>(string address, RestApiMethod apiMethod);
         Task<double> CheckBalance();
-        double? GetChange();
+        double GetChange();
         Task<IEnumerable<T>> GetRangeAsync<T>(string address, int skip, int take, RestApiMethod apiMethod);
         Span<byte> DecodeAddress(string key);
         SecureString From();
