@@ -270,9 +270,6 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// <param name="bytes">Bytes.</param>
         public byte[] DeriveKey(double value, int bytes = 32)
         {
-            if (value == null)
-                throw new Exception("Value can not be null!");
-
             if (value < 0)
                 throw new Exception("Value can not be less than zero!");
 
@@ -613,9 +610,6 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// <param name="value">Value.</param>
         public CoinService Input(double value)
         {
-            if (value == null)
-                throw new Exception("Value can not be null!");
-
             if (value < 0)
                 throw new Exception("Value can not be less than zero!");
 
@@ -637,9 +631,6 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// <param name="value">Value.</param>
         public CoinService Output(double value)
         {
-            if (value == null)
-                throw new Exception("Value can not be null!");
-
             if (value < 0)
                 throw new Exception("Value can not be less than zero!");
 
