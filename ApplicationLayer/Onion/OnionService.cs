@@ -48,6 +48,7 @@ namespace Cypher.ApplicationLayer.Onion
         readonly string controlPortPath;
         readonly string hiddenServicePath;
         readonly string hiddenServicePort;
+        readonly string obfs4proxy;
         string hashedPassword;
         int torId = 0;
 
@@ -75,6 +76,8 @@ namespace Cypher.ApplicationLayer.Onion
             torrcPath = Path.Combine(onionDirectory, TORRC);
             controlPortPath = Path.Combine(onionDirectory, "control-port");
             hiddenServicePath = Path.Combine(onionDirectory, "hidden_service");
+            var pluggableTransports = Path.Combine(tangramDirectory.FullName, "PluggableTransports");
+            obfs4proxy = Path.Combine(pluggableTransports, "obfs4proxy");
         }
 
         public void ChangeCircuit(SecureString password)
@@ -223,7 +226,8 @@ namespace Cypher.ApplicationLayer.Onion
                 $"SocksPort {SocksPort}",
                 "Log notice stdout",
                 $"DataDirectory {onionDirectory}",
-                $"ControlPortWriteToFile {controlPortPath}"
+                $"ControlPortWriteToFile {controlPortPath}",
+                $"ClientTransportPlugin obfs4 exec {obfs4proxy} managed"
             };
 
             try
