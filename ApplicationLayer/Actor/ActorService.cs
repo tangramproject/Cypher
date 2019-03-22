@@ -343,7 +343,8 @@ namespace TangramCypher.ApplicationLayer.Actor
                 throw new ArgumentException("message", nameof(cypher));
 
             var pk = DecodeAddress(address).ToArray();
-            var message = await ReadMessage(cypher, pk);
+            var notification = JObject.Parse(cypher).ToObject<NotificationDto>();
+            var message = await ReadMessage(notification.Body, pk);
             var (isPayment, store) = ParseMessage(message);
             var previousBal = await CheckBalance();
             var payment = await Payment(store);

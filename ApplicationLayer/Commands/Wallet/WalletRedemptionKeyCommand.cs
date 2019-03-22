@@ -1,8 +1,11 @@
 ﻿using System;
+using System.Linq;
 using System.Threading.Tasks;
 using McMaster.Extensions.CommandLineUtils;
 using TangramCypher.ApplicationLayer.Actor;
 using Microsoft.Extensions.DependencyInjection;
+using System.IO;
+using Newtonsoft.Json;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
 {
@@ -25,15 +28,18 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                 using (var identifier = Prompt.GetPasswordAsSecureString("Identifier:", ConsoleColor.Yellow))
                 using (var password = Prompt.GetPasswordAsSecureString("Password:", ConsoleColor.Yellow))
                 {
-                    var cypher = Prompt.GetString("Redemption Key:", null, ConsoleColor.Green);
                     var address = Prompt.GetString("Address:", null, ConsoleColor.Red);
+                    var path = Prompt.GetString("File Path:", null, ConsoleColor.Green);
+
+                    var readLines = File.ReadLines(path).ToArray();
+                    var line = readLines[1];
 
                     var message = await actorService
                         .From(password)
                         .Identifier(identifier)
-                        .ReceivePaymentRedemptionKey(address, cypher);
+                        .ReceivePaymentRedemptionKey(address, line);
 
-                    console.WriteLine(message);
+                    console.WriteLine(JsonConvert.SerializeObject(message));
                 }
             }
             catch (Exception ex)
