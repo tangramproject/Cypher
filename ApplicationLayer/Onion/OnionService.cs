@@ -49,6 +49,7 @@ namespace Cypher.ApplicationLayer.Onion
         readonly string hiddenServicePath;
         readonly string hiddenServicePort;
         string hashedPassword;
+        int torId = 0;
 
         Process TorProcess { get; set; }
         public bool OnionStarted { get; private set; }
@@ -274,7 +275,6 @@ namespace Cypher.ApplicationLayer.Onion
                     {
                         OnionStarted = true;
                         console.ResetColor();
-                        console.WriteLine("tor Started!");
                         logger.LogInformation("tor Started!");
                     }
 
@@ -284,6 +284,9 @@ namespace Cypher.ApplicationLayer.Onion
 
             TorProcess.Start();
 
+            if (torId.Equals(0))
+                torId = TorProcess.Id;
+
             await Task.Run(() => TorProcess.BeginOutputReadLine());
         }
 
@@ -291,7 +294,14 @@ namespace Cypher.ApplicationLayer.Onion
         {
             try
             {
-                TorProcess?.Kill();
+                foreach (Process tor in Process.GetProcesses())
+                {
+                    if (tor.Id == torId)
+                    {
+                        tor.Kill();
+                        break;
+                    }
+                }
             }
             catch (Exception ex)
             {
