@@ -14,6 +14,8 @@ using Microsoft.Extensions.DependencyInjection;
 using TangramCypher.ApplicationLayer.Actor;
 using TangramCypher.Helper;
 using Newtonsoft.Json;
+using System.Text;
+using System.IO;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
 {
@@ -23,6 +25,8 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
         readonly IActorService actorService;
         readonly IConsole console;
         readonly IVaultService vaultService;
+
+        private static readonly DirectoryInfo tangramDirectory = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
 
         public WalletTransferCommand(IServiceProvider serviceProvider)
         {
@@ -57,6 +61,38 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                                     .To(address)
                                     .Memo(memo)
                                     .SendPayment(yesNo);
+
+                        if (yesNo.Equals(false))
+                        {
+                            var notification = message.ToObject<NotificationDto>();
+
+                            console.ForegroundColor = ConsoleColor.Magenta;
+                            console.WriteLine("\nOptions:");
+                            console.WriteLine("Save redemption key to file [1]");
+                            console.WriteLine("Copy redemption key from console [2]\n");
+
+                            var option = Prompt.GetInt("Select option:", 1, ConsoleColor.Yellow);
+
+                            console.ForegroundColor = ConsoleColor.White;
+
+                            var content =
+                                "--------------Begin Redemption Key--------------" +
+                                Environment.NewLine +
+                                JsonConvert.SerializeObject(notification) +
+                                Environment.NewLine +
+                                "--------------End Redemption Key----------------";
+
+                            if (option.Equals(1))
+                            {
+                                var path = $"{tangramDirectory}redem{DateTime.Now.GetHashCode()}.rdkey";
+                                File.WriteAllText(path, content);
+                                console.WriteLine($"\nSaved path: {path}\n");
+                            }
+                            else
+                                console.WriteLine($"\n{content}\n");
+
+                            return;
+                        }
 
                         console.WriteLine(JsonConvert.SerializeObject(message));
                     }
