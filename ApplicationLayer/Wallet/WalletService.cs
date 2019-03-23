@@ -43,12 +43,12 @@ namespace TangramCypher.ApplicationLayer.Wallet
             if (password == null)
                 throw new ArgumentNullException(nameof(password));
 
-            var total = 0.0d;
+            double total = 0.0d;
             var transactions = await Transactions(identifier, password);
 
             if (transactions != null)
             {
-                double? pocket = null;
+                double pocket = 0.0d;
                 TransactionDto burnt = null;
 
                 try
@@ -68,7 +68,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
                             break;
                         default:
                             {
-                                total = burnt.Amount + pocket.Value;
+                                total = burnt.Amount + pocket;
                                 break;
                             }
                     }
