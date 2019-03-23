@@ -104,6 +104,10 @@ namespace TangramCypher.ApplicationLayer.Vault
                 }
 
                 string os = Util.GetOSPlatform().ToString().ToLowerInvariant();
+
+                if (os == "osx")
+                    os = "darwin";
+
                 string architecture = null;
 
                 switch (RuntimeInformation.OSArchitecture)
