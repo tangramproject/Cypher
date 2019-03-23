@@ -22,6 +22,7 @@ using System.Numerics;
 using System.Dynamic;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Logging;
+using Sodium;
 
 namespace TangramCypher.Helper
 {
@@ -141,6 +142,18 @@ namespace TangramCypher.Helper
                     content = await sr.ReadToEndAsync();
 
             return content;
+        }
+
+        public static string GetFileHash(FileInfo file)
+        {
+            return GetFileHash(file.FullName);
+        }
+
+        public static string GetFileHash(string fileFullName)
+        {
+            var bytes = File.ReadAllBytes(fileFullName);
+            var hash = CryptoHash.Sha256(bytes);
+            return Utilities.BinaryToHex(hash);
         }
 
         [CLSCompliant(false)]
