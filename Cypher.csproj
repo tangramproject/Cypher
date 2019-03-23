@@ -42,7 +42,7 @@
     <PackageReference Include="DotNetTor" Version="2.3.3" />
     <PackageReference Include="ReadablePassphrase" Version="1.1.2" />
     <PackageReference Include="ShellProgressBar" Version="4.2.0" />
-    <PackageReference Include="Secp256k1.ZKP.Net" Version="1.0.1" />
+    <PackageReference Include="Secp256k1.ZKP.Net" Version="1.0.2" />
   </ItemGroup>
 
   <ItemGroup>
