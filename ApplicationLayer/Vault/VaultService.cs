@@ -55,6 +55,31 @@ namespace TangramCypher.ApplicationLayer.Vault
                     return "1F3AA640273A90FBA56AE60D06AD15E9D42CA073148CE3F39C800D81D0949682";
                 }
 
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) && RuntimeInformation.OSArchitecture == Architecture.X86)
+                {
+                    return "583DFE3D763DE2A548FB89FDDC8448357EDAD79670E41C8A083B88D9C5BF16BC";
+                }
+
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX) && RuntimeInformation.OSArchitecture == Architecture.X64)
+                {
+                    return "0FB101283185CE6CA7260CA206CFC37F7EDC7EE8AB8682141325A44DE82670A5";
+                }
+
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX) && RuntimeInformation.OSArchitecture == Architecture.X86)
+                {
+                    return "0FB101283185CE6CA7260CA206CFC37F7EDC7EE8AB8682141325A44DE82670A5";
+                }
+
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) && RuntimeInformation.OSArchitecture == Architecture.X64)
+                {
+                    return "B65C20C555BF467D374A7CB984162BD9373313930D8F49570DF35C8B71F5352E";
+                }
+
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) && RuntimeInformation.OSArchitecture == Architecture.X86)
+                {
+                    return "BEB53C4E6ED2930E7BA6143F383D29421DD657DB13927E01CEDB0067356C577B";
+                }
+
                 throw new Exception("Unable to determine vault executable based on platform");
             }
         }
