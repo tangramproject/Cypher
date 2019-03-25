@@ -50,6 +50,7 @@
     <Folder Include="Helper\ZeroKP\" />
     <Folder Include="Helper\Http\" />
     <Folder Include="ApplicationLayer\Coin\" />
+    <Folder Include="Helper\ShellProgress\" />
   </ItemGroup>
   <ItemGroup>
     <None Update="appsettings.json">
