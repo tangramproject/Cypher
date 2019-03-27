@@ -127,9 +127,6 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// <param name="amount">Amount.</param>
         public byte[] Commit(ulong amount)
         {
-            if (amount < 0)
-                throw new Exception("Amount can not be less than zero!");
-
             if (password == null)
                 throw new ArgumentNullException(nameof(password));
 
@@ -153,9 +150,6 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// <param name="blind">Blind.</param>
         public byte[] Commit(ulong amount, byte[] blind)
         {
-            if (amount < 0)
-                throw new Exception("Amount can not be less than zero!");
-
             if ((blind == null) && (blind.Length > 32))
                 throw new ArgumentNullException(nameof(blind));
 
