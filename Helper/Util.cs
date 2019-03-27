@@ -188,5 +188,13 @@ namespace TangramCypher.Helper
             logger.LogError(e, Environment.NewLine);
             console.ResetColor();
         }
+
+        public static void LogWarning(IConsole console, ILogger logger, string message)
+        {
+            console.ForegroundColor = ConsoleColor.Yellow;
+            console.WriteLine(message);
+            console.ResetColor();
+            logger.LogWarning(message);
+        }
     }
 }
