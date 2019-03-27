@@ -213,7 +213,7 @@ namespace TangramCypher.Helper.LibSodium
             if (string.IsNullOrEmpty(text))
                 throw new ArgumentException("message", nameof(text));
 
-            var buf = Encoding.UTF8.GetBytes(text);             var bufOrigialSize = buf.Length;             ulong paddedBufLenp = 0;              Array.Resize(ref buf, 1024);              for (int i = bufOrigialSize; i < buf.Length; i++)             {                 var p = SodiumPadding.Pad(ref paddedBufLenp, buf, (ulong)i, 256, int.MaxValue);             }              return buf;
+            var buf = Encoding.UTF8.GetBytes(text);             var bufOrigialSize = buf.Length;             ulong paddedBufLenp = 0;              Array.Resize(ref buf, 540);              SodiumPadding.Pad(ref paddedBufLenp, buf, (ulong)buf.Length, 32, int.MaxValue);              Array.Resize(ref buf, (int)paddedBufLenp);              paddedBufLenp = 0;              for (int i = bufOrigialSize; i < buf.Length; i++)             {                 SodiumPadding.Pad(ref paddedBufLenp, buf, (ulong)i, 32, int.MaxValue);             }              return buf;
         }
 
         /// <summary>
@@ -227,7 +227,16 @@ namespace TangramCypher.Helper.LibSodium
             if (data == null)
                 throw new ArgumentNullException(nameof(data));
 
-            ulong unpaddedBuflenp = 0;              for (int i = 0; i < data.Length; i++)             {                 var u = SodiumPadding.Unpad(ref unpaddedBuflenp, data, 1024, 256);                 if (u.Equals(0))                     Array.Resize(ref data, data.Length - 1);             }              return data;
+            var text = Encoding.UTF8.GetString(data);
+            var json = text.Substring(0, text.LastIndexOf("}", StringComparison.CurrentCulture) + 1);
+
+            return Encoding.UTF8.GetBytes(json);
+
+            //ulong unpaddedBuflenp = 0;
+            //int dataSize = 544;
+
+            //Array.Resize(ref data, dataSize);
+             //for (int i = dataSize; i >= 0; i--)             //{             //    var u = SodiumPadding.Unpad(ref unpaddedBuflenp, data, (ulong)i, 32);             //    if (u.Equals(0))             //        Array.Resize(ref data, data.Length - 1);             //}              //return data;
         }
 
     }

@@ -340,7 +340,8 @@ namespace TangramCypher.ApplicationLayer.Actor
                 throw new ArgumentException("message", nameof(cypher));
 
             var pk = DecodeAddress(address).ToArray();
-            var message = await ReadMessage(cypher, pk);
+            var notification = JObject.Parse(cypher).ToObject<NotificationDto>();
+            var message = await ReadMessage(notification.Body, pk);
             var (isPayment, store) = ParseMessage(message);
             var previousBal = await CheckBalance();
             var payment = await Payment(store);
@@ -486,7 +487,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         {
             if (string.IsNullOrEmpty(message))
                 throw new ArgumentException("message", nameof(message));
-
+                
             var jObject = JObject.Parse(message);
             var isPayment = jObject.Value<bool>("payment");
 
@@ -814,9 +815,9 @@ namespace TangramCypher.ApplicationLayer.Actor
             {
                 var message = Utilities.HexToBinary(Encoding.UTF8.GetString(Convert.FromBase64String(body)));
                 var opened = Cryptography.OpenBoxSeal(message, new KeyPair(pk, Utilities.HexToBinary(insecureSk.Value)));
-                var unpadded = Cryptography.Unpad(Encoding.UTF8.GetBytes(opened));
+                var unpadded = Cryptography.Unpad(opened.FromHex());
 
-                return Encoding.UTF8.GetString(Utilities.HexToBinary(Encoding.UTF8.GetString(unpadded)));
+                return Encoding.UTF8.GetString(unpadded);
             }
         }
 

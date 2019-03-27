@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -37,11 +37,12 @@
     <PackageReference Include="Serilog.Extensions.Logging.File" Version="1.1.0" />
     <PackageReference Include="Sodium.Core" Version="1.2.0" />
     <PackageReference Include="SimpleBase" Version="1.6.1" />
-    <PackageReference Include="Tangram.Tor" Version="1.0.2" />
+    <PackageReference Include="Tangram.Tor" Version="1.0.4" />
     <PackageReference Include="VaultSharp" Version="0.11.0" />
     <PackageReference Include="DotNetTor" Version="2.3.3" />
     <PackageReference Include="ReadablePassphrase" Version="1.1.2" />
     <PackageReference Include="ShellProgressBar" Version="4.2.0" />
+    <PackageReference Include="Secp256k1.ZKP.Net" Version="1.0.2" />
   </ItemGroup>
 
   <ItemGroup>
@@ -49,10 +50,7 @@
     <Folder Include="Helper\ZeroKP\" />
     <Folder Include="Helper\Http\" />
     <Folder Include="ApplicationLayer\Coin\" />
-    <Folder Include="Lib\" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Remove="Lib\Secp256k1-ZKP.Net.dll" />
+    <Folder Include="Helper\ShellProgress\" />
   </ItemGroup>
   <ItemGroup>
     <None Update="appsettings.json">
@@ -61,13 +59,5 @@
     <None Update="vault.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-  </ItemGroup>
-  <ItemGroup>
-    <Reference Include="Secp256k1-ZKP.Net">
-      <HintPath>Lib\Secp256k1-ZKP.Net.dll</HintPath>
-    </Reference>
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="Lib\Secp256k1-ZKP.Net.dll" />
   </ItemGroup>
 </Project>

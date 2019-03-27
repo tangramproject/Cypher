@@ -22,6 +22,7 @@ using System.Numerics;
 using System.Dynamic;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Logging;
+using Sodium;
 
 namespace TangramCypher.Helper
 {
@@ -143,6 +144,18 @@ namespace TangramCypher.Helper
             return content;
         }
 
+        public static string GetFileHash(FileInfo file)
+        {
+            return GetFileHash(file.FullName);
+        }
+
+        public static string GetFileHash(string fileFullName)
+        {
+            var bytes = File.ReadAllBytes(fileFullName);
+            var hash = CryptoHash.Sha256(bytes);
+            return Utilities.BinaryToHex(hash);
+        }
+
         [CLSCompliant(false)]
 #pragma warning disable CS3021 // Type or member does not need a CLSCompliant attribute because the assembly does not have a CLSCompliant attribute
         public static InsecureString Insecure(this SecureString secureString) => new InsecureString(secureString);
@@ -174,6 +187,14 @@ namespace TangramCypher.Helper
             console.WriteLine(e.ToString());
             logger.LogError(e, Environment.NewLine);
             console.ResetColor();
+        }
+
+        public static void LogWarning(IConsole console, ILogger logger, string message)
+        {
+            console.ForegroundColor = ConsoleColor.Yellow;
+            console.WriteLine(message);
+            console.ResetColor();
+            logger.LogWarning(message);
         }
     }
 }

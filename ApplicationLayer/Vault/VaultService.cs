@@ -15,10 +15,11 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
-using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security;
 using System.Text;
@@ -41,7 +42,8 @@ namespace TangramCypher.ApplicationLayer.Vault
         private static readonly FileInfo shardFile = new FileInfo(Path.Combine(tangramDirectory.FullName, "shard"));
         private static readonly FileInfo serviceTokenFile = new FileInfo(Path.Combine(tangramDirectory.FullName, "servicetoken"));
 
-        private FileInfo vaultExecutable;
+        private readonly string VaultVersion = "1.0.3";
+
         private Process vaultProcess;
 
         private IConsole console;
@@ -74,29 +76,134 @@ namespace TangramCypher.ApplicationLayer.Vault
             vaultClientSettings = new VaultClientSettings(endpoint, null);
         }
 
-        public void StartVaultService()
+        private static string VaultExecutableName
+        {
+            get
+            {
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    return "vault.exe";
+                }
+
+                return "vault";
+            }
+        }
+
+        private string CalculateExpectedVaultExecutableHash()
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) && RuntimeInformation.OSArchitecture == Architecture.X64)
+            {
+                return "1F3AA640273A90FBA56AE60D06AD15E9D42CA073148CE3F39C800D81D0949682";
+            }
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) && RuntimeInformation.OSArchitecture == Architecture.X86)
+            {
+                return "583DFE3D763DE2A548FB89FDDC8448357EDAD79670E41C8A083B88D9C5BF16BC";
+            }
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX) && RuntimeInformation.OSArchitecture == Architecture.X64)
+            {
+                return "0FB101283185CE6CA7260CA206CFC37F7EDC7EE8AB8682141325A44DE82670A5";
+            }
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX) && RuntimeInformation.OSArchitecture == Architecture.X86)
+            {
+                return "0FB101283185CE6CA7260CA206CFC37F7EDC7EE8AB8682141325A44DE82670A5";
+            }
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) && RuntimeInformation.OSArchitecture == Architecture.X64)
+            {
+                return "B65C20C555BF467D374A7CB984162BD9373313930D8F49570DF35C8B71F5352E";
+            }
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) && RuntimeInformation.OSArchitecture == Architecture.X86)
+            {
+                return "BEB53C4E6ED2930E7BA6143F383D29421DD657DB13927E01CEDB0067356C577B";
+            }
+
+            throw new Exception("Unable to determine vault executable hash based on current platform");
+        }
+
+        private string CalculateVaultExecutableUrl()
+        {
+            var filename = CalculateDownloadFilename();
+
+            return $"https://releases.hashicorp.com/vault/{VaultVersion}/{filename}";
+        }
+
+        private string CalculateDownloadFilename()
+        {
+            string os = Util.GetOSPlatform().ToString().ToLowerInvariant();
+
+            if (os == "osx")
+                os = "darwin";
+
+            string architecture = null;
+
+            switch (RuntimeInformation.OSArchitecture)
+            {
+                case Architecture.X64:
+                    architecture = "amd64";
+                    break;
+                case Architecture.X86:
+                    architecture = "386";
+                    break;
+                case Architecture.Arm:
+                    architecture = "arm";
+                    break;
+            }
+
+            if (string.IsNullOrEmpty(architecture))
+            {
+                throw new Exception("Unable derive supported architecture");
+            }
+
+            return $"vault_{VaultVersion}_{os}_{architecture}.zip";
+        }
+
+        private async Task DownloadVault()
+        {
+            using (var webClient = new WebClient())
+            {
+                var executableUrl = CalculateVaultExecutableUrl();
+                var fileName = CalculateDownloadFilename();
+
+                console.WriteLine($"Downloading {executableUrl}");
+
+                webClient.DownloadProgressChanged += WebClient_DownloadProgressChanged;
+                webClient.DownloadFileCompleted += WebClient_DownloadFileCompleted;
+
+                await webClient.DownloadFileTaskAsync(executableUrl, fileName);
+
+                console.WriteLine($"\nFinished Downloading Vault");
+
+                console.WriteLine($"Extracting {fileName}...");
+
+                ZipFile.ExtractToDirectory(fileName, ".", true);
+
+                console.WriteLine($"Finished Extracting {fileName}");
+
+                File.Delete(fileName);
+
+                console.WriteLine($"Deleted {fileName}");
+            }
+        }
+
+        private void WebClient_DownloadFileCompleted(object sender, System.ComponentModel.AsyncCompletedEventArgs e)
+        {
+            console.ResetColor();
+        }
+
+        private void WebClient_DownloadProgressChanged(object sender, DownloadProgressChangedEventArgs e)
+        {
+            console.ForegroundColor = ConsoleColor.Yellow;
+            console.Write($"\rDownloaded {e.ProgressPercentage}%");
+        }
+
+        public async Task StartVaultService()
         {
             //  Find Vault Executable
-            FileInfo[] fileInfo = null;
-
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                fileInfo = tangramDirectory.GetFiles("vault.exe", SearchOption.TopDirectoryOnly);
-            }
-            else
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) || RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            {
-                fileInfo = tangramDirectory.GetFiles("vault", SearchOption.TopDirectoryOnly);
-            }
-
-            if (fileInfo != null && fileInfo.Length == 1)
-            {
-                vaultExecutable = fileInfo[0];
-            }
-            else
-            {
-                throw new Exception("Unable to find Vault executable.");
-            }
+            await EnsureVaultExecutablePresent();
 
             //  Launch service
             console.ResetColor();
@@ -120,6 +227,44 @@ namespace TangramCypher.ApplicationLayer.Vault
             else
             {
                 StartVaultProcess();
+            }
+        }
+
+        private async Task EnsureVaultExecutablePresent()
+        {
+            if (VaultExecutable != null)
+            {
+                var checksum = Util.GetFileHash(VaultExecutable).ToUpperInvariant();
+
+                if (checksum != CalculateExpectedVaultExecutableHash())
+                {
+                    console.WriteLine("Your vault doesn't match the expected version. Automatically downloading...");
+                    await DownloadVault();
+                }
+                else
+                {
+                    console.WriteLine("Vault version matches expected hash.");
+                }
+            }
+            else
+            {
+                console.WriteLine("Unable to find Vault executable. Attempting to automatically download...");
+                await DownloadVault();
+            }
+        }
+
+        private FileInfo VaultExecutable
+        {
+            get
+            {
+                var fileInfo = tangramDirectory.GetFiles(VaultExecutableName, SearchOption.TopDirectoryOnly);
+
+                if (fileInfo != null && fileInfo.Length == 1)
+                {
+                    return fileInfo[0];
+                }
+
+                return null;
             }
         }
 
@@ -196,7 +341,7 @@ namespace TangramCypher.ApplicationLayer.Vault
             logger.LogInformation($"WorkingDirectory: {tangramDirectory.FullName}");
 
             vaultProcess = new Process();
-            vaultProcess.StartInfo.FileName = vaultExecutable.FullName;
+            vaultProcess.StartInfo.FileName = VaultExecutable.FullName;
             vaultProcess.StartInfo.Arguments = $"server -config {tangramDirectory.FullName}vault.json";
             vaultProcess.StartInfo.UseShellExecute = false;
             vaultProcess.StartInfo.CreateNoWindow = true;
@@ -395,12 +540,11 @@ namespace TangramCypher.ApplicationLayer.Vault
             console.WriteLine();
             console.WriteLine();
 
-            int i = 1;
-            foreach (var key in keys)
+            for(var i = 0; i < keys.Count; ++i)
             {
+                var key = keys.ElementAt(i);
                 console.ForegroundColor = ConsoleColor.Red;
-                console.WriteLine($"KEY {i}: {key}");
-                ++i;
+                console.WriteLine($"KEY {i+1}: {key}");
             }
 
             console.ForegroundColor = ConsoleColor.DarkRed;
@@ -687,7 +831,7 @@ namespace TangramCypher.ApplicationLayer.Vault
                 }
 
                 var vaultClientSettings = new VaultClientSettings(endpoint, new UserPassAuthMethodInfo(u.Value,
-                                                                                                   p.Value));
+                                                                                                       p.Value));
                 var vc = new VaultClient(vaultClientSettings);
 
                 var secret = await vc.V1.Secrets.KeyValue.V1.ReadSecretAsync(path);
@@ -711,7 +855,7 @@ namespace TangramCypher.ApplicationLayer.Vault
         {
             try
             {
-                await Task.Run(() => StartVaultService());
+                await Task.Run(async () => await StartVaultService());
             }
             catch(Exception e)
             {
@@ -732,3 +876,4 @@ namespace TangramCypher.ApplicationLayer.Vault
         }
     }
 }
+
