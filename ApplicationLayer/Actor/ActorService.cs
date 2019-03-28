@@ -346,10 +346,21 @@ namespace TangramCypher.ApplicationLayer.Actor
             if (payment)
             {
                 var availableBal = await CheckBalance();
-                return JObject.Parse(@"{success: true, message: { previous:" + previousBal + ", available:" + availableBal + "}}");
+                return JObject.FromObject(new {
+                    success = true,
+                    message = new {
+                        previous = previousBal,
+                        available = availableBal
+                    }
+                });
             }
 
-            return JObject.Parse(@"{success: false, message: { available:" + previousBal + "}}");
+            return JObject.FromObject(new {
+                success = false,
+                message = new {
+                    available = previousBal
+                }
+            });
         }
 
         /// <summary>
@@ -484,7 +495,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         {
             if (string.IsNullOrEmpty(message))
                 throw new ArgumentException("message", nameof(message));
-                
+
             var jObject = JObject.Parse(message);
             var isPayment = jObject.Value<bool>("payment");
 
@@ -523,7 +534,10 @@ namespace TangramCypher.ApplicationLayer.Actor
             var pk = DecodeAddress(To()).ToArray();
             var notificationAddress = Cryptography.GenericHashWithKey(pk.ToHex(), pk);
             var senderPk = PublicKey().ToUnSecureString();
-            var innerMessage = JObject.Parse(@"{payment: false, store:'" + EncodeAddress(senderPk) + "'}");
+            var innerMessage = JObject.FromObject(new {
+                payment = false,
+                store = EncodeAddress(senderPk)
+            });
             var paddedBuf = Cryptography.Pad(innerMessage.ToString());
             var cypher = Cypher(Encoding.UTF8.GetString(paddedBuf), pk);
             var payload = new MessageDto
@@ -556,7 +570,13 @@ namespace TangramCypher.ApplicationLayer.Actor
             var bal = await CheckBalance();
 
             if (bal < Amount())
-                return JObject.Parse(@"{success: false, message: { available:" + bal + ", spend:" + Amount() + "}}");
+                return JObject.FromObject(new {
+                    success = false,
+                    message = new {
+                        available = bal,
+                        spend = Amount()
+                    }
+                });
 
             await SetSecretKey();
 
@@ -564,7 +584,10 @@ namespace TangramCypher.ApplicationLayer.Actor
             var coins = await PostCoinsAsync(spendCoins);
 
             if (coins == null)
-                return JObject.Parse(@"{success: false, message:'Coins failed to post!'}");
+                return JObject.FromObject(new {
+                    success = false,
+                    message = "Coins failed to post!"
+                });
 
             await AddWalletTransactions(coins);
 
@@ -576,7 +599,10 @@ namespace TangramCypher.ApplicationLayer.Actor
             receiverCoin = await AddAsync(receiverCoin.FormatCoinToBase64(), RestApiMethod.PostCoin);
 
             if (receiverCoin == null)
-                return JObject.Parse(@"{success: false, message:'Receiver coin failed!'}");
+                return JObject.FromObject(new {
+                    success = false,
+                    message = "Receiver coin failed!"
+                });
 
             var message = await BuildRedemptionKeyMessage(receiverOutput, receiverCoin.FormatCoinFromBase64());
 
@@ -664,7 +690,10 @@ namespace TangramCypher.ApplicationLayer.Actor
                 Memo = Memo(),
                 Stamp = coin.Stamp
             };
-            var innerMessage = JObject.Parse(@"{payment: true, store:" + JsonConvert.SerializeObject(redemption) + "}");
+            var innerMessage = JObject.FromObject(new {
+                payment = true,
+                store = JsonConvert.SerializeObject(redemption)
+            });
             var paddedBuf = Cryptography.Pad(innerMessage.ToString());
             var cypher = Cypher(Encoding.UTF8.GetString(paddedBuf), pk);
             var sharedKey = await ToSharedKey(pk.ToArray());
@@ -764,16 +793,25 @@ namespace TangramCypher.ApplicationLayer.Actor
             var msg = await EstablishPubKeyMessage();
 
             if (msg == null)
-                return JObject.Parse(@"{success: 'false', message:'First Message failed to send!'}");
+                return JObject.FromObject(new {
+                    success = false,
+                    message = "First message failed to send!"
+                });
 
             await Task.Delay(3000);
 
             msg = await AddAsync(message, RestApiMethod.PostMessage);
 
             if (msg == null)
-                return JObject.Parse(@"{success: false, message:'Second message failed to send!'}");
+                return JObject.FromObject(new {
+                    success = false,
+                    message = "Second message failed to send!"
+                });
 
-            return JObject.Parse(@"{success: true, message:'Message sent.'}");
+            return JObject.FromObject(new {
+                success = true,
+                message = "Message sent."
+            });
         }
 
         /// <summary>
