@@ -18,5 +18,6 @@ namespace TangramCypher.ApplicationLayer.Coin
         public string Principle { get; set; }
         public string Stamp { get; set; }
         public int Version { get; set; }
+        public string Network { get; set; }
     }
 }

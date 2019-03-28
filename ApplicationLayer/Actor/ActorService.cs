@@ -20,7 +20,6 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using SimpleBase;
 using Sodium;
-using TangramCypher.ApplicationLayer.Helper.ZeroKP;
 using TangramCypher.ApplicationLayer.Wallet;
 using TangramCypher.Helper;
 using TangramCypher.Helper.Http;
@@ -41,7 +40,6 @@ namespace TangramCypher.ApplicationLayer.Actor
         protected SecureString identifier;
 
         private readonly IConfigurationSection apiRestSection;
-        private readonly IConfigurationSection apiOnionSection;
         private readonly ILogger logger;
         private readonly IOnionService onionService;
         private readonly IWalletService walletService;
@@ -60,7 +58,6 @@ namespace TangramCypher.ApplicationLayer.Actor
                 new Client();
 
             apiRestSection = configuration.GetSection(Constant.ApiGateway);
-            apiOnionSection = configuration.GetSection(Constant.Onion);
         }
 
         /// <summary>
@@ -575,6 +572,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             coinService.ClearCache();
 
+            receiverCoin.Network = walletService.NetworkAddress(receiverCoin).ToHex();
             receiverCoin = await AddAsync(receiverCoin.FormatCoinToBase64(), RestApiMethod.PostCoin);
 
             if (receiverCoin == null)
@@ -642,25 +640,6 @@ namespace TangramCypher.ApplicationLayer.Actor
         }
 
         /// <summary>
-        /// Returns provers password.
-        /// </summary>
-        /// <returns>The password.</returns>
-        /// <param name="password">Password.</param>
-        /// <param name="version">Version.</param>
-        public string ProverPassword(SecureString password, int version)
-        {
-            if (password == null)
-                throw new ArgumentNullException(nameof(password));
-
-            using (var insecurePassword = password.Insecure())
-            {
-                var hash = Cryptography.GenericHashNoKey(string.Format("{0} {1}", version, insecurePassword.Value));
-
-                return Prover.GetHashStringNumber(hash).ToByteArray().ToHex();
-            }
-        }
-
-        /// <summary>
         /// Builds the redemption key message.
         /// </summary>
         /// <returns>The redemption key message.</returns>
@@ -721,6 +700,8 @@ namespace TangramCypher.ApplicationLayer.Actor
                   .Version(makeChange.Transaction.Version)
                   .BuildSender();
             }
+
+            coin.Network =  walletService.NetworkAddress(coin).ToHex();
 
             return new List<CoinDto> { coin };
         }

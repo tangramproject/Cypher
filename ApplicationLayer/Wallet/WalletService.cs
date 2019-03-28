@@ -17,16 +17,25 @@ using SimpleBase;
 using TangramCypher.ApplicationLayer.Vault;
 using TangramCypher.Helper;
 using TangramCypher.Helper.LibSodium;
+using TangramCypher.ApplicationLayer.Coin;
+using TangramCypher.ApplicationLayer.Actor;
+using System.Text;
+using TangramCypher.ApplicationLayer.Helper.ZeroKP;
+using Microsoft.Extensions.Configuration;
 
 namespace TangramCypher.ApplicationLayer.Wallet
 {
     public class WalletService : IWalletService
     {
         private readonly IVaultService vaultService;
-
-        public WalletService(IVaultService vaultService)
+        private readonly IConfigurationSection apiNetworkSection;
+        private readonly string environment;
+        public WalletService(IVaultService vaultService, IConfiguration configuration)
         {
             this.vaultService = vaultService;
+
+            apiNetworkSection = configuration.GetSection(Constant.ApiNetwork);
+            environment = apiNetworkSection.GetValue<string>(Constant.Environment);
         }
 
         /// <summary>
@@ -90,7 +99,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
             {
                 PublicKey = kp.PublicKey.ToHex(),
                 SecretKey = kp.SecretKey.ToHex(),
-                Address = Base58.Bitcoin.Encode(kp.PublicKey)
+                Address = Encoding.UTF8.GetString(NetworkAddress(kp.PublicKey))
             };
         }
 
@@ -448,6 +457,76 @@ namespace TangramCypher.ApplicationLayer.Wallet
             transactionChange.Transaction = coins.FirstOrDefault(a => a.Amount.Equals(closest));
 
             return transactionChange;
+        }
+
+        /// <summary>
+        /// Network address.
+        /// </summary>
+        /// <returns>The address.</returns>
+        /// <param name="coin">Coin.</param>
+        /// <param name="networkApi">Network API.</param>
+        public byte[] NetworkAddress(CoinDto coin, NetworkApiMethod networkApi = null)
+        {
+            string env = string.Empty;
+            byte[] address = new byte[33];
+
+            env = networkApi == null ? environment : networkApi.ToString();
+            address[0] = networkApi.ToString().Equals(env) ? (byte)0x1 : (byte)74;
+
+            var hash = Cryptography.GenericHashWithKey(
+                $"{coin.Envelope.Commitment}" +
+                $" {coin.Envelope.Proof}" +
+                $" {coin.Envelope.PublicKey}" +
+                $" {coin.Envelope.Signature}" +
+                $" {coin.Hash}" +
+                $" {coin.Hint}" +
+                $" {coin.Keeper}" +
+                $" {coin.Principle}" +
+                $" {coin.Stamp}" +
+                $" {coin.Version}",
+                Encoding.UTF8.GetBytes(coin.Principle));
+
+            Array.Copy(hash, 0, address, 1, 32);
+
+            return Encoding.UTF8.GetBytes(Base58.Bitcoin.Encode(address));
+        }
+
+        /// <summary>
+        /// Network address.
+        /// </summary>
+        /// <returns>The address.</returns>
+        /// <param name="pk">Pk.</param>
+        /// <param name="networkApi">Network API.</param>
+        public byte[] NetworkAddress(byte[] pk, NetworkApiMethod networkApi = null)
+        {
+            string env = string.Empty;
+            byte[] address = new byte[33];
+
+            env = networkApi == null ? environment : networkApi.ToString();
+            address[0] = networkApi.ToString().Equals(env) ? (byte)0x1 : (byte)74;
+
+            Array.Copy(pk, 0, address, 1, 32);
+
+            return Encoding.UTF8.GetBytes(Base58.Bitcoin.Encode(address));
+        }
+
+        /// <summary>
+        /// Returns provers password.
+        /// </summary>
+        /// <returns>The password.</returns>
+        /// <param name="password">Password.</param>
+        /// <param name="version">Version.</param>
+        public string ProverPassword(SecureString password, int version)
+        {
+            if (password == null)
+                throw new ArgumentNullException(nameof(password));
+
+            using (var insecurePassword = password.Insecure())
+            {
+                var hash = Cryptography.GenericHashNoKey(string.Format("{0} {1}", version, insecurePassword.Value));
+
+                return Prover.GetHashStringNumber(hash).ToByteArray().ToHex();
+            }
         }
     }
 }

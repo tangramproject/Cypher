@@ -9,6 +9,8 @@
 using System.Collections.Generic;
 using System.Security;
 using System.Threading.Tasks;
+using TangramCypher.ApplicationLayer.Actor;
+using TangramCypher.ApplicationLayer.Coin;
 
 namespace TangramCypher.ApplicationLayer.Wallet
 {
@@ -29,5 +31,8 @@ namespace TangramCypher.ApplicationLayer.Wallet
         Task<TransactionChange> MakeChange(SecureString identifier, SecureString password, double amount, string stamp);
         Task AddMessageTracking(SecureString identifier, SecureString password, MessageTrackDto messageTrack);
         Task<MessageTrackDto> MessageTrack(SecureString identifier, SecureString password, string pk);
+        byte[] NetworkAddress(CoinDto coin, NetworkApiMethod networkApi = null);
+        byte[] NetworkAddress(byte[] pk, NetworkApiMethod networkApi = null);
+        string ProverPassword(SecureString password, int version);
     }
 }

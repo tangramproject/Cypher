@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.Security;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
+using TangramCypher.ApplicationLayer.Coin;
 using TangramCypher.ApplicationLayer.Wallet;
 
 namespace TangramCypher.ApplicationLayer.Actor
@@ -44,6 +45,5 @@ namespace TangramCypher.ApplicationLayer.Actor
         Task<JObject> SendPayment(bool sendMessage);
         string To();
         ActorService To(string address);
-        string ProverPassword(SecureString password, int version);
     }
 }
