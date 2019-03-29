@@ -16,6 +16,7 @@ namespace Cypher.ApplicationLayer.Onion
         bool OnionStarted { get; }
         string SocksHost { get; }
         int SocksPort { get; }
+        int ControlPort { get; }
         int OnionEnabled { get; }
 
         void ChangeCircuit(SecureString password);

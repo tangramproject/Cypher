@@ -42,7 +42,6 @@ namespace Cypher.ApplicationLayer.Onion
         readonly ILogger logger;
         readonly IConsole console;
         readonly string controlHost;
-        readonly int controlPort;
         readonly string onionDirectory;
         readonly string torrcPath;
         readonly string controlPortPath;
@@ -57,6 +56,7 @@ namespace Cypher.ApplicationLayer.Onion
         public string SocksHost { get; }
         public int SocksPort { get; }
         public int OnionEnabled { get; }
+        public int ControlPort { get; }
 
         public OnionService(IConfiguration configuration, ILogger logger, IConsole console)
         {
@@ -68,7 +68,7 @@ namespace Cypher.ApplicationLayer.Onion
             SocksHost = onionSection.GetValue<string>(SOCKS_HOST);
             SocksPort = onionSection.GetValue<int>(SOCKS_PORT);
             controlHost = onionSection.GetValue<string>(CONTROL_HOST);
-            controlPort = onionSection.GetValue<int>(CONTROL_PORT);
+            ControlPort = onionSection.GetValue<int>(CONTROL_PORT);
             hiddenServicePort = onionSection.GetValue<string>(HIDDEN_SERVICE_PORT);
             OnionEnabled = onionSection.GetValue<int>(ONION_ENABLED);
 
@@ -89,7 +89,7 @@ namespace Cypher.ApplicationLayer.Onion
             {
                 using (var insecurePassword = password.Insecure())
                 {
-                    var controlPortClient = new DotNetTor.ControlPort.Client(controlHost, controlPort, insecurePassword.Value);
+                    var controlPortClient = new DotNetTor.ControlPort.Client(controlHost, ControlPort, insecurePassword.Value);
                     controlPortClient.ChangeCircuitAsync().Wait();
                 }
             }
@@ -162,7 +162,7 @@ namespace Cypher.ApplicationLayer.Onion
             {
                 using (var insecurePassword = password.Insecure())
                 {
-                    var controlPortClient = new DotNetTor.ControlPort.Client(controlHost, controlPort, insecurePassword.Value);
+                    var controlPortClient = new DotNetTor.ControlPort.Client(controlHost, ControlPort, insecurePassword.Value);
                     var result = controlPortClient.SendCommandAsync(command).GetAwaiter().GetResult();
                 }
             }
@@ -215,19 +215,15 @@ namespace Cypher.ApplicationLayer.Onion
                 "AvoidDiskWrites 1",
                 $"HashedControlPassword {hashedPassword}",
                 "SocksPort auto IPv6Traffic PreferIPv6 KeepAliveIsolateSOCKSAuth",
-                "ControlPort auto",
                 "CookieAuthentication 1",
-                $"HiddenServiceDir {hiddenServicePath}",
-                $"HiddenServicePort {hiddenServicePort}",
-                "HiddenServiceVersion 3",
                 "CircuitBuildTimeout 10",
                 "KeepalivePeriod 60",
                 "NumEntryGuards 8",
-                $"SocksPort {SocksPort}",
+                $"ControlPort {ControlPort}",
                 "Log notice stdout",
                 $"DataDirectory {onionDirectory}",
                 $"ControlPortWriteToFile {controlPortPath}",
-                $"ClientTransportPlugin obfs4 exec {obfs4proxy} managed"
+                $"ClientTransportPlugin obfs4 exec {obfs4proxy}"
             };
 
             try
@@ -260,38 +256,41 @@ namespace Cypher.ApplicationLayer.Onion
                 catch { }
             }
 
-            return port == 0 ? controlPort : port;
+            return port == 0 ? ControlPort : port;
         }
 
         async Task StartTorProcess()
         {
-            TorProcess = new Process();
-            TorProcess.StartInfo.FileName = GetTorFileName();
-            TorProcess.StartInfo.Arguments = $"-f \"{torrcPath}\"";
-            TorProcess.StartInfo.UseShellExecute = false;
-            TorProcess.StartInfo.CreateNoWindow = true;
-            TorProcess.StartInfo.RedirectStandardOutput = true;
-            TorProcess.OutputDataReceived += (sender, e) =>
-            {
-                if (!string.IsNullOrEmpty(e.Data))
-                {
-                    if (e.Data.Contains("Bootstrapped 100%: Done"))
-                    {
-                        OnionStarted = true;
-                        console.ResetColor();
-                        logger.LogInformation("tor Started!");
-                    }
-
-                    logger.LogInformation(e.Data);
-                }
-            };
-
-            TorProcess.Start();
-
             if (torId.Equals(0))
+            {
+                TorProcess = new Process();
+                TorProcess.StartInfo.FileName = GetTorFileName();
+                TorProcess.StartInfo.Arguments = $"-f \"{torrcPath}\"";
+                TorProcess.StartInfo.UseShellExecute = false;
+                TorProcess.StartInfo.CreateNoWindow = true;
+                TorProcess.StartInfo.RedirectStandardOutput = true;
+                TorProcess.OutputDataReceived += (sender, e) =>
+                {
+                    if (!string.IsNullOrEmpty(e.Data))
+                    {
+                        if (e.Data.Contains("Bootstrapped 100%: Done"))
+                        {
+                            OnionStarted = true;
+                            console.ResetColor();
+                            logger.LogInformation("tor Started!");
+                        }
+
+                        logger.LogInformation(e.Data);
+                    }
+                };
+
+                TorProcess.Start();
+
                 torId = TorProcess.Id;
 
-            await Task.Run(() => TorProcess.BeginOutputReadLine());
+                await Task.Run(() => TorProcess.BeginOutputReadLine());
+            }
+
         }
 
         public override void Dispose()
