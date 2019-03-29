@@ -14,6 +14,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using DotNetTor.SocksPort;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -22,12 +23,16 @@ namespace TangramCypher.Helper.Http
     public class Client
     {
         private readonly SocksPortHandler socksPortHandler;
+        private readonly ILogger logger;
 
-        public Client()
-        { }
-
-        public Client(SocksPortHandler socksPortHandler)
+        public Client(ILogger logger)
         {
+            this.logger = logger;
+        }
+
+        public Client(ILogger logger, SocksPortHandler socksPortHandler)
+        {
+            this.logger = logger;
             this.socksPortHandler = socksPortHandler;
         }
 
@@ -168,12 +173,32 @@ namespace TangramCypher.Helper.Http
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine(ex.Message);
+                        logger.LogError(ex.StackTrace);
                     }
                 }
             }
 
             return null;
         }
+
+        /// <summary>
+        /// Changes the tor circuit.
+        /// </summary>
+        /// <param name="host">Host.</param>
+        /// <param name="port">Port.</param>
+        public void ChangeCircuit(string host, int port)
+        {
+            try
+            {
+                var controlPortClient = new DotNetTor.ControlPort.Client(host, port);
+                controlPortClient.ChangeCircuitAsync().Wait();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex.StackTrace);
+            }
+        }
+
     }
 }
+

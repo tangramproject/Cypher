@@ -45,7 +45,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         private readonly IWalletService walletService;
         private readonly ICoinService coinService;
         private readonly Client client;
-
+   
         public ActorService(IOnionService onionService, IWalletService walletService, ICoinService coinService, IConfiguration configuration, ILogger logger)
         {
             this.onionService = onionService;
@@ -54,10 +54,11 @@ namespace TangramCypher.ApplicationLayer.Actor
             this.logger = logger;
 
             client = onionService.OnionEnabled.Equals(1) ?
-                new Client(new DotNetTor.SocksPort.SocksPortHandler(onionService.SocksHost, onionService.SocksPort)) :
-                new Client();
+                new Client(logger, new DotNetTor.SocksPort.SocksPortHandler(onionService.SocksHost, onionService.SocksPort)) :
+                new Client(logger);
 
             apiRestSection = configuration.GetSection(Constant.ApiGateway);
+
         }
 
         /// <summary>
@@ -76,7 +77,9 @@ namespace TangramCypher.ApplicationLayer.Actor
             var path = apiRestSection.GetSection(Constant.Routing).GetValue<string>(apiMethod.ToString());
             var jObject = await client.PostAsync(payload, baseAddress, path, new CancellationToken());
 
-            return jObject.ToObject<T>();
+            client.ChangeCircuit(onionService.SocksHost, onionService.ControlPort);
+
+            return jObject == null ? (default) : jObject.ToObject<T>();
         }
 
         /// <summary>
@@ -93,9 +96,11 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             var baseAddress = GetBaseAddress();
             var path = string.Format(apiRestSection.GetSection(Constant.Routing).GetValue<string>(apiMethod.ToString()), address);
-            var message = await client.GetAsync<T>(baseAddress, path, new CancellationToken());
+            var jObject = await client.GetAsync<T>(baseAddress, path, new CancellationToken());
 
-            return message.ToObject<T>();
+            client.ChangeCircuit(onionService.SocksHost, onionService.ControlPort);
+
+            return jObject == null ? (default) : jObject.ToObject<T>();
         }
 
         /// <summary>
@@ -116,6 +121,8 @@ namespace TangramCypher.ApplicationLayer.Actor
             var path = string.Format(apiRestSection.GetSection(Constant.Routing).GetValue<string>(apiMethod.ToString()), address, skip, take);
             var returnMessages = await client.GetRangeAsync(baseAddress, path, new CancellationToken());
             var messages = returnMessages.Select(m => m.ToObject<T>());
+
+            client.ChangeCircuit(onionService.SocksHost, onionService.ControlPort);
 
             return Task.FromResult(messages).Result;
         }
@@ -531,7 +538,12 @@ namespace TangramCypher.ApplicationLayer.Actor
         {
             await SetPublicKey();
 
-            var pk = DecodeAddress(To()).ToArray();
+            var networkAddress = DecodeAddress(To()).ToArray();
+
+            byte[] pk = new byte[32];
+
+            Array.Copy(networkAddress, 1, pk, 0, 32);
+
             var notificationAddress = Cryptography.GenericHashWithKey(pk.ToHex(), pk);
             var senderPk = PublicKey().ToUnSecureString();
             var innerMessage = JObject.FromObject(new {
@@ -679,7 +691,6 @@ namespace TangramCypher.ApplicationLayer.Actor
                 throw new ArgumentNullException(nameof(coin));
 
             var (key1, key2) = coinService.HotRelease(coin.Version, coin.Stamp, From());
-            var pk = DecodeAddress(To()).ToArray();
             var redemption = new RedemptionKeyDto
             {
                 Amount = receiverOutput.Amount,
@@ -695,6 +706,12 @@ namespace TangramCypher.ApplicationLayer.Actor
                 store = JsonConvert.SerializeObject(redemption)
             });
             var paddedBuf = Cryptography.Pad(innerMessage.ToString());
+            var networkAddress = DecodeAddress(To()).ToArray();
+
+            byte[] pk = new byte[32];
+
+            Array.Copy(networkAddress, 1, pk, 0, 32);
+
             var cypher = Cypher(Encoding.UTF8.GetString(paddedBuf), pk);
             var sharedKey = await ToSharedKey(pk.ToArray());
             var notificationAddress = Cryptography.GenericHashWithKey(sharedKey.ToHex(), pk);
@@ -706,6 +723,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             return message;
         }
+
 
         /// TODO: Now operating on a single coin as the output will create a new block. 
         /// We need to handle mutiple coins...
@@ -776,6 +794,8 @@ namespace TangramCypher.ApplicationLayer.Actor
             var tasks = coins.Select(coin => AddAsync(coin.FormatCoinToBase64(), RestApiMethod.PostCoin));
             var results = await Task.WhenAll(tasks);
             var json = await results.AsJson().ReadAsStringAsync();
+
+            if (json.Equals("[null]")) return null;
 
             return JToken.Parse(json).ToObject<IEnumerable<CoinDto>>();
         }
