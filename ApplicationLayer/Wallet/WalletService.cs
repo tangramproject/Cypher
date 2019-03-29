@@ -471,7 +471,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
             byte[] address = new byte[33];
 
             env = networkApi == null ? environment : networkApi.ToString();
-            address[0] = networkApi.ToString().Equals(env) ? (byte)0x1 : (byte)74;
+            address[0] = env == Constant.Mainnet ? (byte)0x1 : (byte)74;
 
             var hash = Cryptography.GenericHashWithKey(
                 $"{coin.Envelope.Commitment}" +
@@ -503,7 +503,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
             byte[] address = new byte[33];
 
             env = networkApi == null ? environment : networkApi.ToString();
-            address[0] = networkApi.ToString().Equals(env) ? (byte)0x1 : (byte)74;
+            address[0] = env == Constant.Mainnet ? (byte)0x1 : (byte)74;
 
             Array.Copy(pk, 0, address, 1, 32);
 
