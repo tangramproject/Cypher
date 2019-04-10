@@ -181,24 +181,6 @@ namespace TangramCypher.Helper.Http
             return null;
         }
 
-        /// <summary>
-        /// Changes the tor circuit.
-        /// </summary>
-        /// <param name="host">Host.</param>
-        /// <param name="port">Port.</param>
-        public void ChangeCircuit(string host, int port)
-        {
-            try
-            {
-                var controlPortClient = new DotNetTor.ControlPort.Client(host, port);
-                controlPortClient.ChangeCircuitAsync().Wait();
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex.StackTrace);
-            }
-        }
-
     }
 }
 
