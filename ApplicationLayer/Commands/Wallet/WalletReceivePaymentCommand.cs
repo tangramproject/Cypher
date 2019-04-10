@@ -16,6 +16,8 @@ using TangramCypher.Helper;
 using TangramCypher.ApplicationLayer.Wallet;
 using TangramCypher.Helper.LibSodium;
 using System.Collections.Generic;
+using Kurukuru;
+using System.Security;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
 {
@@ -52,16 +54,20 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
 
                     if (!string.IsNullOrEmpty(address))
                     {
-                        await actorService
-                          .From(password)
-                          .Identifier(identifier)
-                          .ReceivePayment(address);
+                        await Spinner.StartAsync("Processing receive payment ...", async spinner =>
+                        {
+                            await actorService
+                                      .From(password)
+                                      .Identifier(identifier)
+                                      .ReceivePayment(address);
 
-                        var total = await walletService.AvailableBalance(identifier, password);
+                            spinner.Text = "Fetching balance ...";
 
-                        console.ForegroundColor = ConsoleColor.Magenta;
-                        console.WriteLine($"\nWallet balance: {total}\n");
-                        console.ForegroundColor = ConsoleColor.White;
+                            await Task.Delay(1500);
+                            await CheckBalance(identifier, password);
+
+                            spinner.Text = "Done ...";
+                        });
                     }
                 }
             }
@@ -69,6 +75,15 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
             {
                 throw ex;
             }
+        }
+
+        private async Task CheckBalance(SecureString identifier, SecureString password)
+        {
+            var total = await walletService.AvailableBalance(identifier, password);
+
+            console.ForegroundColor = ConsoleColor.Magenta;
+            console.WriteLine($"\nAvailable Balance: {total}\n");
+            console.ForegroundColor = ConsoleColor.White;
         }
     }
 }

@@ -16,6 +16,11 @@ using TangramCypher.Helper;
 using Newtonsoft.Json;
 using System.Text;
 using System.IO;
+using System.Threading;
+using Kurukuru;
+using Newtonsoft.Json.Linq;
+using TangramCypher.ApplicationLayer.Wallet;
+using System.Security;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
 {
@@ -25,6 +30,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
         readonly IActorService actorService;
         readonly IConsole console;
         readonly IVaultService vaultService;
+        readonly IWalletService walletService;
 
         private static readonly DirectoryInfo tangramDirectory = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
 
@@ -33,6 +39,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
             actorService = serviceProvider.GetService<IActorService>();
             console = serviceProvider.GetService<IConsole>();
             vaultService = serviceProvider.GetService<IVaultService>();
+            walletService = serviceProvider.GetService<IWalletService>();
         }
         public override async Task Execute()
         {
@@ -53,48 +60,38 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
 
                     if (double.TryParse(amount, out double t))
                     {
-                        var message =
-                            await actorService
-                                    .From(password)
-                                    .Identifier(identifier)
-                                    .Amount(t)
-                                    .To(address)
-                                    .Memo(memo)
-                                    .SendPayment(yesNo);
+                        Newtonsoft.Json.Linq.JObject payment;
 
-                        if (yesNo.Equals(false))
+                        await Spinner.StartAsync("Processing payment ...", async spinner =>
                         {
-                            var notification = message.ToObject<NotificationDto>();
+                            spinner.Color = ConsoleColor.Blue;
 
-                            console.ForegroundColor = ConsoleColor.Magenta;
-                            console.WriteLine("\nOptions:");
-                            console.WriteLine("Save redemption key to file [1]");
-                            console.WriteLine("Copy redemption key from console [2]\n");
+                            payment = await actorService
+                                             .From(password)
+                                             .Identifier(identifier)
+                                             .Amount(t)
+                                             .To(address)
+                                             .Memo(memo)
+                                             .SendPayment(yesNo);
 
-                            var option = Prompt.GetInt("Select option:", 1, ConsoleColor.Yellow);
+                            spinner.Text = "Fetching balance ...";
+                            await Task.Delay(1500);
 
-                            console.ForegroundColor = ConsoleColor.White;
+                            await CheckBalance(identifier, password);
 
-                            var content =
-                                "--------------Begin Redemption Key--------------" +
-                                Environment.NewLine +
-                                JsonConvert.SerializeObject(notification) +
-                                Environment.NewLine +
-                                "--------------End Redemption Key----------------";
+                            spinner.Text = "Done ...";
 
-                            if (option.Equals(1))
-                            {
-                                var path = $"{tangramDirectory}redem{DateTime.Now.GetHashCode()}.rdkey";
-                                File.WriteAllText(path, content);
-                                console.WriteLine($"\nSaved path: {path}\n");
-                            }
+                            if (yesNo.Equals(false))
+                                SaveRedemptionKeyLocal(spinner, payment);
                             else
-                                console.WriteLine($"\n{content}\n");
+                            {
+                                var success = payment.GetValue("success");
+                                var message = payment.GetValue("message");
 
-                            return;
-                        }
-
-                        console.WriteLine(JsonConvert.SerializeObject(message));
+                                if (success.ToObject<bool>().Equals(false))
+                                    spinner.Fail(message.ToObject<string>());
+                            }
+                        });
                     }
                 }
             }
@@ -102,6 +99,47 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
             {
                 throw ex;
             }
+        }
+
+        private void SaveRedemptionKeyLocal(Spinner spinner, JObject payment)
+        {
+            spinner.Stop();
+
+            var notification = payment.ToObject<NotificationDto>();
+
+            console.ForegroundColor = ConsoleColor.Magenta;
+            console.WriteLine("\nOptions:");
+            console.WriteLine("Save redemption key to file [1]");
+            console.WriteLine("Copy redemption key from console [2]\n");
+
+            var option = Prompt.GetInt("Select option:", 1, ConsoleColor.Yellow);
+
+            console.ForegroundColor = ConsoleColor.White;
+
+            var content =
+                "--------------Begin Redemption Key--------------" +
+                Environment.NewLine +
+                JsonConvert.SerializeObject(notification) +
+                Environment.NewLine +
+                "--------------End Redemption Key----------------";
+
+            if (option.Equals(1))
+            {
+                var path = $"{tangramDirectory}redem{DateTime.Now.GetHashCode()}.rdkey";
+                File.WriteAllText(path, content);
+                console.WriteLine($"\nSaved path: {path}\n");
+            }
+            else
+                console.WriteLine($"\n{content}\n");
+        }
+
+        private async Task CheckBalance(SecureString identifier, SecureString password)
+        {
+            var total = await walletService.AvailableBalance(identifier, password);
+
+            console.ForegroundColor = ConsoleColor.Magenta;
+            console.WriteLine($"\nAvailable Balance: {total}\n");
+            console.ForegroundColor = ConsoleColor.White;
         }
     }
 }

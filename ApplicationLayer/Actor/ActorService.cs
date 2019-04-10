@@ -58,7 +58,6 @@ namespace TangramCypher.ApplicationLayer.Actor
                 new Client(logger);
 
             apiRestSection = configuration.GetSection(Constant.ApiGateway);
-
         }
 
         /// <summary>
@@ -77,7 +76,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             var path = apiRestSection.GetSection(Constant.Routing).GetValue<string>(apiMethod.ToString());
             var jObject = await client.PostAsync(payload, baseAddress, path, new CancellationToken());
 
-            client.ChangeCircuit(onionService.SocksHost, onionService.ControlPort);
+            onionService.ChangeCircuit("ILoveTangram".ToSecureString());
 
             return jObject == null ? (default) : jObject.ToObject<T>();
         }
@@ -98,7 +97,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             var path = string.Format(apiRestSection.GetSection(Constant.Routing).GetValue<string>(apiMethod.ToString()), address);
             var jObject = await client.GetAsync<T>(baseAddress, path, new CancellationToken());
 
-            client.ChangeCircuit(onionService.SocksHost, onionService.ControlPort);
+            onionService.ChangeCircuit("ILoveTangram".ToSecureString());
 
             return jObject == null ? (default) : jObject.ToObject<T>();
         }
@@ -122,7 +121,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             var returnMessages = await client.GetRangeAsync(baseAddress, path, new CancellationToken());
             var messages = returnMessages.Select(m => m.ToObject<T>());
 
-            client.ChangeCircuit(onionService.SocksHost, onionService.ControlPort);
+            onionService.ChangeCircuit("ILoveTangram".ToSecureString());
 
             return Task.FromResult(messages).Result;
         }
@@ -818,7 +817,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                     message = "First message failed to send!"
                 });
 
-            await Task.Delay(3000);
+            await Task.Delay(500);
 
             msg = await AddAsync(message, RestApiMethod.PostMessage);
 

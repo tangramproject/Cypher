@@ -135,7 +135,7 @@ namespace TangramCypher.Helper
             formattedCoin.Hash = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Hash));
             formattedCoin.Hint = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Hint));
             formattedCoin.Keeper = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Keeper));
-            formattedCoin.Network = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Network));
+            // formattedCoin.Network = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Network));
             formattedCoin.Principle = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Principle));
             formattedCoin.Stamp = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Stamp));
             formattedCoin.Version = coin.Version;
