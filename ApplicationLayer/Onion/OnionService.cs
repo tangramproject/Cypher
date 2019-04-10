@@ -99,6 +99,29 @@ namespace Cypher.ApplicationLayer.Onion
             }
         }
 
+        public async Task<bool> CircuitEstablished(SecureString password)
+        {
+            if (password == null)
+                throw new ArgumentNullException(nameof(password));
+
+            bool hasCircuit = false;
+
+            try
+            {
+                using (var insecurePassword = password.Insecure())
+                {
+                    var controlPortClient = new DotNetTor.ControlPort.Client(controlHost, ControlPort, insecurePassword.Value);
+                    hasCircuit = await controlPortClient.IsCircuitEstablishedAsync();
+                }
+            }
+            catch (DotNetTor.TorException ex)
+            {
+                console.WriteLine(ex.Message);
+            }
+
+            return hasCircuit;
+        }
+
         public void GenerateHashPassword(SecureString password)
         {
             using (var insecurePassword = password.Insecure())
@@ -214,8 +237,6 @@ namespace Cypher.ApplicationLayer.Onion
             var torrcContent = new string[] {
                 "AvoidDiskWrites 1",
                 $"HashedControlPassword {hashedPassword}",
-                "SocksPort auto IPv6Traffic PreferIPv6 KeepAliveIsolateSOCKSAuth",
-                "CookieAuthentication 1",
                 "CircuitBuildTimeout 10",
                 "KeepalivePeriod 60",
                 "NumEntryGuards 8",

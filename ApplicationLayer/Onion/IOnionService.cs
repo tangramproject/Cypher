@@ -8,6 +8,7 @@
 
 using Microsoft.Extensions.Hosting;
 using System.Security;
+using System.Threading.Tasks;
 
 namespace Cypher.ApplicationLayer.Onion
 {
@@ -20,6 +21,7 @@ namespace Cypher.ApplicationLayer.Onion
         int OnionEnabled { get; }
 
         void ChangeCircuit(SecureString password);
+        Task<bool> CircuitEstablished(SecureString password);
         void Dispose();
         void GenerateHashPassword(SecureString password);
         void SendCommands(string command, SecureString password);
