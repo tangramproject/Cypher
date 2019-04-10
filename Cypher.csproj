@@ -41,8 +41,8 @@
     <PackageReference Include="VaultSharp" Version="0.11.0" />
     <PackageReference Include="DotNetTor" Version="2.3.3" />
     <PackageReference Include="ReadablePassphrase" Version="1.1.2" />
-    <PackageReference Include="ShellProgressBar" Version="4.2.0" />
     <PackageReference Include="Secp256k1.ZKP.Net" Version="1.0.4" />
+    <PackageReference Include="Kurukuru" Version="1.1.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -50,7 +50,6 @@
     <Folder Include="Helper\ZeroKP\" />
     <Folder Include="Helper\Http\" />
     <Folder Include="ApplicationLayer\Coin\" />
-    <Folder Include="Helper\ShellProgress\" />
   </ItemGroup>
   <ItemGroup>
     <None Update="appsettings.json">
