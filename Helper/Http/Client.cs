@@ -52,30 +52,40 @@ namespace TangramCypher.Helper.Http
             if (string.IsNullOrEmpty(path))
                 throw new ArgumentException("Path is missing!", nameof(path));
 
+            JObject result = null;
+
             using (var client = socksPortHandler == null ? new HttpClient() : new HttpClient(socksPortHandler))
             {
                 client.BaseAddress = baseAddress;
                 client.DefaultRequestHeaders.Accept.Clear();
                 client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
-                using (var request = new HttpRequestMessage(HttpMethod.Get, path))
-                using (var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
+                try
                 {
-                    var stream = await response.Content.ReadAsStreamAsync();
-
-                    if (response.IsSuccessStatusCode)
+                    using (var request = new HttpRequestMessage(HttpMethod.Get, path))
+                    using (var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
                     {
-                        var result = Util.DeserializeJsonFromStream<JObject>(stream);
-                        return Task.FromResult(result).Result;
+                        var stream = await response.Content.ReadAsStreamAsync();
+
+                        if (response.IsSuccessStatusCode)
+                            result = Util.DeserializeJsonFromStream<JObject>(stream);
+                        else
+                        {
+                            var content = await Util.StreamToStringAsync(stream);
+                            throw new ApiException
+                            {
+                                StatusCode = (int)response.StatusCode,
+                                Content = content
+                            };
+                        }
                     }
-
-                    var content = await Util.StreamToStringAsync(stream);
-                    throw new ApiException
-                    {
-                        StatusCode = (int)response.StatusCode,
-                        Content = content
-                    };
                 }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex.StackTrace);
+                }
+
+                return Task.FromResult(result).Result;
             }
         }
 
@@ -94,30 +104,40 @@ namespace TangramCypher.Helper.Http
             if (string.IsNullOrEmpty(path))
                 throw new ArgumentException("Path is missing!", nameof(path));
 
+            IEnumerable<JObject> results = null;
+
             using (var client = socksPortHandler == null ? new HttpClient() : new HttpClient(socksPortHandler))
             {
                 client.BaseAddress = baseAddress;
                 client.DefaultRequestHeaders.Accept.Clear();
                 client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
-                using (var request = new HttpRequestMessage(HttpMethod.Get, path))
-                using (var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
+                try
                 {
-                    var stream = await response.Content.ReadAsStreamAsync();
-
-                    if (response.IsSuccessStatusCode)
+                    using (var request = new HttpRequestMessage(HttpMethod.Get, path))
+                    using (var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
                     {
-                        var result = Util.DeserializeJsonEnumerable<JObject>(stream);
-                        return Task.FromResult(result).Result;
+                        var stream = await response.Content.ReadAsStreamAsync();
+
+                        if (response.IsSuccessStatusCode)
+                            results = Util.DeserializeJsonEnumerable<JObject>(stream);
+                        else
+                        {
+                            var content = await Util.StreamToStringAsync(stream);
+                            throw new ApiException
+                            {
+                                StatusCode = (int)response.StatusCode,
+                                Content = content
+                            };
+                        }
                     }
-
-                    var content = await Util.StreamToStringAsync(stream);
-                    throw new ApiException
-                    {
-                        StatusCode = (int)response.StatusCode,
-                        Content = content
-                    };
                 }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex.StackTrace);
+                }
+
+                return Task.FromResult(results).Result;
             }
         }
 

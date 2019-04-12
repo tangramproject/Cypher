@@ -196,5 +196,18 @@ namespace TangramCypher.Helper
             console.ResetColor();
             logger.LogWarning(message);
         }
+
+        public static byte[] FormatNetworkAddress(byte[] networkAddress)
+        {
+            try
+            {
+                byte[] pk = new byte[32];
+                Array.Copy(networkAddress, 1, pk, 0, 32);
+                return pk;
+            }
+            catch { }
+
+            return networkAddress;
+        }
     }
 }
