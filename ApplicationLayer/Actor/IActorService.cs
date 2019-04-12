@@ -11,13 +11,14 @@ using System.Collections.Generic;
 using System.Security;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
-using TangramCypher.ApplicationLayer.Coin;
 using TangramCypher.ApplicationLayer.Wallet;
 
 namespace TangramCypher.ApplicationLayer.Actor
 {
     public interface IActorService
     {
+        event MessagePumpEventHandler MessagePump;
+
         Task<T> AddAsync<T>(T payload, RestApiMethod apiMethod);
         double Amount();
         ActorService Amount(double value);
