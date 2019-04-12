@@ -14,8 +14,6 @@ using Microsoft.Extensions.DependencyInjection;
 using TangramCypher.ApplicationLayer.Actor;
 using TangramCypher.Helper;
 using TangramCypher.ApplicationLayer.Wallet;
-using TangramCypher.Helper.LibSodium;
-using System.Collections.Generic;
 using Kurukuru;
 using System.Security;
 
@@ -29,13 +27,17 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
         readonly IVaultService vaultService;
         readonly IWalletService walletService;
 
+        private Spinner spinner;
+
         public WalletReceivePaymentCommand(IServiceProvider serviceProvider)
         {
             actorService = serviceProvider.GetService<IActorService>();
             console = serviceProvider.GetService<IConsole>();
             vaultService = serviceProvider.GetService<IVaultService>();
             walletService = serviceProvider.GetService<IWalletService>();
-        }
+
+            actorService.MessagePump += ActorService_MessagePump;
+        }         
 
         public override async Task Execute()
         {
@@ -56,6 +58,8 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                     {
                         await Spinner.StartAsync("Processing receive payment ...", async spinner =>
                         {
+                            this.spinner = spinner;
+
                             await actorService
                                       .From(password)
                                       .Identifier(identifier)
@@ -84,6 +88,11 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
             console.ForegroundColor = ConsoleColor.Magenta;
             console.WriteLine($"\nAvailable Balance: {total}\n");
             console.ForegroundColor = ConsoleColor.White;
+        }
+
+        private void ActorService_MessagePump(object sender, MessagePumpEventArgs e)
+        {
+            spinner.Text = e.Message;
         }
     }
 }

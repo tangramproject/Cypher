@@ -32,6 +32,8 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
         readonly IVaultService vaultService;
         readonly IWalletService walletService;
 
+        private Spinner spinner;
+
         private static readonly DirectoryInfo tangramDirectory = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
 
         public WalletTransferCommand(IServiceProvider serviceProvider)
@@ -40,6 +42,8 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
             console = serviceProvider.GetService<IConsole>();
             vaultService = serviceProvider.GetService<IVaultService>();
             walletService = serviceProvider.GetService<IWalletService>();
+
+            actorService.MessagePump += ActorService_MessagePump;
         }
         public override async Task Execute()
         {
@@ -60,10 +64,11 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
 
                     if (double.TryParse(amount, out double t))
                     {
-                        Newtonsoft.Json.Linq.JObject payment;
+                        JObject payment;
 
                         await Spinner.StartAsync("Processing payment ...", async spinner =>
                         {
+                            this.spinner = spinner;
                             spinner.Color = ConsoleColor.Blue;
 
                             payment = await actorService
@@ -141,5 +146,11 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
             console.WriteLine($"\nAvailable Balance: {total}\n");
             console.ForegroundColor = ConsoleColor.White;
         }
+
+        private void ActorService_MessagePump(object sender, MessagePumpEventArgs e)
+        {
+            spinner.Text = e.Message;
+        }
+
     }
 }
