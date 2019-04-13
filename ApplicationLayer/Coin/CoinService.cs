@@ -1,8 +1,8 @@
 ﻿// Cypher (c) by Tangram Inc
-// 
+//
 // Cypher is licensed under a
 // Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International License.
-// 
+//
 // You should have received a copy of the license along with this
 // work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
 
@@ -150,8 +150,11 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// <param name="blind">Blind.</param>
         public byte[] Commit(ulong amount, byte[] blind)
         {
-            if ((blind == null) && (blind.Length > 32))
+            if (blind == null)
                 throw new ArgumentNullException(nameof(blind));
+
+            if (blind.Length > 32)
+                throw new IndexOutOfRangeException(nameof(blind));
 
             using (var pedersen = new Pedersen())
             {
@@ -304,7 +307,7 @@ namespace TangramCypher.ApplicationLayer.Coin
         }
 
         /// <summary>
-        ///  Releases two secret keys to continue hashchaing for sender/recipient. 
+        ///  Releases two secret keys to continue hashchaing for sender/recipient.
         /// </summary>
         /// <returns>The release.</returns>
         /// <param name="version">Version.</param>
