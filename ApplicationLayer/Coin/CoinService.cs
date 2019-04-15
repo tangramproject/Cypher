@@ -456,8 +456,11 @@ namespace TangramCypher.ApplicationLayer.Coin
             if (password == null)
                 throw new ArgumentNullException(nameof(password));
 
-            if ((msg == null) && (msg.Length > 32))
+            if (msg == null)
                 throw new ArgumentNullException(nameof(msg));
+
+            if (msg.Length > 32)
+                throw new IndexOutOfRangeException(nameof(msg));
 
             using (var secp256k1 = new Secp256k1())
             {
@@ -476,8 +479,11 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// <param name="msg">Message.</param>
         public byte[] Sign(ulong amount, byte[] msg)
         {
-            if ((msg == null) && (msg.Length > 32))
+            if (msg == null)
                 throw new ArgumentNullException(nameof(msg));
+
+            if (msg.Length > 32)
+                throw new IndexOutOfRangeException(nameof(msg));
 
             using (var secp256k1 = new Secp256k1())
             {
@@ -497,11 +503,17 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// <param name="blinding">Blinding.</param>
         public byte[] SignWithBlinding(byte[] msg, byte[] blinding)
         {
-            if ((msg == null) && (msg.Length > 32))
+            if (msg == null)
                 throw new ArgumentNullException(nameof(msg));
 
-            if ((blinding == null) && (blinding.Length > 32))
+            if (msg.Length > 32)
+                throw new IndexOutOfRangeException(nameof(msg));
+
+            if (blinding == null)
                 throw new ArgumentNullException(nameof(blinding));
+
+            if (blinding.Length > 32)
+                throw new IndexOutOfRangeException(nameof(blinding));
 
             using (var secp256k1 = new Secp256k1())
             {
@@ -518,8 +530,11 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// <param name="blinding">Blinding.</param>
         public (byte[], byte[]) Split(byte[] blinding)
         {
-            if ((blinding == null) && (blinding.Length > 32))
+            if (blinding == null)
                 throw new ArgumentNullException(nameof(blinding));
+
+            if (blinding.Length > 32)
+                throw new IndexOutOfRangeException(nameof(blinding));
 
             using (var pedersen = new Pedersen())
             {
@@ -719,14 +734,23 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// <param name="commitNeg">Commit neg.</param>
         private CoinDto BuildCoin(byte[] blindSum, byte[] commitPos, byte[] commitNeg, bool receiver = false)
         {
-            if ((blindSum == null) && (blindSum.Length > 32))
+            if (blindSum == null)
                 throw new ArgumentNullException(nameof(blindSum));
 
-            if ((commitPos == null) && (commitPos.Length > 33))
+            if (blindSum.Length > 32)
+                throw new IndexOutOfRangeException(nameof(blindSum));
+
+            if (commitPos == null)
                 throw new ArgumentNullException(nameof(commitPos));
 
-            if ((commitNeg == null) && (commitNeg.Length > 33))
+            if (commitPos.Length > 33)
+                throw new IndexOutOfRangeException(nameof(commitPos));
+
+            if (commitNeg == null)
                 throw new ArgumentNullException(nameof(commitNeg));
+
+            if (commitNeg.Length > 33)
+                throw new IndexOutOfRangeException(nameof(commitNeg));
 
             CoinDto coin;
             bool isVerified;
