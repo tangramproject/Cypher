@@ -14,9 +14,7 @@ using Microsoft.Extensions.DependencyInjection;
 using TangramCypher.ApplicationLayer.Actor;
 using TangramCypher.Helper;
 using Newtonsoft.Json;
-using System.Text;
 using System.IO;
-using System.Threading;
 using Kurukuru;
 using Newtonsoft.Json.Linq;
 using TangramCypher.ApplicationLayer.Wallet;
@@ -52,8 +50,8 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                 using (var identifier = Prompt.GetPasswordAsSecureString("Identifier:", ConsoleColor.Yellow))
                 using (var password = Prompt.GetPasswordAsSecureString("Password:", ConsoleColor.Yellow))
                 {
-                    var amount = Prompt.GetString("Amount:", null, ConsoleColor.Red);
                     var address = Prompt.GetString("To:", null, ConsoleColor.Red);
+                    var amount = Prompt.GetString("Amount:", null, ConsoleColor.Red);
                     var memo = Prompt.GetString("Memo:", null, ConsoleColor.Green);
                     var yesNo = Prompt.GetYesNo("Send redemption key to message pool?", true, ConsoleColor.Yellow);
 
@@ -69,7 +67,6 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                         await Spinner.StartAsync("Processing payment ...", async spinner =>
                         {
                             this.spinner = spinner;
-                            spinner.Color = ConsoleColor.Blue;
 
                             payment = await actorService
                                              .From(password)
@@ -79,23 +76,17 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                                              .Memo(memo)
                                              .SendPayment(yesNo);
 
-                            spinner.Text = "Fetching balance ...";
-                            await Task.Delay(1500);
+                            var success = payment.GetValue("success").ToObject<bool>();
+                            if (success.Equals(false))
+                            {
+                                spinner.Fail(payment.GetValue("message").ToObject<string>());
+                                return;
+                            }
 
-                            await CheckBalance(identifier, password);
-
-                            spinner.Text = "Done ...";
+                            spinner.Succeed($"Available Balance: {Convert.ToString(await CheckBalance(identifier, password))}");
 
                             if (yesNo.Equals(false))
-                                SaveRedemptionKeyLocal(spinner, payment);
-                            else
-                            {
-                                var success = payment.GetValue("success");
-                                var message = payment.GetValue("message");
-
-                                if (success.ToObject<bool>().Equals(false))
-                                    spinner.Fail(message.ToObject<string>());
-                            }
+                                SaveRedemptionKeyLocal(payment);
                         });
                     }
                 }
@@ -106,11 +97,9 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
             }
         }
 
-        private void SaveRedemptionKeyLocal(Spinner spinner, JObject payment)
+        private void SaveRedemptionKeyLocal(JObject payment)
         {
-            spinner.Stop();
-
-            var notification = payment.ToObject<NotificationDto>();
+            var notification = payment.GetValue("message").ToObject<NotificationDto>();
 
             console.ForegroundColor = ConsoleColor.Magenta;
             console.WriteLine("\nOptions:");
@@ -138,13 +127,9 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                 console.WriteLine($"\n{content}\n");
         }
 
-        private async Task CheckBalance(SecureString identifier, SecureString password)
+        private async Task<double> CheckBalance(SecureString identifier, SecureString password)
         {
-            var total = await walletService.AvailableBalance(identifier, password);
-
-            console.ForegroundColor = ConsoleColor.Magenta;
-            console.WriteLine($"\nAvailable Balance: {total}\n");
-            console.ForegroundColor = ConsoleColor.White;
+            return await walletService.AvailableBalance(identifier, password);
         }
 
         private void ActorService_MessagePump(object sender, MessagePumpEventArgs e)

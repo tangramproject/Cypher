@@ -609,7 +609,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             await AddWalletTransactions(coins);
 
-            UpdateMessagePump("Sending coin ...");
+            UpdateMessagePump("Sending receiver coin ...");
 
             var (receiverOutput, receiverCoin) = coinService.BuildReceiver();
 
@@ -628,9 +628,16 @@ namespace TangramCypher.ApplicationLayer.Actor
             var message = await BuildRedemptionKeyMessage(receiverOutput, receiverCoin.FormatCoinFromBase64());
 
             if (sendMessage)
+            {
+                UpdateMessagePump("Sending redemption key ...");
                 return await SendMessage(message);
+            }
 
-            return JObject.Parse(JsonConvert.SerializeObject(message));
+            return JObject.FromObject(new
+            {
+                success = true,
+                message
+            });
         }
 
         /// <summary>
@@ -730,7 +737,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         }
 
 
-        /// TODO: Now operating on a single coin as the output will create a new block. 
+        /// TODO: Operating on a single coin as the output will create a new block. 
         /// We need to handle mutiple coins...
 
         /// <summary>
@@ -796,13 +803,24 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <param name="coins">Coins.</param>
         private async Task<IEnumerable<CoinDto>> PostCoinsAsync(IEnumerable<CoinDto> coins)
         {
-            var tasks = coins.Select(coin => AddAsync(coin.FormatCoinToBase64(), RestApiMethod.PostCoin));
-            var results = await Task.WhenAll(tasks);
-            var json = await results.AsJson().ReadAsStringAsync();
+            IEnumerable<CoinDto> coinDtos = null;
 
-            if (json.Equals("[null]") || json == null) return null;
+            try
+            {
+                var tasks = coins.Select(coin => AddAsync(coin.FormatCoinToBase64(), RestApiMethod.PostCoin));
+                var results = await Task.WhenAll(tasks);
+                var json = await results.AsJson().ReadAsStringAsync();
 
-            return JToken.Parse(json).ToObject<IEnumerable<CoinDto>>();
+                if (json == null || json.Equals("[null]")) return null;
+
+                coinDtos = JToken.Parse(json).ToObject<IEnumerable<CoinDto>>();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex.Message);
+            }
+
+            return coinDtos;
         }
 
         /// <summary>

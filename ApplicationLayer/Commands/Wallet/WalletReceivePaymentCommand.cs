@@ -56,7 +56,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
 
                     if (!string.IsNullOrEmpty(address))
                     {
-                        await Spinner.StartAsync("Processing receive payment ...", async spinner =>
+                        await Spinner.StartAsync("Processing receive payment(s) ...", async spinner =>
                         {
                             this.spinner = spinner;
 
@@ -65,12 +65,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                                       .Identifier(identifier)
                                       .ReceivePayment(address);
 
-                            spinner.Text = "Fetching balance ...";
-
-                            await Task.Delay(1500);
-                            await CheckBalance(identifier, password);
-
-                            spinner.Text = "Done ...";
+                            spinner.Text = $"Available Balance: {Convert.ToString(await CheckBalance(identifier, password))}";
                         });
                     }
                 }
@@ -81,13 +76,9 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
             }
         }
 
-        private async Task CheckBalance(SecureString identifier, SecureString password)
+        private async Task<double> CheckBalance(SecureString identifier, SecureString password)
         {
-            var total = await walletService.AvailableBalance(identifier, password);
-
-            console.ForegroundColor = ConsoleColor.Magenta;
-            console.WriteLine($"\nAvailable Balance: {total}\n");
-            console.ForegroundColor = ConsoleColor.White;
+           return await walletService.AvailableBalance(identifier, password);
         }
 
         private void ActorService_MessagePump(object sender, MessagePumpEventArgs e)
