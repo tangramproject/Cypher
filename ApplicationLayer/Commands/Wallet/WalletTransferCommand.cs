@@ -79,7 +79,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                             var success = payment.GetValue("success").ToObject<bool>();
                             if (success.Equals(false))
                             {
-                                spinner.Fail(payment.GetValue("message").ToObject<string>());
+                                spinner.Fail(JsonConvert.SerializeObject(payment.GetValue("message")));
                                 return;
                             }
 

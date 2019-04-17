@@ -14,9 +14,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Vault
     [CommandDescriptor(new string[] { "setnodeendpoint" }, "Set contact endpoint")]
     public class SetNodeEndpointCommand : Command
     {
-#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
         public override async Task Execute()
-#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
         {
             throw new NotImplementedException();
         }
