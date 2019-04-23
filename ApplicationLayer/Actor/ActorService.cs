@@ -361,6 +361,13 @@ namespace TangramCypher.ApplicationLayer.Actor
         public async Task<List<TransactionDto>> Sync()
         {
             var transactions = await walletService.Transactions(Identifier(), From());
+
+            if (transactions == null)
+            {
+                UpdateMessagePump("Nothing to sync ...");
+                return null;
+            }
+
             var tasks = transactions.Select(tx => GetAsync<CoinDto>(tx.Hash, RestApiMethod.Coin));
             var results = await Task.WhenAll(tasks);
             var coins = results.Where(c => c != null).ToList();
@@ -374,7 +381,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             UpdateMessagePump("Synced wallet ...");
 
-            return transactions;
+            return newTransactions;
         }
 
         /// <summary>
@@ -422,7 +429,8 @@ namespace TangramCypher.ApplicationLayer.Actor
                         Take = take
                     };
 
-                    await walletService.AddMessageTracking(Identifier(), From(), track);
+                    //TODO: Could possibility fail.. need recovery..
+                    var added = await walletService.AddMessageTracking(Identifier(), From(), track);
                 }
 
                 skip++;
@@ -509,9 +517,16 @@ namespace TangramCypher.ApplicationLayer.Actor
         {
             Guard.Argument(message, nameof(message)).NotNull().NotEmpty();
 
-            var jObject = JObject.Parse(message);
-
-            return (jObject.Value<bool>("payment"), jObject.Value<string>("store"));
+            try
+            {
+                var jObject = JObject.Parse(message);
+                return (jObject.Value<bool>("payment"), jObject.Value<string>("store"));
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex.Message);
+                throw ex;
+            }
         }
 
         /// <summary>
@@ -554,9 +569,9 @@ namespace TangramCypher.ApplicationLayer.Actor
                 Address = notificationAddress.ToBase64(),
                 Body = cypher.ToBase64()
             };
-            var message = await AddAsync(payload, RestApiMethod.PostMessage);
+            var msg = await AddAsync(payload, RestApiMethod.PostMessage);
 
-            return message;
+            return msg;
         }
 
         /// <summary>
@@ -564,10 +579,23 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// </summary>
         /// <returns>The address.</returns>
         /// <param name="pk">Pk.</param>
-        private static string EncodeAddress(string pk)
+        private string EncodeAddress(string pk)
         {
             Guard.Argument(pk, nameof(pk)).NotNull().NotEmpty();
-            return Base58.Bitcoin.Encode(Utilities.HexToBinary(pk));
+
+            string address = null;
+
+            try
+            {
+                address = Base58.Bitcoin.Encode(Utilities.HexToBinary(pk));
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex.Message);
+                throw ex;
+            }
+
+            return address;
         }
 
         /// <summary>
@@ -654,6 +682,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             }
             catch (Exception ex)
             {
+                logger.LogError(ex.Message);
                 throw ex;
             }
         }
@@ -670,6 +699,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             }
             catch (Exception ex)
             {
+                logger.LogError(ex.Message);
                 throw ex;
             }
         }
@@ -838,14 +868,25 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             await SetSecretKey();
 
+            string unpadded = null;
+
             using (var insecureSk = SecretKey().Insecure())
             {
-                var message = Utilities.HexToBinary(Encoding.UTF8.GetString(Convert.FromBase64String(body)));
-                var opened = Cryptography.OpenBoxSeal(message, new KeyPair(pk, Utilities.HexToBinary(insecureSk.Value)));
-                var unpadded = Cryptography.Unpad(opened.FromHex());
+                try
+                {
+                    var message = Utilities.HexToBinary(Encoding.UTF8.GetString(Convert.FromBase64String(body)));
+                    var opened = Cryptography.OpenBoxSeal(message, new KeyPair(pk, Utilities.HexToBinary(insecureSk.Value)));
 
-                return Encoding.UTF8.GetString(unpadded);
+                    unpadded = Encoding.UTF8.GetString((Cryptography.Unpad(opened.FromHex())));
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex.Message);
+                    throw ex;
+                }
             }
+
+            return unpadded;
         }
 
         /// <summary>
