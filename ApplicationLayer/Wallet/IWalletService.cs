@@ -21,18 +21,18 @@ namespace TangramCypher.ApplicationLayer.Wallet
         SecureString NewID(int bytes = 32);
         SecureString Passphrase();
         byte[] HashPassword(SecureString passphrase);
-        Task AddTransaction(SecureString identifier, SecureString password, TransactionDto transaction);
+        Task<bool> AddTransaction(SecureString identifier, SecureString password, TransactionDto transaction);
         Task<TransactionDto> Transaction(SecureString identifier, SecureString password, string hash);
         Task<List<TransactionDto>> Transactions(SecureString identifier, SecureString password);
         Task<List<TransactionDto>> Transactions(SecureString identifier, SecureString password, string stamp);
         Task<double> TransactionAmount(SecureString identifier, SecureString password, string stamp);
         Task<SecureString> StoreKey(SecureString identifier, SecureString password, string storeKey);
-        Task<TransactionChange> MakeChange(SecureString identifier, SecureString password, double amount);
-        Task<TransactionChange> MakeChange(SecureString identifier, SecureString password, double amount, string stamp);
-        Task AddMessageTracking(SecureString identifier, SecureString password, MessageTrackDto messageTrack);
+        Task<TransactionIndicator> SortChange(SecureString identifier, SecureString password, double amount, string stamp = null);
+        Task<bool> AddMessageTracking(SecureString identifier, SecureString password, MessageTrackDto messageTrack);
         Task<MessageTrackDto> MessageTrack(SecureString identifier, SecureString password, string pk);
         byte[] NetworkAddress(CoinDto coin, NetworkApiMethod networkApi = null);
         byte[] NetworkAddress(byte[] pk, NetworkApiMethod networkApi = null);
         string ProverPassword(SecureString password, int version);
+        Task<bool> ClearTransactions(SecureString identifier, SecureString password);
     }
 }

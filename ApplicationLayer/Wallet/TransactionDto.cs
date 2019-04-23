@@ -11,6 +11,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
 {
     public enum TransactionType
     {
+        Change,
         Send,
         Receive
     }

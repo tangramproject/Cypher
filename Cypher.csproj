@@ -43,13 +43,18 @@
     <PackageReference Include="ReadablePassphrase" Version="1.1.2" />
     <PackageReference Include="Secp256k1.ZKP.Net" Version="1.0.4" />
     <PackageReference Include="Kurukuru" Version="1.1.0" />
+    <PackageReference Include="Dawn.Guard" Version="1.8.0" />
   </ItemGroup>
-
+  
   <ItemGroup>
-    <Folder Include="ApplicationLayer\Onion\" />
-    <Folder Include="Helper\ZeroKP\" />
-    <Folder Include="Helper\Http\" />
-    <Folder Include="ApplicationLayer\Coin\" />
+    <None Include="**/*" />
+    <None Include="**/*" />
+    <None Include="**/*" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Remove="bin\Debug\netcoreapp2.2\onion\control-port" />
+    <None Remove="bin\Debug\netcoreapp2.2\onion\control-port" />
+    <None Remove="bin\Debug\netcoreapp2.2\onion\control-port" />
   </ItemGroup>
   <ItemGroup>
     <None Update="appsettings.json">

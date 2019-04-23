@@ -9,6 +9,7 @@
 using System;
 using System.Security;
 using System.Text;
+using Dawn;
 using Sodium;
 
 namespace TangramCypher.Helper.LibSodium
@@ -23,11 +24,8 @@ namespace TangramCypher.Helper.LibSodium
         /// <param name="pk">Pk.</param>
         public static byte[] BoxSeal(string message, byte[] pk)
         {
-            if (string.IsNullOrEmpty(message))
-                throw new ArgumentException("message", nameof(message));
-
-            if (pk == null)
-                throw new ArgumentNullException(nameof(pk));
+            Guard.Argument(message, nameof(message)).NotNull().NotEmpty();
+            Guard.Argument(pk, nameof(pk)).NotNull().MaxCount(32);
 
             var encrypted = SealedPublicKeyBox.Create(Encoding.UTF8.GetBytes(message), pk);
             return encrypted;
@@ -41,16 +39,16 @@ namespace TangramCypher.Helper.LibSodium
         /// <param name="bytes">Bytes.</param>
         public static byte[] GenericHashNoKey(string message, int bytes = 32)
         {
-            if (string.IsNullOrEmpty(message))
-                throw new ArgumentException("Message cannot be null or empty!", nameof(message));
+            Guard.Argument(message, nameof(message)).NotNull().NotEmpty();
+            Guard.Argument(bytes, nameof(bytes)).NotNegative();
 
             return GenericHash.Hash(Encoding.UTF8.GetBytes(message), null, bytes);
         }
 
         public static byte[] GenericHashNoKey(byte[] message, int bytes = 32)
         {
-            if (message == null)
-                throw new ArgumentNullException(nameof(message));
+            Guard.Argument(message, nameof(message)).NotNull().NotEmpty();
+            Guard.Argument(bytes, nameof(bytes)).NotNegative();
 
             return GenericHash.Hash(message, null, bytes);
         }
@@ -64,8 +62,9 @@ namespace TangramCypher.Helper.LibSodium
         /// <param name="bytes">Bytes.</param>
         public static byte[] GenericHashWithKey(string message, byte[] key, int bytes = 32)
         {
-            if (string.IsNullOrEmpty(message))
-                throw new ArgumentException("Message cannot be null or empty!", nameof(message));
+            Guard.Argument(message, nameof(message)).NotNull().NotEmpty();
+            Guard.Argument(key, nameof(key)).NotNull();
+            Guard.Argument(bytes, nameof(bytes)).NotNegative();
 
             return GenericHash.Hash(Encoding.UTF8.GetBytes(message), key, bytes);
         }
@@ -77,8 +76,7 @@ namespace TangramCypher.Helper.LibSodium
         /// <param name="password">Password.</param>
         public static byte[] ArgonHashPassword(SecureString password)
         {
-            if (password == null)
-                throw new ArgumentNullException(nameof(password));
+            Guard.Argument(password, nameof(password)).NotNull();
 
             const long OPS_LIMIT = 4;
             const int MEM_LIMIT = 33554432;
@@ -102,15 +100,12 @@ namespace TangramCypher.Helper.LibSodium
             return new KeyPairDto() { PublicKey = kp.PublicKey, SecretKey = kp.PrivateKey };
         }
 
-        public static string OpenBoxSeal(byte[] cipher, KeyPair keyPair)
+        public static string OpenBoxSeal(byte[] cypher, KeyPair keyPair)
         {
-            if (cipher == null)
-                throw new ArgumentNullException(nameof(cipher));
+            Guard.Argument(cypher, nameof(cypher)).NotNull();
+            Guard.Argument(keyPair, nameof(keyPair)).NotNull();
 
-            if (keyPair == null)
-                throw new ArgumentNullException(nameof(keyPair));
-
-            var decrypted = SealedPublicKeyBox.Open(cipher, keyPair);
+            var decrypted = SealedPublicKeyBox.Open(cypher, keyPair);
             return Encoding.UTF8.GetString(decrypted);
         }
 
@@ -121,6 +116,7 @@ namespace TangramCypher.Helper.LibSodium
         /// <param name="bytes">Bytes.</param>
         public static byte[] RandomBytes(int bytes = 32)
         {
+            Guard.Argument(bytes, nameof(bytes)).NotNegative();
             return SodiumCore.GetRandomBytes(bytes);
         }
 
@@ -140,6 +136,7 @@ namespace TangramCypher.Helper.LibSodium
         /// <param name="n">N.</param>
         public static int RandomNumbers(int n)
         {
+            Guard.Argument(n, nameof(n)).NotNegative();
             return SodiumCore.GetRandomNumber(n);
         }
 
@@ -150,9 +147,7 @@ namespace TangramCypher.Helper.LibSodium
         /// <param name="sk">Sk.</param>
         public static byte[] ScalarBase(byte[] sk)
         {
-            if (sk == null)
-                throw new ArgumentNullException(nameof(sk));
-
+            Guard.Argument(sk, nameof(sk)).NotNull().MaxCount(32);
             return Sodium.ScalarMult.Base(sk);
         }
 
@@ -164,11 +159,8 @@ namespace TangramCypher.Helper.LibSodium
         /// <param name="pk">Pk.</param>
         public static byte[] ScalarMult(byte[] sk, byte[] pk)
         {
-            if (sk == null)
-                throw new ArgumentNullException(nameof(sk));
-
-            if (pk == null)
-                throw new ArgumentNullException(nameof(pk));
+            Guard.Argument(sk, nameof(sk)).NotNull().MaxCount(32);
+            Guard.Argument(pk, nameof(pk)).NotNull().MaxCount(32);
 
             return Sodium.ScalarMult.Mult(sk, pk);
         }
@@ -181,6 +173,9 @@ namespace TangramCypher.Helper.LibSodium
         /// <param name="key">Key.</param>
         public static byte[] ShortHash(string message, byte[] key)
         {
+            Guard.Argument(message, nameof(message)).NotNull().NotEmpty();
+            Guard.Argument(key, nameof(key)).NotNull().MaxCount(32);
+
             return Sodium.ShortHash.Hash(message, key);
         }
 
@@ -192,11 +187,8 @@ namespace TangramCypher.Helper.LibSodium
         /// <param name="pwd">Pwd.</param>
         public static bool VerifiyPwd(byte[] hash, byte[] pwd)
         {
-            if (hash == null)
-                throw new ArgumentNullException(nameof(hash));
-
-            if (pwd == null)
-                throw new ArgumentNullException(nameof(pwd));
+            Guard.Argument(hash, nameof(hash)).NotNull();
+            Guard.Argument(pwd, nameof(pwd)).NotNull();
 
             return PasswordHash.ArgonHashStringVerify(hash, pwd);
         }
@@ -210,8 +202,7 @@ namespace TangramCypher.Helper.LibSodium
         /// <param name="text">Text.</param>
         public static byte[] Pad(string text)
         {
-            if (string.IsNullOrEmpty(text))
-                throw new ArgumentException("message", nameof(text));
+            Guard.Argument(text, nameof(text)).NotNull().NotEmpty();
 
             var buf = Encoding.UTF8.GetBytes(text);             var bufOrigialSize = buf.Length;             ulong paddedBufLenp = 0;              Array.Resize(ref buf, 540);              SodiumPadding.Pad(ref paddedBufLenp, buf, (ulong)buf.Length, 32, int.MaxValue);              Array.Resize(ref buf, (int)paddedBufLenp);              paddedBufLenp = 0;              for (int i = bufOrigialSize; i < buf.Length; i++)             {                 SodiumPadding.Pad(ref paddedBufLenp, buf, (ulong)i, 32, int.MaxValue);             }              return buf;
         }
@@ -224,8 +215,7 @@ namespace TangramCypher.Helper.LibSodium
         /// <param name="data">Data.</param>
         public static byte[] Unpad(byte[] data)
         {
-            if (data == null)
-                throw new ArgumentNullException(nameof(data));
+            Guard.Argument(data, nameof(data)).NotNull();
 
             var text = Encoding.UTF8.GetString(data);
             var json = text.Substring(0, text.LastIndexOf("}", StringComparison.CurrentCulture) + 1);

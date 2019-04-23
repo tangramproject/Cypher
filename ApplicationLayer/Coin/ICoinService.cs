@@ -15,20 +15,22 @@ namespace TangramCypher.ApplicationLayer.Coin
 {
     public interface ICoinService
     {
-        (ReceiverOutput, CoinDto) BuildReceiver();
-        CoinDto BuildSender();
+        CoinService BuildReceiver();
+        CoinService BuildSender();
         void ClearCache();
         double Change();
         (CoinDto, CoinDto) CoinSwap(SecureString password, CoinDto coin, RedemptionKeyDto redemptionKey);
         byte[] Commit(ulong amount, int version, string stamp, SecureString password);
         byte[] Commit(ulong amount);
         byte[] Commit(ulong amount, byte[] blind);
+        CoinDto Coin();
         CoinDto DeriveCoin(SecureString password, CoinDto coin);
         CoinDto DeriveCoin(CoinDto coin);
         string DeriveKey(int version, string stamp, SecureString password, int bytes = 32);
         byte[] DeriveKey(int bytes = 32);
         byte[] DeriveKey(double value, int bytes = 32);
         string GetNewStamp();
+        ReceiverOutput ReceiverOutput();
         byte[] Hash(CoinDto coin);
         (string, string) HotRelease(int version, string stamp, SecureString password);
         double Input();

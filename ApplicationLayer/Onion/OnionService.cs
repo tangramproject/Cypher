@@ -99,6 +99,44 @@ namespace Cypher.ApplicationLayer.Onion
             }
         }
 
+        public void DisconnectDisposeSocket(SecureString password)
+        {
+            if (password == null)
+                throw new ArgumentNullException(nameof(password));
+
+            try
+            {
+                using (var insecurePassword = password.Insecure())
+                {
+                    var controlPortClient = new DotNetTor.ControlPort.Client(controlHost, ControlPort, insecurePassword.Value);
+                    controlPortClient.DisconnectDisposeSocket();
+                }
+            }
+            catch (DotNetTor.TorException ex)
+            {
+                console.WriteLine(ex.Message);
+            }
+        }
+
+        public void InitializeConnectSocket(SecureString password)
+        {
+            if (password == null)
+                throw new ArgumentNullException(nameof(password));
+
+            try
+            {
+                using (var insecurePassword = password.Insecure())
+                {
+                    var controlPortClient = new DotNetTor.ControlPort.Client(controlHost, ControlPort, insecurePassword.Value);
+                    controlPortClient.InitializeConnectSocketAsync(new CancellationToken()).Wait();
+                }
+            }
+            catch (DotNetTor.TorException ex)
+            {
+                console.WriteLine(ex.Message);
+            }
+        }
+
         public async Task<bool> CircuitEstablished(SecureString password)
         {
             if (password == null)

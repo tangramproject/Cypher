@@ -28,16 +28,15 @@ namespace TangramCypher.ApplicationLayer.Coin
         private int version;
         private string stamp;
         private SecureString password;
+        private ReceiverOutput receiverOutput;
+        private CoinDto mintedCoin;
 
         /// <summary>
         /// Builds the receiver.
         /// </summary>
         /// <returns>The receiver.</returns>
-        public (ReceiverOutput, CoinDto) BuildReceiver()
+        public CoinService BuildReceiver()
         {
-            ReceiverOutput receiver = null;
-            CoinDto coin = null;
-
             using (var secp256k1 = new Secp256k1())
             using (var pedersen = new Pedersen())
             {
@@ -49,21 +48,19 @@ namespace TangramCypher.ApplicationLayer.Coin
                 Stamp(GetNewStamp());
                 Version(-1);
 
-                coin = BuildCoin(blindSum, commitPos, commitNeg, true);
-                receiver = new ReceiverOutput(Output(), commitPos, blindSum);
+                mintedCoin = BuildCoin(blindSum, commitPos, commitNeg, true);
+                receiverOutput = new ReceiverOutput(Output(), commitPos, blindSum);
             }
 
-            return (receiver, coin);
+            return this;
         }
 
         /// <summary>
         /// Builds the sender.
         /// </summary>
         /// <returns>The sender.</returns>
-        public CoinDto BuildSender()
+        public CoinService BuildSender()
         {
-            CoinDto coin = null;
-
             using (var secp256k1 = new Secp256k1())
             using (var pedersen = new Pedersen())
             {
@@ -73,10 +70,10 @@ namespace TangramCypher.ApplicationLayer.Coin
                 var commitPos = Commit((ulong)Input(), blindPos);
                 var commitNeg = Commit((ulong)Output(), blindNeg);
 
-                coin = BuildCoin(blindSum, commitPos, commitNeg);
+                mintedCoin = BuildCoin(blindSum, commitPos, commitNeg);
             }
 
-            return coin;
+            return this;
         }
 
         /// <summary>
@@ -86,14 +83,16 @@ namespace TangramCypher.ApplicationLayer.Coin
         public double Change() => change = Math.Abs(input) - Math.Abs(output);
 
         /// <summary>
-        /// Clears the change, imputs, outputs and version cache.
+        /// Clears the change, imputs, minted coin, outputs, password, receiver output, stamp and version cache.
         /// </summary>
         public void ClearCache()
         {
             change = 0;
             Input(0);
+            mintedCoin = null;
             Output(0);
             Password(null);
+            receiverOutput = null;
             Stamp(string.Empty);
             Version(0);
         }
@@ -164,6 +163,12 @@ namespace TangramCypher.ApplicationLayer.Coin
         }
 
         /// <summary>
+        /// Coin.
+        /// </summary>
+        /// <returns>The coin.</returns>
+        public CoinDto Coin() => mintedCoin;
+
+        /// <summary>
         /// Derives the coin.
         /// </summary>
         /// <returns>The coin.</returns>
@@ -181,7 +186,7 @@ namespace TangramCypher.ApplicationLayer.Coin
             var v1 = +coin.Version + 1;
             var v2 = +coin.Version + 2;
 
-            var c = new CoinDto()
+            var coinDto = new CoinDto()
             {
                 Keeper = DeriveKey(v1, coin.Stamp, DeriveKey(v2, coin.Stamp, DeriveKey(v2, coin.Stamp, password).ToSecureString()).ToSecureString()),
                 Version = v0,
@@ -191,7 +196,7 @@ namespace TangramCypher.ApplicationLayer.Coin
                 Hint = DeriveKey(v1, coin.Stamp, DeriveKey(v1, coin.Stamp, password).ToSecureString())
             };
 
-            return c;
+            return coinDto;
         }
 
         /// <summary>
@@ -286,6 +291,12 @@ namespace TangramCypher.ApplicationLayer.Coin
         }
 
         /// <summary>
+        /// Gets the receivers output.
+        /// </summary>
+        /// <returns>The output.</returns>
+        public ReceiverOutput ReceiverOutput() => receiverOutput;
+
+        /// <summary>
         /// Hash the specified coin.
         /// </summary>
         /// <returns>The hash.</returns>
@@ -374,6 +385,10 @@ namespace TangramCypher.ApplicationLayer.Coin
 
             if (!redemptionKey.Stamp.Equals(coin.Stamp))
                 throw new Exception("Redemption stamp is not equal to the coins stamp!");
+
+            try
+            { coin = coin.FormatCoinFromBase64(); }
+            catch (FormatException) { }
 
             var v1 = coin.Version + 1;
             var v2 = coin.Version + 2;

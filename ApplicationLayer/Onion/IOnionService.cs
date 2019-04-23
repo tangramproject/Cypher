@@ -22,6 +22,8 @@ namespace Cypher.ApplicationLayer.Onion
 
         void ChangeCircuit(SecureString password);
         Task<bool> CircuitEstablished(SecureString password);
+        void DisconnectDisposeSocket(SecureString password);
+        void InitializeConnectSocket(SecureString password);
         void Dispose();
         void GenerateHashPassword(SecureString password);
         void SendCommands(string command, SecureString password);

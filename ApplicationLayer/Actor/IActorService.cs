@@ -25,6 +25,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         Task<T> GetAsync<T>(string address, RestApiMethod apiMethod);
         Task<double> CheckBalance();
         double GetChange();
+        JObject GetLastError();
         Task<IEnumerable<T>> GetRangeAsync<T>(string address, int skip, int take, RestApiMethod apiMethod);
         Span<byte> DecodeAddress(string key);
         SecureString From();
@@ -43,8 +44,10 @@ namespace TangramCypher.ApplicationLayer.Actor
         SecureString SecretKey();
         ActorService SecretKey(SecureString sk);
         Task<MessageDto> EstablishPubKeyMessage();
-        Task<JObject> SendPayment(bool sendMessage);
+        Task<bool> SendPayment();
+        Task<JObject> SendPaymentMessage(bool send);
         string To();
         ActorService To(string address);
+        Task<List<TransactionDto>> Sync();
     }
 }

@@ -19,6 +19,7 @@ using Kurukuru;
 using Newtonsoft.Json.Linq;
 using TangramCypher.ApplicationLayer.Wallet;
 using System.Security;
+using Microsoft.Extensions.Logging;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
 {
@@ -29,6 +30,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
         readonly IConsole console;
         readonly IVaultService vaultService;
         readonly IWalletService walletService;
+        readonly ILogger logger;
 
         private Spinner spinner;
 
@@ -40,66 +42,83 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
             console = serviceProvider.GetService<IConsole>();
             vaultService = serviceProvider.GetService<IVaultService>();
             walletService = serviceProvider.GetService<IWalletService>();
+            logger = serviceProvider.GetService<ILogger>();
 
             actorService.MessagePump += ActorService_MessagePump;
         }
+
         public override async Task Execute()
         {
-            try
+
+            using (var identifier = Prompt.GetPasswordAsSecureString("Identifier:", ConsoleColor.Yellow))
+            using (var password = Prompt.GetPasswordAsSecureString("Password:", ConsoleColor.Yellow))
             {
-                using (var identifier = Prompt.GetPasswordAsSecureString("Identifier:", ConsoleColor.Yellow))
-                using (var password = Prompt.GetPasswordAsSecureString("Password:", ConsoleColor.Yellow))
+                var address = Prompt.GetString("To:", null, ConsoleColor.Red);
+                var amount = Prompt.GetString("Amount:", null, ConsoleColor.Red);
+                var memo = Prompt.GetString("Memo:", null, ConsoleColor.Green);
+                var yesNo = Prompt.GetYesNo("Send redemption key to message pool?", true, ConsoleColor.Yellow);
+
+
+                if (double.TryParse(amount, out double t))
                 {
-                    var address = Prompt.GetString("To:", null, ConsoleColor.Red);
-                    var amount = Prompt.GetString("Amount:", null, ConsoleColor.Red);
-                    var memo = Prompt.GetString("Memo:", null, ConsoleColor.Green);
-                    var yesNo = Prompt.GetYesNo("Send redemption key to message pool?", true, ConsoleColor.Yellow);
-
-                    using (var insecureIdentifier = identifier.Insecure())
+                    await Spinner.StartAsync("Processing payment ...", async spinner =>
                     {
-                        await vaultService.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
-                    }
+                        this.spinner = spinner;
 
-                    if (double.TryParse(amount, out double t))
-                    {
-                        JObject payment;
-
-                        await Spinner.StartAsync("Processing payment ...", async spinner =>
+                        try
                         {
-                            this.spinner = spinner;
+                            var sent = await actorService
+                                      .From(password)
+                                      .Identifier(identifier)
+                                      .Amount(t)
+                                      .To(address)
+                                      .Memo(memo)
+                                      .SendPayment();
 
-                            payment = await actorService
-                                             .From(password)
-                                             .Identifier(identifier)
-                                             .Amount(t)
-                                             .To(address)
-                                             .Memo(memo)
-                                             .SendPayment(yesNo);
-
-                            var success = payment.GetValue("success").ToObject<bool>();
-                            if (success.Equals(false))
+                            if (sent.Equals(false))
                             {
-                                spinner.Fail(JsonConvert.SerializeObject(payment.GetValue("message")));
+                                var failedMessage = JsonConvert.SerializeObject(actorService.GetLastError().GetValue("message"));
+                                logger.LogCritical(failedMessage);
+                                spinner.Fail(failedMessage);
                                 return;
                             }
 
-                            spinner.Succeed($"Available Balance: {Convert.ToString(await CheckBalance(identifier, password))}");
+                            switch (yesNo)
+                            {
+                                case true:
+                                    var networkMessage = await actorService.SendPaymentMessage(true);
+                                    var success = networkMessage.GetValue("success").ToObject<bool>();
 
-                            if (yesNo.Equals(false))
-                                SaveRedemptionKeyLocal(payment);
-                        });
-                    }
+                                    if (success.Equals(false))
+                                        spinner.Fail(JsonConvert.SerializeObject(networkMessage.GetValue("message")));
+
+                                    break;
+
+                                case false:
+                                    var localMessage = await actorService.SendPaymentMessage(false);
+
+                                    SaveRedemptionKeyLocal(localMessage);
+
+                                    break;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            logger.LogError(ex.StackTrace);
+                            throw ex;
+                        }
+                        finally
+                        {
+                            spinner.Text = $"Available Balance: {Convert.ToString(await CheckBalance(identifier, password))}";
+                        }
+                    });
                 }
-            }
-            catch (Exception ex)
-            {
-                throw ex;
             }
         }
 
-        private void SaveRedemptionKeyLocal(JObject payment)
+        private void SaveRedemptionKeyLocal(JObject message)
         {
-            var notification = payment.GetValue("message").ToObject<NotificationDto>();
+            var notification = message.GetValue("message").ToObject<NotificationDto>();
 
             console.ForegroundColor = ConsoleColor.Magenta;
             console.WriteLine("\nOptions:");
@@ -136,6 +155,5 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
         {
             spinner.Text = e.Message;
         }
-
     }
 }
