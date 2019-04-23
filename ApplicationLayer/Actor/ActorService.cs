@@ -64,17 +64,6 @@ namespace TangramCypher.ApplicationLayer.Actor
                 new Client(logger);
 
             apiRestSection = configuration.GetSection(Constant.ApiGateway);
-
-            //var id = "id_9b1ef1085a920c6885844571fe686695".ToSecureString();             //var pass = "their unripe thing liberally scarred out of his delirious mudguards".ToSecureString();
-
-            //var coin = coinService
-            //                .Password(pass)
-            //                .Input(1800000)
-            //                .Output(1)
-            //                .Stamp(coinService.GetNewStamp())
-            //                .BuildSender()
-            //                .Coin();              //coin.Network = walletService.NetworkAddress(coin).ToHex();              //var coinResult = AddAsync(coin.FormatCoinToBase64(), RestApiMethod.PostCoin).GetAwaiter().GetResult().FormatCoinFromBase64();              //From(pass);             //Identifier(id); 
-            //AddWalletTransaction(coin, coinService.Change();, TransactionType.Receive);
         }
 
         /// <summary>
@@ -248,10 +237,8 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <param name="text">Text.</param>
         public ActorService Memo(string memo)
         {
-            this.memo = Guard.Argument(memo, nameof(memo))
-                            .NotNull()
-                            .NotEmpty()
-                            .Modify((s) => s = string.Empty);
+            if (memo == null)
+                this.memo = string.Empty;
 
             this.memo = Guard.Argument(memo, nameof(memo)).MaxLength(64);
 
