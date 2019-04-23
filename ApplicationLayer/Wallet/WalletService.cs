@@ -426,10 +426,10 @@ namespace TangramCypher.ApplicationLayer.Wallet
 
             List<TransactionDto> transactions = null;
 
-            if (stamp.Equals(null))
+            if (stamp == null)
                 transactions = await Transactions(identifier, password);
 
-            if (!stamp.Equals(null))
+            if (stamp != null)
                 transactions = await Transactions(identifier, password, stamp);
 
             if (transactions == null)
