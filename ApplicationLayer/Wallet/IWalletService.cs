@@ -16,7 +16,9 @@ namespace TangramCypher.ApplicationLayer.Wallet
 {
     public interface IWalletService
     {
-        Task<double> AvailableBalance(SecureString identifier, SecureString password);
+        Task<double> AvailableBalanceFromStamp(SecureString identifier, SecureString password, string stamp);
+        Task<double> AvailableBalanceGeneric(SecureString identifier, SecureString password);
+        Task<bool> AddKey(SecureString identifier, SecureString password, PkSkDto pkSk);
         PkSkDto CreatePkSk();
         SecureString NewID(int bytes = 32);
         SecureString Passphrase();
@@ -27,12 +29,14 @@ namespace TangramCypher.ApplicationLayer.Wallet
         Task<List<TransactionDto>> Transactions(SecureString identifier, SecureString password, string stamp);
         Task<double> TransactionAmount(SecureString identifier, SecureString password, string stamp);
         Task<SecureString> StoreKey(SecureString identifier, SecureString password, string storeKey);
-        Task<TransactionIndicator> SortChange(SecureString identifier, SecureString password, double amount, string stamp = null);
+        Task<SecureString> StoreKey(SecureString identifier, SecureString password, StoreKeyApiMethod storeKeyApi, string address);
+        Task<TransactionIndicator> SortChange(SecureString identifier, SecureString password, double amount);
         Task<bool> AddMessageTracking(SecureString identifier, SecureString password, MessageTrackDto messageTrack);
         Task<MessageTrackDto> MessageTrack(SecureString identifier, SecureString password, string pk);
         byte[] NetworkAddress(CoinDto coin, NetworkApiMethod networkApi = null);
         byte[] NetworkAddress(byte[] pk, NetworkApiMethod networkApi = null);
         string ProverPassword(SecureString password, int version);
         Task<bool> ClearTransactions(SecureString identifier, SecureString password);
+        Task<string> RandomAddress(SecureString identifier, SecureString password);
     }
 }

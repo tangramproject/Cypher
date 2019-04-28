@@ -33,6 +33,7 @@ namespace TangramCypher.ApplicationLayer.Actor
     {
         protected SecureString masterKey;
         protected string toAdress;
+        protected string fromAddress;
         protected double amount;
         protected string memo;
         protected double change;
@@ -150,7 +151,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// Checks the balance.
         /// </summary>
         /// <returns>The balance.</returns>
-        public async Task<double> CheckBalance() => await walletService.AvailableBalance(Identifier(), From());
+        public async Task<double> CheckBalance() => await walletService.AvailableBalanceGeneric(Identifier(), MasterKey());
 
         /// <summary>
         /// Decodes the address.
@@ -163,14 +164,14 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// Gets the master key instance.
         /// </summary>
         /// <returns>The from.</returns>
-        public SecureString From() => masterKey;
+        public SecureString MasterKey() => masterKey;
 
         /// <summary>
         /// Sets the specified password.
         /// </summary>
         /// <returns>The from.</returns>
         /// <param name="password">Password.</param>
-        public ActorService From(SecureString password)
+        public ActorService MasterKey(SecureString password)
         {
             masterKey = password ?? throw new ArgumentNullException(nameof(masterKey));
             return this;
@@ -284,8 +285,17 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// Receives the payment.
         /// </summary>
         /// <returns>The payment.</returns>
+        public async Task ReceivePayment()
+        {
+            await ReceivePayment(fromAddress);
+        }
+
+        /// <summary>
+        /// Receives the payment.
+        /// </summary>
+        /// <returns>The payment.</returns>
         /// <param name="address">Address.</param>
-        public async Task ReceivePayment(string address, bool sharedKey = false, byte[] receiverPk = null)
+        private async Task ReceivePayment(string address, bool sharedKey = false, byte[] receiverPk = null)
         {
             Guard.Argument(address, nameof(address)).NotNull().NotEmpty();
 
@@ -295,7 +305,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             notificationAddress = sharedKey ? pk.ToHex() : Cryptography.GenericHashWithKey(pk.ToHex(), pk).ToHex();
 
-            var messageTrack = await walletService.MessageTrack(Identifier(), From(), pk.ToHex());
+            var messageTrack = await walletService.MessageTrack(Identifier(), MasterKey(), pk.ToHex());
 
             UpdateMessagePump("Downloading messages ...");
 
@@ -360,7 +370,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <returns>Wallet transactions</returns>
         public async Task<List<TransactionDto>> Sync()
         {
-            var transactions = await walletService.Transactions(Identifier(), From());
+            var transactions = await walletService.Transactions(Identifier(), MasterKey());
 
             if (transactions == null)
             {
@@ -430,7 +440,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                     };
 
                     //TODO: Could possibility fail.. need recovery..
-                    var added = await walletService.AddMessageTracking(Identifier(), From(), track);
+                    var added = await walletService.AddMessageTracking(Identifier(), MasterKey(), track);
                 }
 
                 skip++;
@@ -454,7 +464,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             try
             {
-                var (swap1, swap2) = coinService.CoinSwap(From(), coin, redemptionKey);
+                var (swap1, swap2) = coinService.CoinSwap(MasterKey(), coin, redemptionKey);
 
                 var keeperPass = await CoinPass(swap1, 3);
                 if (keeperPass.Equals(false))
@@ -492,7 +502,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             Guard.Argument(mode, nameof(mode)).NotNegative();
 
             var canPass = false;
-            var coin = coinService.DeriveCoin(From(), swap);
+            var coin = coinService.DeriveCoin(MasterKey(), swap);
             var status = coinService.VerifyCoin(swap, coin);
 
             coin.Hash = coinService.Hash(coin).ToHex();
@@ -554,7 +564,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         {
             await SetPublicKey();
 
-            var pk = Util.FormatNetworkAddress(DecodeAddress(To()).ToArray());
+            var pk = Util.FormatNetworkAddress(DecodeAddress(ToAddress()).ToArray());
             var notificationAddress = Cryptography.GenericHashWithKey(pk.ToHex(), pk);
             var senderPk = PublicKey().ToUnSecureString();
             var innerMessage = JObject.FromObject(new
@@ -608,6 +618,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             if (isSpendable.Equals(false))
                 return false;
 
+            await SetRandomAddress();
             await SetSecretKey();
 
             var spendCoin = await Spend();
@@ -623,19 +634,53 @@ namespace TangramCypher.ApplicationLayer.Actor
         }
 
         /// <summary>
+        /// Sets random address.
+        /// </summary>
+        /// <returns>The random address.</returns>
+        private async Task SetRandomAddress()
+        {
+            try
+            {
+                FromAddress(await walletService.RandomAddress(Identifier(), MasterKey()));
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex.Message);
+                throw ex;
+            }
+        }
+
+        /// <summary>
         /// Gets the specified To address.
         /// </summary>
         /// <returns>The to.</returns>
-        public string To() => toAdress;
+        public string ToAddress() => toAdress;
 
         /// <summary>
         /// Set the specified To address.
         /// </summary>
         /// <returns>The to.</returns>
         /// <param name="address">Address.</param>
-        public ActorService To(string address)
+        public ActorService ToAddress(string address)
         {
             toAdress = Guard.Argument(address, nameof(address)).NotNull().NotEmpty();
+            return this;
+        }
+
+        /// <summary>
+        /// Gets the specified from address.
+        /// </summary>
+        /// <returns>The to.</returns>
+        public string FromAddress() => fromAddress;
+
+        /// <summary>
+        /// Set the specified from address.
+        /// </summary>
+        /// <returns>The to.</returns>
+        /// <param name="address">Address.</param>
+        public ActorService FromAddress(string address)
+        {
+            fromAddress = Guard.Argument(address, nameof(address)).NotNull().NotEmpty();
             return this;
         }
 
@@ -678,7 +723,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         {
             try
             {
-                SecretKey(await walletService.StoreKey(Identifier(), From(), "SecretKey"));
+                SecretKey(await walletService.StoreKey(Identifier(), MasterKey(), StoreKeyApiMethod.SecretKey, FromAddress()));
             }
             catch (Exception ex)
             {
@@ -695,7 +740,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         {
             try
             {
-                PublicKey(await walletService.StoreKey(Identifier(), From(), "PublicKey"));
+                PublicKey(await walletService.StoreKey(Identifier(), MasterKey(), StoreKeyApiMethod.PublicKey, FromAddress()));
             }
             catch (Exception ex)
             {
@@ -714,7 +759,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             Guard.Argument(receiverOutput, nameof(receiverOutput)).NotNull();
             Guard.Argument(coin, nameof(coin)).NotNull();
 
-            var (key1, key2) = coinService.HotRelease(coin.Version, coin.Stamp, From());
+            var (key1, key2) = coinService.HotRelease(coin.Version, coin.Stamp, MasterKey());
             var redemption = new RedemptionKeyDto
             {
                 Amount = receiverOutput.Amount,
@@ -731,7 +776,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                 store = JsonConvert.SerializeObject(redemption)
             });
             var paddedBuf = Cryptography.Pad(innerMessage.ToString());
-            var pk = Util.FormatNetworkAddress(DecodeAddress(To()).ToArray());
+            var pk = Util.FormatNetworkAddress(DecodeAddress(ToAddress()).ToArray());
             var cypher = Cypher(Encoding.UTF8.GetString(paddedBuf), pk);
             var sharedKey = await ToSharedKey(pk.ToArray());
             var notificationAddress = Cryptography.GenericHashWithKey(sharedKey.ToHex(), pk);
@@ -751,37 +796,56 @@ namespace TangramCypher.ApplicationLayer.Actor
         private async Task<CoinDto> Spend()
         {
             CoinDto coin = null;
-            var sortChange = await walletService.SortChange(Identifier(), From(), Amount());
+            var sortChange = await walletService.SortChange(Identifier(), MasterKey(), Amount());
 
-            if ((sortChange != null) && (sortChange.Transaction != null))
+            if (sortChange == null)
             {
-                var senderCoin = coinService
-                                  .Password(From())
-                                  .Input(sortChange.Change)
-                                  .Output(sortChange.AmountFor)
-                                  .Stamp(sortChange.Stamp)
-                                  .Version(sortChange.NextVersion)
-                                  .BuildSender()
-                                  .Coin();
-
-                senderCoin.Network = walletService.NetworkAddress(coin).ToHex();
-
-                coin = await AddAsync(senderCoin.FormatCoinToBase64(), RestApiMethod.PostCoin);
-
-                if (coin == null)
+                lastError = JObject.FromObject(new
                 {
-                    lastError = JObject.FromObject(new
-                    {
-                        success = false,
-                        message = "Failed to send the request!"
-                    });
+                    success = false,
+                    message = "Not enough coin on a sigle chain for the request!"
+                });
 
-                    return null;
-                }
-
-                //TODO: Could possibility fail.. need recovery..
-                var added = await AddWalletTransaction(coin, coinService.Output(), TransactionType.Send);
+                return null;
             }
+
+            var senderCoin = coinService
+                             .Password(MasterKey())
+                             .Input(sortChange.Balance)
+                             .Output(sortChange.Amount)
+                             .Stamp(sortChange.Stamp)
+                             .Version(sortChange.Version)
+                             .BuildSender()
+                             .Coin();
+
+            senderCoin.Network = walletService.NetworkAddress(senderCoin).ToHex();
+
+            if (!sortChange.Change.Equals(coinService.Change()))
+            {
+                lastError = JObject.FromObject(new
+                {
+                    success = false,
+                    message = "Calculated change does not equal the coin chnage!"
+                });
+
+                return null;
+            }
+
+            coin = await AddAsync(senderCoin.FormatCoinToBase64(), RestApiMethod.PostCoin);
+
+            if (coin == null)
+            {
+                lastError = JObject.FromObject(new
+                {
+                    success = false,
+                    message = "Failed to send the request!"
+                });
+
+                return null;
+            }
+
+            //TODO: Could possibility fail.. need recovery..
+            var added = await AddWalletTransaction(coin, coinService.Output(), TransactionType.Send);
 
             return coin;
         }
@@ -814,7 +878,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                 TransactionType = transactionType
             };
 
-            var added = await walletService.AddTransaction(Identifier(), From(), transaction);
+            var added = await walletService.AddTransaction(Identifier(), MasterKey(), transaction);
 
             return added;
         }

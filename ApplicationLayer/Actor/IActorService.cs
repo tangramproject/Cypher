@@ -28,8 +28,8 @@ namespace TangramCypher.ApplicationLayer.Actor
         JObject GetLastError();
         Task<IEnumerable<T>> GetRangeAsync<T>(string address, int skip, int take, RestApiMethod apiMethod);
         Span<byte> DecodeAddress(string key);
-        SecureString From();
-        ActorService From(SecureString password);
+        SecureString MasterKey();
+        ActorService MasterKey(SecureString password);
         byte[] Cypher(string message, byte[] pk);
         Task<byte[]> ToSharedKey(byte[] pk);
         SecureString Identifier();
@@ -39,15 +39,17 @@ namespace TangramCypher.ApplicationLayer.Actor
         string OpenBoxSeal(string cypher, PkSkDto pkSkDto);
         SecureString PublicKey();
         ActorService PublicKey(SecureString pk);
-        Task ReceivePayment(string address, bool sharedKey = false, byte[] receiverPk = null);
+        Task ReceivePayment();
         Task<JObject> ReceivePaymentRedemptionKey(string address, string cypher);
         SecureString SecretKey();
         ActorService SecretKey(SecureString sk);
         Task<MessageDto> EstablishPubKeyMessage();
         Task<bool> SendPayment();
         Task<JObject> SendPaymentMessage(bool send);
-        string To();
-        ActorService To(string address);
+        string ToAddress();
+        ActorService ToAddress(string address);
         Task<List<TransactionDto>> Sync();
+        string FromAddress();
+        ActorService FromAddress(string address);
     }
 }

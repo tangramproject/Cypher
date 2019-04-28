@@ -45,17 +45,6 @@
     <PackageReference Include="Kurukuru" Version="1.1.0" />
     <PackageReference Include="Dawn.Guard" Version="1.8.0" />
   </ItemGroup>
-  
-  <ItemGroup>
-    <None Include="**/*" />
-    <None Include="**/*" />
-    <None Include="**/*" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Remove="bin\Debug\netcoreapp2.2\onion\control-port" />
-    <None Remove="bin\Debug\netcoreapp2.2\onion\control-port" />
-    <None Remove="bin\Debug\netcoreapp2.2\onion\control-port" />
-  </ItemGroup>
   <ItemGroup>
     <None Update="appsettings.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>

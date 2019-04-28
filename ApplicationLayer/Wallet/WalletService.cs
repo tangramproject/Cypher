@@ -45,50 +45,76 @@ namespace TangramCypher.ApplicationLayer.Wallet
         }
 
         /// <summary>
-        /// Gets the available balance.
+        ///Gets the available balance from associated stamp.
+        /// </summary>
+        /// <returns>The balance in chain stamp.</returns>
+        /// <param name="identifier">Identifier.</param>
+        /// <param name="password">Password.</param>
+        /// <param name="stamp">Stamp.</param>
+        public async Task<double> AvailableBalanceFromStamp(SecureString identifier, SecureString password, string stamp)
+        {
+            Guard.Argument(identifier, nameof(identifier)).NotNull();
+            Guard.Argument(password, nameof(password)).NotNull();
+            Guard.Argument(stamp, nameof(stamp)).NotNull().NotEmpty();
+
+            var transactions = await Transactions(identifier, password, stamp);
+
+            return Balance(identifier, password, transactions);
+        }
+
+        /// <summary>
+        /// Gets the generic available balance.
         /// </summary>
         /// <returns>The balance.</returns>
         /// <param name="identifier">Identifier.</param>
         /// <param name="password">Password.</param>
-        public async Task<double> AvailableBalance(SecureString identifier, SecureString password)
+        public async Task<double> AvailableBalanceGeneric(SecureString identifier, SecureString password)
         {
             Guard.Argument(identifier, nameof(identifier)).NotNull();
             Guard.Argument(password, nameof(password)).NotNull();
 
-            var total = 0.0d;
             var transactions = await Transactions(identifier, password);
 
-            if (transactions != null)
-            {
-                double? pocket = null;
-                double? burnt = null;
+            return Balance(identifier, password, transactions);
+        }
 
+        /// <summary>
+        /// Adds the keys.
+        /// </summary>
+        /// <returns>The keys.</returns>
+        /// <param name="identifier">Identifier.</param>
+        /// <param name="password">Password.</param>
+        /// <param name="pkSk">Pk sk.</param>
+        public async Task<bool> AddKey(SecureString identifier, SecureString password, PkSkDto pkSk)
+        {
+            Guard.Argument(identifier, nameof(identifier)).NotNull();
+            Guard.Argument(password, nameof(password)).NotNull();
+            Guard.Argument(pkSk, nameof(pkSk)).NotNull();
+
+            bool added = false;
+
+            using (var insecureIdentifier = identifier.Insecure())
+            {
                 try
                 {
-                    pocket = transactions.Where(tx => tx.TransactionType == TransactionType.Receive).Sum(p => p.Amount);
-                    burnt = transactions.Where(tx => tx.TransactionType == TransactionType.Send).Sum(p => p.Amount);
+                    var data = await vaultService.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
+
+                    if (data.Data.TryGetValue("storeKeys", out object keys))
+                    {
+                        ((JArray)keys).Add(JObject.FromObject(pkSk));
+
+                        await vaultService.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", data.Data);
+
+                        added = true;
+                    }
                 }
                 catch (Exception ex)
                 {
                     logger.LogError(ex.Message);
                 }
-                finally
-                {
-                    switch (burnt)
-                    {
-                        case null:
-                            total = pocket == null ? 0 : pocket.Value;
-                            break;
-                        default:
-                            {
-                                total = pocket.Value - burnt.Value;
-                                break;
-                            }
-                    }
-                }
             }
 
-            return total;
+            return added;
         }
 
         /// <summary>
@@ -115,7 +141,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
         public SecureString NewID(int bytes = 32)
         {
             var secureString = new SecureString();
-            foreach (var c in string.Format("id_{0}", Cryptography.RandomBytes(bytes).ToHex())) secureString.AppendChar(c);
+            foreach (var c in $"id_{Cryptography.RandomBytes(bytes).ToHex()}") secureString.AppendChar(c);
             return secureString;
         }
 
@@ -409,39 +435,178 @@ namespace TangramCypher.ApplicationLayer.Wallet
         }
 
         /// <summary>
+        ///  Gets the store key from the address.
+        /// </summary>
+        /// <returns>The key.</returns>
+        /// <param name="identifier">Identifier.</param>
+        /// <param name="password">Password.</param>
+        /// <param name="storeKeyApi">Store key API.</param>
+        /// <param name="address">Address.</param>
+        public async Task<SecureString> StoreKey(SecureString identifier, SecureString password, StoreKeyApiMethod storeKeyApi, string address)
+        {
+            Guard.Argument(identifier, nameof(identifier)).NotNull();
+            Guard.Argument(password, nameof(password)).NotNull();
+            Guard.Argument(address, nameof(address)).NotNull().NotEmpty();
+
+            SecureString secureString = null;
+
+            using (var insecureIdentifier = identifier.Insecure())
+            {
+                try
+                {
+                    var data = await vaultService.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
+
+                    if (data.Data.TryGetValue("storeKeys", out object keys))
+                    {
+                        foreach (JObject item in ((JArray)keys).Children().ToList())
+                        {
+                            var addressKey = item.GetValue("Address");
+                            if (addressKey.Value<string>().Equals(address))
+                            {
+                                var key = item.GetValue(storeKeyApi.ToString()).Value<string>();
+
+                                secureString = new SecureString();
+
+                                foreach (var c in key) secureString.AppendChar(Convert.ToChar(c));
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex.Message);
+                }
+            }
+
+            return secureString;
+        }
+
+        /// <summary>
+        /// Select random address.
+        /// </summary>
+        /// <returns>The address.</returns>
+        /// <param name="identifier">Identifier.</param>
+        /// <param name="password">Password.</param>
+        public async Task<string> RandomAddress(SecureString identifier, SecureString password)
+        {
+            Guard.Argument(identifier, nameof(identifier)).NotNull();
+            Guard.Argument(password, nameof(password)).NotNull();
+
+            string address = null;
+
+            using (var insecureIdentifier = identifier.Insecure())
+            {
+                try
+                {
+                    var data = await vaultService.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
+
+                    if (data.Data.TryGetValue("storeKeys", out object keys))
+                    {
+                        var rnd = new Random();
+                        var pkSks = ((JArray)keys).ToObject<List<PkSkDto>>();
+
+                        address = pkSks[rnd.Next(pkSks.Count())].Address;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex.Message);
+                }
+            }
+
+            return address;
+        }
+
+        /// <summary>
         /// Sorts the change.
         /// </summary>
         /// <returns>The change.</returns>
         /// <param name="identifier">Identifier.</param>
         /// <param name="password">Password.</param>
         /// <param name="amount">Amount.</param>
-        /// <param name="stamp">Stamp.</param>
-        public async Task<TransactionIndicator> SortChange(SecureString identifier, SecureString password, double amount, string stamp = null)
+        public async Task<TransactionIndicator> SortChange(SecureString identifier, SecureString password, double amount)
         {
             Guard.Argument(identifier, nameof(identifier)).NotNull();
             Guard.Argument(password, nameof(password)).NotNull();
+            Guard.Argument(amount, nameof(amount)).NotNaN().NotNegative();
 
-            if (!double.TryParse(amount.ToString(), out double t))
-                throw new InvalidCastException();
-
-            List<TransactionDto> transactions = null;
-
-            if (stamp == null)
-                transactions = await Transactions(identifier, password);
-
-            if (stamp != null)
-                transactions = await Transactions(identifier, password, stamp);
+            var transactions = await Transactions(identifier, password);
 
             if (transactions == null)
                 return null;
 
-            var txsIn = transactions.Where(tx => tx.TransactionType == TransactionType.Receive).OrderBy(tx => tx.Version).ToArray();
-            var transactionIndicator = CalculateChange(amount, ref t, txsIn);
+            TransactionIndicator indicator = null;
+            TransactionDto[] txsIn = transactions.Where(tx => tx.TransactionType == TransactionType.Receive).OrderBy(tx => tx.Version).ToArray();
+            TransactionDto[] target = new TransactionDto[txsIn.Length];
 
-            //TODO: Fix
-            transactionIndicator.Change = await AvailableBalance(identifier, password) - transactionIndicator.AmountFor;
+            Array.Copy(txsIn, target, txsIn.Length);
+            for (int i = 0, targetLength = target.Length; i < targetLength; i++)
+            {
+                (TransactionDto transaction, double amountFor) = CalculateChange(amount, txsIn);
+                var balance = await AvailableBalanceFromStamp(identifier, password, transaction.Stamp);
 
-            return transactionIndicator;
+                if (balance >= amountFor)
+                {
+                    indicator = new TransactionIndicator
+                    {
+                        Amount = amountFor,
+                        Balance = balance,
+                        Change = balance - amountFor,
+                        Stamp = transaction.Stamp,
+                        Version = transactions.Where(s => s.Stamp.Equals(transaction.Stamp)).Last().Version
+                    };
+                    break;
+                }
+
+                var idx = Array.FindIndex(txsIn, t => t.Stamp.Equals(transaction.Stamp));
+                txsIn = txsIn.Where((source, index) => index != idx).ToArray();
+            }
+
+            return indicator;
+        }
+
+        /// <summary>
+        /// Calculate balance from transactions.
+        /// </summary>
+        /// <returns>The balance.</returns>
+        /// <param name="identifier">Identifier.</param>
+        /// <param name="password">Password.</param>
+        /// <param name="transactions">Transactions.</param>
+        private double Balance(SecureString identifier, SecureString password, List<TransactionDto> transactions)
+        {
+            var total = 0.0d;
+
+            if (transactions != null)
+            {
+                double? pocket = null;
+                double? burnt = null;
+
+                try
+                {
+                    pocket = transactions.Where(tx => tx.TransactionType == TransactionType.Receive).Sum(p => p.Amount);
+                    burnt = transactions.Where(tx => tx.TransactionType == TransactionType.Send).Sum(p => p.Amount);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex.Message);
+                }
+                finally
+                {
+                    switch (burnt)
+                    {
+                        case null:
+                            total = pocket == null ? 0 : pocket.Value;
+                            break;
+                        default:
+                            {
+                                total = pocket.Value - burnt.Value;
+                                break;
+                            }
+                    }
+                }
+            }
+
+            return total;
         }
 
         /// <summary>
@@ -449,40 +614,30 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// </summary>
         /// <returns>The change.</returns>
         /// <param name="amount">Amount.</param>
-        /// <param name="t">T.</param>
         /// <param name="transactions">Transactions.</param>
-        private static TransactionIndicator CalculateChange(double amount, ref double t, TransactionDto[] transactions)
+        private (TransactionDto, double) CalculateChange(double amount, TransactionDto[] transactions)
         {
-            if (!double.TryParse(amount.ToString(), out double am))
-                throw new InvalidCastException();
-
+            Guard.Argument(amount, nameof(amount)).NotNaN().NotNegative();
             Guard.Argument(transactions, nameof(transactions)).NotNull();
 
-            int count, i;
-            var transactionIndicator = new TransactionIndicator();
+            int count;
+            var tempTxs = new List<TransactionDto>();
 
-            for (i = 0; i < transactions.Length; i++)
+            for (var i = 0; i < transactions.Length; i++)
             {
-                count = (int)(t / Math.Abs(transactions[i].Amount));
+                count = (int)(amount / Math.Abs(transactions[i].Amount));
                 if (count != 0)
-                {
-                    // Console.WriteLine("Count of {0} change :{1}", coins[i].Amount, count);
-                    for (int k = 0; k < count; k++) transactionIndicator.Transactions.Add(transactions[i]);
-                }
+                    for (int k = 0; k < count; k++) tempTxs.Add(transactions[i]);
 
-                t %= transactions[i].Amount;
+                amount %= transactions[i].Amount;
             }
 
-            var sum = transactionIndicator.Transactions.Sum(s => Math.Abs(s.Amount));
+            var sum = tempTxs.Sum(s => Math.Abs(s.Amount));
             var remainder = amount - sum;
             var closest = transactions.Select(x => Math.Abs(x.Amount)).Aggregate((x, y) => Math.Abs(x - remainder) < Math.Abs(y - remainder) ? x : y);
+            var tx = transactions.FirstOrDefault(a => a.Amount.Equals(closest));
 
-            transactionIndicator.AmountFor = remainder;
-            transactionIndicator.Transaction = transactions.FirstOrDefault(a => a.Amount.Equals(closest));
-            //TODO: Fix
-            transactionIndicator.NextVersion = transactions.Last().Version;
-            transactionIndicator.Stamp = transactionIndicator.Transaction.Stamp;
-            return transactionIndicator;
+            return (tx, remainder);
         }
 
         /// <summary>
@@ -553,7 +708,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
 
             using (var insecurePassword = password.Insecure())
             {
-                var hash = Cryptography.GenericHashNoKey(string.Format("{0} {1}", version, insecurePassword.Value));
+                var hash = Cryptography.GenericHashNoKey($"{version} {insecurePassword.Value}");
                 return Prover.GetHashStringNumber(hash).ToByteArray().ToHex();
             }
         }

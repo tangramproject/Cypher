@@ -44,16 +44,10 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
             {
                 await vaultService.CreateUserAsync(walletId, passphrase);
 
-                // TODO: Add list for multiple store keys.
-                //var dic = new Dictionary<string, object>
-                //{
-                //    { "storeKeys", new List<PkSkDto> { pkSk } }
-                //};
-
                 var dic = new Dictionary<string, object>
-                    {
-                        { "storeKeys", pkSk  }
-                    };
+                {
+                    { "storeKeys", new List<PkSkDto> { pkSk } }
+                };
 
                 await vaultService.SaveDataAsync(
                     walletId,

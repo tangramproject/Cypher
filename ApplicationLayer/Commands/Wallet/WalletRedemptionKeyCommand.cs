@@ -35,7 +35,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                     var line = readLines[1];
 
                     var message = await actorService
-                        .From(password)
+                        .MasterKey(password)
                         .Identifier(identifier)
                         .ReceivePaymentRedemptionKey(address, line);
 

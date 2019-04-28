@@ -8,20 +8,54 @@
 
 using System;
 using System.Threading.Tasks;
+using McMaster.Extensions.CommandLineUtils;
+using Microsoft.Extensions.DependencyInjection;
+using Newtonsoft.Json;
+using TangramCypher.ApplicationLayer.Wallet;
+using TangramCypher.Helper;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
 {
+    [CommandDescriptor(new string[] { "wallet", "key" }, "Creates a new key set")]
     public class WalletAddressCommand : Command
     {
-        public WalletAddressCommand()
+        readonly IConsole console;
+        readonly IWalletService walletService;
+
+        public WalletAddressCommand(IServiceProvider serviceProvider)
         {
+            console = serviceProvider.GetService<IConsole>();
+            walletService = serviceProvider.GetService<IWalletService>();
         }
 
-        public override Task Execute()
+        public async override Task Execute()
         {
-            Console.WriteLine("Method not implemented!");
+            try
+            {
+                using (var identifier = Prompt.GetPasswordAsSecureString("Identifier:", ConsoleColor.Yellow))
+                using (var password = Prompt.GetPasswordAsSecureString("Password:", ConsoleColor.Yellow))
+                {
+                    var pksk = walletService.CreatePkSk();
+                    var added = await walletService.AddKey(identifier, password, pksk);
 
-            return Task.CompletedTask;
+                    if(added)
+                    {
+                        console.ForegroundColor = ConsoleColor.Magenta;
+                        console.WriteLine("\nWallet Key set added!\n");
+                        console.ForegroundColor = ConsoleColor.White;
+
+                        return;
+                    }
+
+                    console.ForegroundColor = ConsoleColor.Red;
+                    console.WriteLine("Something went wrong!");
+                    console.ForegroundColor = ConsoleColor.White;
+                }
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
         }
     }
 }

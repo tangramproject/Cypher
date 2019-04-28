@@ -26,7 +26,6 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
         readonly IActorService actorService;
         readonly IConsole console;
         readonly IVaultService vaultService;
-        readonly IWalletService walletService;
         readonly ILogger logger;
 
         private Spinner spinner;
@@ -36,7 +35,6 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
             actorService = serviceProvider.GetService<IActorService>();
             console = serviceProvider.GetService<IConsole>();
             vaultService = serviceProvider.GetService<IVaultService>();
-            walletService = serviceProvider.GetService<IWalletService>();
             logger = serviceProvider.GetService<ILogger>();
 
             actorService.MessagePump += ActorService_MessagePump;
@@ -61,9 +59,10 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                         try
                         {
                             await actorService
-                                  .From(password)
+                                  .MasterKey(password)
                                   .Identifier(identifier)
-                                  .ReceivePayment(address);
+                                  .FromAddress(address)
+                                  .ReceivePayment();
                         }
                         catch (Exception ex)
                         {
@@ -72,16 +71,11 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                         }
                         finally
                         {
-                            spinner.Text = $"Available Balance: {Convert.ToString(await CheckBalance(identifier, password))}";
+                            spinner.Text = $"Available Balance: {Convert.ToString(await actorService.CheckBalance())}";
                         }
                     });
                 }
             }
-        }
-
-        private async Task<double> CheckBalance(SecureString identifier, SecureString password)
-        {
-            return await walletService.AvailableBalance(identifier, password);
         }
 
         private void ActorService_MessagePump(object sender, MessagePumpEventArgs e)
