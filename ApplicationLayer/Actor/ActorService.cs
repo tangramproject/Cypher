@@ -670,13 +670,13 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <summary>
         /// Gets the specified from address.
         /// </summary>
-        /// <returns>The to.</returns>
+        /// <returns>The fromAddress.</returns>
         public string FromAddress() => fromAddress;
 
         /// <summary>
         /// Set the specified from address.
         /// </summary>
-        /// <returns>The to.</returns>
+        /// <returns>The fromAddress.</returns>
         /// <param name="address">Address.</param>
         public ActorService FromAddress(string address)
         {
@@ -825,7 +825,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                 lastError = JObject.FromObject(new
                 {
                     success = false,
-                    message = "Calculated change does not equal the coin chnage!"
+                    message = "Calculated change does not equal the coin change!"
                 });
 
                 return null;
@@ -856,10 +856,10 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <returns>The Wallet transaction.</returns>
         /// <param name="coin">Coin.</param>
         /// <param name="transactionType">Transaction type.</param>
-        private async Task<bool> AddWalletTransaction(CoinDto coin, double amount, TransactionType transactionType)
+        private async Task<bool> AddWalletTransaction(CoinDto coin, double total, TransactionType transactionType)
         {
             Guard.Argument(coin, nameof(coin)).NotNull();
-            Guard.Argument(amount, nameof(amount)).NotNegative();
+            Guard.Argument(total, nameof(total)).NotNegative();
 
             CoinDto formattedCoin = null;
 
@@ -870,7 +870,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             var transaction = new TransactionDto
             {
-                Amount = amount,
+                Amount = total,
                 Commitment = formattedCoin.Envelope.Commitment,
                 Hash = formattedCoin.Hash,
                 Stamp = formattedCoin.Stamp,
