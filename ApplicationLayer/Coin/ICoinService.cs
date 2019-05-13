@@ -8,6 +8,7 @@
 
 using System.Collections.Generic;
 using System.Security;
+using Secp256k1_ZKP.Net;
 using TangramCypher.ApplicationLayer.Actor;
 using TangramCypher.ApplicationLayer.Wallet;
 
@@ -40,6 +41,7 @@ namespace TangramCypher.ApplicationLayer.Coin
         CoinDto MakeSingleCoin();
         double Output();
         CoinService Output(double value);
+        ProofStruct ProofStruct();
         string PartialRelease(int version, string stamp, string memo, SecureString password);
         SecureString Password();
         CoinService Password(SecureString password);

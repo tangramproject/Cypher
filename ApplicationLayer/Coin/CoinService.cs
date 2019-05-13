@@ -31,6 +31,7 @@ namespace TangramCypher.ApplicationLayer.Coin
         private SecureString password;
         private ReceiverOutput receiverOutput;
         private CoinDto mintedCoin;
+        private ProofStruct proofStruct;
 
         /// <summary>
         /// Builds the receiver.
@@ -603,6 +604,12 @@ namespace TangramCypher.ApplicationLayer.Coin
         }
 
         /// <summary>
+        /// Range proof struct.
+        /// </summary>
+        /// <returns>The struct.</returns>
+        public ProofStruct ProofStruct() => proofStruct;
+
+        /// <summary>
         /// Verifies the coin on ownership.
         /// </summary>
         /// <returns>The coin.</returns>
@@ -691,6 +698,7 @@ namespace TangramCypher.ApplicationLayer.Coin
 
             using (var secp256k1 = new Secp256k1())
             using (var pedersen = new Pedersen())
+            using (var rangeProof = new RangeProof())
             {
                 var commitSum = pedersen.CommitSum(new List<byte[]> { commitPos }, new List<byte[]> { commitNeg });
 
@@ -711,6 +719,13 @@ namespace TangramCypher.ApplicationLayer.Coin
                 coin.Envelope.Signature = secp256k1.Sign(Hash(coin), k1).ToHex();
 
                 coin.Hash = Hash(coin).ToHex();
+
+                proofStruct = rangeProof.Proof(0, (ulong)Change(), blindSum, commitSum, coin.Hash.FromHex());
+
+                isVerified = rangeProof.Verify(commitSum, proofStruct);
+
+                if (!isVerified)
+                    throw new Exception(nameof(isVerified));
             }
 
             return coin;

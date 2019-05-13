@@ -41,7 +41,7 @@
     <PackageReference Include="VaultSharp" Version="0.11.0" />
     <PackageReference Include="DotNetTor" Version="2.3.3" />
     <PackageReference Include="ReadablePassphrase" Version="1.1.2" />
-    <PackageReference Include="Secp256k1.ZKP.Net" Version="1.0.4" />
+    <PackageReference Include="Secp256k1.ZKP.Net" Version="1.0.6" />
     <PackageReference Include="Kurukuru" Version="1.1.0" />
     <PackageReference Include="Dawn.Guard" Version="1.8.0" />
   </ItemGroup>
