@@ -122,6 +122,8 @@ namespace TangramCypher.ApplicationLayer.Controllers
 
                 if (success.Equals(false))
                     return new ObjectResult(new { error = JsonConvert.SerializeObject(networkMessage.GetValue("message")), statusCode = 500 });
+
+                balance = await actorService.CheckBalance();
             }
             catch (Exception ex)
             {
