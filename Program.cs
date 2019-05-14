@@ -63,6 +63,8 @@ namespace TangramCypher
                             return sp.GetService<ICommandService>() as CommandService;
                         });
 
+                    services.AddSingleton<IHostedService, ApplicationLayer.HttpXy>();
+
                     services.Add(new ServiceDescriptor(typeof(IConsole), PhysicalConsole.Singleton));
 
 
@@ -74,7 +76,7 @@ namespace TangramCypher
                     services.Add(new ServiceDescriptor(typeof(ILogger),
                                                                 provider => logger,
                                                                 ServiceLifetime.Singleton));
-                                                               
+
                 })
                 .UseConsoleLifetime();
 

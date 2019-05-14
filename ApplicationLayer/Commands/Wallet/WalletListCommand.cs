@@ -14,30 +14,29 @@ using TangramCypher.ApplicationLayer.Vault;
 using Microsoft.Extensions.DependencyInjection;
 using McMaster.Extensions.CommandLineUtils;
 using Newtonsoft.Json;
+using TangramCypher.ApplicationLayer.Wallet;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
 {
     [CommandDescriptor(new string[] { "wallet", "list" }, "Lists the wallets available")]
     class WalletListCommand : Command
     {
-        private IVaultService vaultService;
-        private IConsole console;
+        private readonly IWalletService walletService;
+        private readonly IConsole console;
 
         public WalletListCommand(IServiceProvider serviceProvider)
         {
-            vaultService = serviceProvider.GetService<IVaultService>();
+            walletService = serviceProvider.GetService<IWalletService>();
             console = serviceProvider.GetService<IConsole>();
         }
 
         public override async Task Execute()
         {
-            var data = await vaultService.GetListAsync($"wallets/");
-
-            var keys = data.Data?.Keys;
+            var keys = await walletService.WalletList();
 
             if (keys != null)
             {
-                foreach (var key in data.Data?.Keys)
+                foreach (var key in keys)
                 {
                     var k = key.TrimEnd('/');
 

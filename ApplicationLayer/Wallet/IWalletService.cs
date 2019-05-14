@@ -20,6 +20,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
         Task<double> AvailableBalanceGeneric(SecureString identifier, SecureString password);
         Task<bool> AddKey(SecureString identifier, SecureString password, PkSkDto pkSk);
         PkSkDto CreatePkSk();
+        Task<CredentialsDto> CreateWallet();
         SecureString NewID(int bytes = 32);
         SecureString Passphrase();
         byte[] HashPassword(SecureString passphrase);
@@ -38,5 +39,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
         string ProverPassword(SecureString password, int version);
         Task<bool> ClearTransactions(SecureString identifier, SecureString password);
         Task<string> RandomAddress(SecureString identifier, SecureString password);
+        Task<string> Profile(SecureString identifier, SecureString password);
+        Task<IEnumerable<string>> WalletList();
     }
 }

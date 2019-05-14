@@ -7,57 +7,36 @@
 // work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
 
 using System;
-using System.Collections.Generic;
-using System.Text;
 using System.Threading.Tasks;
-using TangramCypher.ApplicationLayer.Vault;
 using Microsoft.Extensions.DependencyInjection;
 using McMaster.Extensions.CommandLineUtils;
-using Newtonsoft.Json;
-using Microsoft.Extensions.Logging;
 using TangramCypher.Helper;
+using TangramCypher.ApplicationLayer.Wallet;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
 {
     [CommandDescriptor(new string[] { "wallet", "get" }, "Retrieves the contents of a wallet")]
     class WalletGetCommand : Command
     {
-        private IVaultService vaultService;
-        private IConsole console;
-        private ILogger logger;
+        private readonly IWalletService walletService;
+        private readonly IConsole console;
 
         public WalletGetCommand(IServiceProvider serviceProvider)
         {
-            vaultService = serviceProvider.GetService<IVaultService>();
+            walletService = serviceProvider.GetService<IWalletService>();
             console = serviceProvider.GetService<IConsole>();
-            logger = serviceProvider.GetService<ILogger>();
         }
 
         public override async Task Execute()
         {
-            try
+            using (var identifier = Prompt.GetPasswordAsSecureString("Identifier:", ConsoleColor.Yellow))
+            using (var password = Prompt.GetPasswordAsSecureString("Password:", ConsoleColor.Yellow))
             {
-                using (var identifier = Prompt.GetPasswordAsSecureString("Identifier:", ConsoleColor.Yellow))
-                using (var password = Prompt.GetPasswordAsSecureString("Password:", ConsoleColor.Yellow))
+                using (var id = identifier.Insecure())
                 {
-
-                    using (var rng = System.Security.Cryptography.RandomNumberGenerator.Create())
-                    {
-                        using (var id = identifier.Insecure())
-                        {
-                            var data = await vaultService.GetDataAsync(identifier, password, $"wallets/{id.Value}/wallet");
-
-                            var w = JsonConvert.SerializeObject(data);
-
-                            console.WriteLine(w);
-                        }
-                    }
+                    var profile = await walletService.Profile(identifier, password);
+                    console.WriteLine(profile);
                 }
-            }
-            catch (Exception e)
-            {
-                logger.LogError(e, "Exception");
-                throw;
             }
         }
     }

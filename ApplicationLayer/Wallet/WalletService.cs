@@ -24,6 +24,7 @@ using TangramCypher.ApplicationLayer.Helper.ZeroKP;
 using Microsoft.Extensions.Configuration;
 using Dawn;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 
 namespace TangramCypher.ApplicationLayer.Wallet
 {
@@ -131,6 +132,48 @@ namespace TangramCypher.ApplicationLayer.Wallet
                 SecretKey = kp.SecretKey.ToHex(),
                 Address = Encoding.UTF8.GetString(NetworkAddress(kp.PublicKey))
             };
+        }
+
+        /// <summary>
+        /// Create new wallet.
+        /// </summary>
+        /// <returns>The wallet.</returns>
+        public async Task<CredentialsDto> CreateWallet()
+        {
+            var walletId = NewID(16);
+            var passphrase = Passphrase();
+            var pkSk = CreatePkSk();
+
+            walletId.MakeReadOnly();
+            passphrase.MakeReadOnly();
+
+            try
+            {
+                await vaultService.CreateUserAsync(walletId, passphrase);
+
+                var dic = new Dictionary<string, object>
+                {
+                    { "storeKeys", new List<PkSkDto> { pkSk } }
+                };
+
+                await vaultService.SaveDataAsync(
+                    walletId,
+                    passphrase,
+                            $"wallets/{walletId.ToUnSecureString()}/wallet",
+                    dic);
+
+                return new CredentialsDto { Identifier = walletId.ToUnSecureString(), Password = passphrase.ToUnSecureString() };
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex.Message);
+                throw new Exception("Failed to create wallet. Is the vault unsealed?");
+            }
+            finally
+            {
+                walletId.Dispose();
+                passphrase.Dispose();
+            }
         }
 
         /// <summary>
@@ -563,6 +606,44 @@ namespace TangramCypher.ApplicationLayer.Wallet
             }
 
             return indicator;
+        }
+
+        /// <summary>
+        /// Wallet profile Profile.
+        /// </summary>
+        /// <returns>The profile.</returns>
+        /// <param name="identifier">Identifier.</param>
+        /// <param name="password">Password.</param>
+        public async Task<string> Profile(SecureString identifier, SecureString password)
+        {
+            string profile = null;
+
+            try
+            {
+                using (var id = identifier.Insecure())
+                {
+                    var data = await vaultService.GetDataAsync(identifier, password, $"wallets/{id.Value}/wallet");
+                    profile = JsonConvert.SerializeObject(data);
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex.Message);
+                throw;
+            }
+
+            return profile;
+        }
+
+        /// <summary>
+        /// Lists the wallets available.
+        /// </summary>
+        /// <returns>The identifier list.</returns>
+        public async Task<IEnumerable<string>> WalletList()
+        {
+            var data = await vaultService.GetListAsync($"wallets/");
+            var keys = data.Data?.Keys;
+            return keys;
         }
 
         /// <summary>
