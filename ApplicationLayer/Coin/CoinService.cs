@@ -23,6 +23,11 @@ namespace TangramCypher.ApplicationLayer.Coin
 {
     public class CoinService : ICoinService
     {
+        public const int Tan = 1;
+        public const int MicroTan = 100;
+        public const int NanoTan = 1000_000_000;
+        public const long AttoTan = 1000_000_000_000_000_000;
+
         private double input;
         private double output;
         private double change;
@@ -42,9 +47,10 @@ namespace TangramCypher.ApplicationLayer.Coin
             using (var secp256k1 = new Secp256k1())
             using (var pedersen = new Pedersen())
             {
-                var blind = DeriveKey(Output());
+                var naTOutput = NaT(Output());
+                var blind = DeriveKey(naTOutput);
                 var blindSum = pedersen.BlindSum(new List<byte[]> { blind, blind }, new List<byte[]> { });
-                var commitPos = Commit((ulong)Output(), blind);
+                var commitPos = Commit(naTOutput, blind);
                 var commitNeg = Commit(0, blind);
 
                 Stamp(GetNewStamp());
@@ -66,11 +72,13 @@ namespace TangramCypher.ApplicationLayer.Coin
             using (var secp256k1 = new Secp256k1())
             using (var pedersen = new Pedersen())
             {
-                var blindPos = pedersen.BlindSwitch((ulong)Input(), DeriveKey(Input()));
-                var blindNeg = pedersen.BlindSwitch((ulong)Output(), DeriveKey(Output()));
+                var naTInput = NaT(Input());
+                var naTOutput = NaT(Output());
+                var blindPos = pedersen.BlindSwitch(naTInput, DeriveKey(naTInput));
+                var blindNeg = pedersen.BlindSwitch(naTOutput, DeriveKey(naTOutput));
                 var blindSum = pedersen.BlindSum(new List<byte[]> { blindPos }, new List<byte[]> { blindNeg });
-                var commitPos = Commit((ulong)Input(), blindPos);
-                var commitNeg = Commit((ulong)Output(), blindNeg);
+                var commitPos = Commit(naTInput, blindPos);
+                var commitNeg = Commit(naTOutput, blindNeg);
 
                 mintedCoin = BuildCoin(blindSum, commitPos, commitNeg);
             }
@@ -497,7 +505,8 @@ namespace TangramCypher.ApplicationLayer.Coin
 
             using (var pedersen = new Pedersen())
             {
-                var skey1 = DeriveKey(Change());
+                var naTChange = NaT(Change());
+                var skey1 = DeriveKey(naTChange);
                 var skey2 = pedersen.BlindSum(new List<byte[]> { blinding }, new List<byte[]> { skey1 });
 
                 return (skey1, skey2);
@@ -574,11 +583,7 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// <param name="value">Value.</param>
         public CoinService Input(double value)
         {
-            if (value < 0)
-                throw new Exception("Value can not be less than zero!");
-
-            input = value;
-
+            input = Guard.Argument(value, nameof(value)).NotNegative();
             return this;
         }
 
@@ -595,11 +600,7 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// <param name="value">Value.</param>
         public CoinService Output(double value)
         {
-            if (value < 0)
-                throw new Exception("Value can not be less than zero!");
-
-            output = value;
-
+            output = Guard.Argument(value, nameof(value)).NotNegative();
             return this;
         }
 
@@ -720,7 +721,8 @@ namespace TangramCypher.ApplicationLayer.Coin
 
                 coin.Hash = Hash(coin).ToHex();
 
-                proofStruct = rangeProof.Proof(0, (ulong)Change(), blindSum, commitSum, coin.Hash.FromHex());
+                var naTChange = NaT(Change());
+                proofStruct = rangeProof.Proof(0, naTChange, blindSum, commitSum, coin.Hash.FromHex());
 
                 isVerified = rangeProof.Verify(commitSum, proofStruct);
 
@@ -729,6 +731,16 @@ namespace TangramCypher.ApplicationLayer.Coin
             }
 
             return coin;
+        }
+
+        /// <summary>
+        /// naT decimal format.
+        /// </summary>
+        /// <returns>The t.</returns>
+        /// <param name="value">Value.</param>
+        private ulong NaT(double value)
+        {
+            return (ulong)(value * NanoTan);
         }
     }
 }
