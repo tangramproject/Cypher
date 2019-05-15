@@ -702,9 +702,10 @@ namespace TangramCypher.ApplicationLayer.Coin
             using (var rangeProof = new RangeProof())
             {
                 var commitSum = pedersen.CommitSum(new List<byte[]> { commitPos }, new List<byte[]> { commitNeg });
+                var naTOutput = NaT(Output());
 
                 isVerified = receiver
-                    ? pedersen.VerifyCommitSum(new List<byte[]> { commitPos, commitNeg }, new List<byte[]> { Commit((ulong)Output(), blindSum) })
+                    ? pedersen.VerifyCommitSum(new List<byte[]> { commitPos, commitNeg }, new List<byte[]> { Commit(naTOutput, blindSum) })
                     : pedersen.VerifyCommitSum(new List<byte[]> { commitPos }, new List<byte[]> { commitNeg, commitSum });
 
                 if (!isVerified)
@@ -714,17 +715,24 @@ namespace TangramCypher.ApplicationLayer.Coin
 
                 coin = MakeSingleCoin();
 
-                coin.Envelope.Commitment = commitSum.ToHex();
+                coin.Envelope.Commitment = receiver ? Commit(naTOutput, blindSum).ToHex() : commitSum.ToHex();
                 coin.Envelope.Proof = k2.ToHex();
                 coin.Envelope.PublicKey = pedersen.ToPublicKey(Commit(0, k1)).ToHex();
                 coin.Envelope.Signature = secp256k1.Sign(Hash(coin), k1).ToHex();
 
                 coin.Hash = Hash(coin).ToHex();
 
-                var naTChange = NaT(Change());
-                proofStruct = rangeProof.Proof(0, naTChange, blindSum, commitSum, coin.Hash.FromHex());
-
-                isVerified = rangeProof.Verify(commitSum, proofStruct);
+                if (!receiver)
+                {
+                    var naTChange = NaT(Change());
+                    proofStruct = rangeProof.Proof(0, naTChange, blindSum, commitSum, coin.Hash.FromHex());
+                    isVerified = rangeProof.Verify(commitSum, proofStruct);
+                }
+                else
+                {
+                    proofStruct = rangeProof.Proof(0, naTOutput, blindSum, coin.Envelope.Commitment.FromHex(), coin.Hash.FromHex());
+                    isVerified = rangeProof.Verify(coin.Envelope.Commitment.FromHex(), proofStruct);
+                }
 
                 if (!isVerified)
                     throw new Exception(nameof(isVerified));
