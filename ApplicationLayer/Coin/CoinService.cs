@@ -365,12 +365,12 @@ namespace TangramCypher.ApplicationLayer.Coin
             Guard.Argument(coin, nameof(coin)).NotNull();
             Guard.Argument(redemptionKey, nameof(redemptionKey)).NotNull();
 
-            if (!redemptionKey.Stamp.Equals(coin.Stamp))
-                throw new Exception("Redemption stamp is not equal to the coins stamp!");
-
             try
             { coin = coin.FormatCoinFromBase64(); }
             catch (FormatException) { }
+
+            if (!redemptionKey.Stamp.Equals(coin.Stamp))
+                throw new Exception("Redemption stamp is not equal to the coins stamp!");
 
             var v1 = coin.Version + 1;
             var v2 = coin.Version + 2;
