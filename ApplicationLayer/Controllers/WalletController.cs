@@ -133,5 +133,12 @@ namespace TangramCypher.ApplicationLayer.Controllers
 
             return new OkObjectResult(balance);
         }
+
+        [HttpPost("transactions", Name = "WalletTransactions")]
+        public async Task<IActionResult> WalletTransactions([FromBody] CredentialsDto credentials)
+        {
+            var creds = await walletService.Transactions(credentials.Identifier.ToSecureString(), credentials.Password.ToSecureString());
+            return new OkObjectResult(creds);
+        }
     }
 }
