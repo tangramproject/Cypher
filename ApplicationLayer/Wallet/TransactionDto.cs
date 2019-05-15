@@ -23,5 +23,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
         public string Stamp { get; set; }
         public int Version { get; set; }
         public TransactionType TransactionType { get; set; }
+        public string Memo { get; set; }
+        public DateTime DateTime { get; set; }
     }
 }

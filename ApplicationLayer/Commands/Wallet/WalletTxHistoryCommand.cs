@@ -36,7 +36,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                 try
                 {
                     var transactions = await walletService.Transactions(identifier, password);
-                    var txs = transactions.Select(tx => new { tx.Amount, tx.Version, tx.TransactionType, tx.Hash }).ToList();
+                    var txs = transactions.Select(tx => new { tx.Amount, tx.Memo, tx.TransactionType, tx.DateTime, tx.Hash }).ToList();
                     var table = ConsoleTable.From(txs).ToString();
 
                     console.WriteLine(table);

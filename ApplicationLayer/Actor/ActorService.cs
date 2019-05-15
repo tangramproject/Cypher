@@ -480,6 +480,8 @@ namespace TangramCypher.ApplicationLayer.Actor
                 if (added.Equals(false))
                     return false;
 
+                Memo(redemptionKey.Memo);
+
                 return true;
             }
             catch (Exception ex)
@@ -875,7 +877,9 @@ namespace TangramCypher.ApplicationLayer.Actor
                 Hash = formattedCoin.Hash,
                 Stamp = formattedCoin.Stamp,
                 Version = formattedCoin.Version,
-                TransactionType = transactionType
+                TransactionType = transactionType,
+                Memo = Memo(),
+                DateTime = DateTime.Now
             };
 
             var added = await walletService.AddTransaction(Identifier(), MasterKey(), transaction);
