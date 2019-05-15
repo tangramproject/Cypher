@@ -703,6 +703,7 @@ namespace TangramCypher.ApplicationLayer.Coin
             {
                 var commitSum = pedersen.CommitSum(new List<byte[]> { commitPos }, new List<byte[]> { commitNeg });
                 var naTOutput = NaT(Output());
+                var naTChange = NaT(Change());
 
                 isVerified = receiver
                     ? pedersen.VerifyCommitSum(new List<byte[]> { commitPos, commitNeg }, new List<byte[]> { Commit(naTOutput, blindSum) })
@@ -722,17 +723,11 @@ namespace TangramCypher.ApplicationLayer.Coin
 
                 coin.Hash = Hash(coin).ToHex();
 
-                if (!receiver)
-                {
-                    var naTChange = NaT(Change());
-                    proofStruct = rangeProof.Proof(0, naTChange, blindSum, commitSum, coin.Hash.FromHex());
-                    isVerified = rangeProof.Verify(commitSum, proofStruct);
-                }
-                else
-                {
-                    proofStruct = rangeProof.Proof(0, naTOutput, blindSum, coin.Envelope.Commitment.FromHex(), coin.Hash.FromHex());
-                    isVerified = rangeProof.Verify(coin.Envelope.Commitment.FromHex(), proofStruct);
-                }
+                proofStruct = receiver
+                    ? rangeProof.Proof(0, naTOutput, blindSum, coin.Envelope.Commitment.FromHex(), coin.Hash.FromHex())
+                    : rangeProof.Proof(0, naTChange, blindSum, coin.Envelope.Commitment.FromHex(), coin.Hash.FromHex());
+
+                isVerified = rangeProof.Verify(coin.Envelope.Commitment.FromHex(), proofStruct);
 
                 if (!isVerified)
                     throw new Exception(nameof(isVerified));
