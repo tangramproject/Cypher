@@ -95,14 +95,24 @@ namespace TangramCypher.ApplicationLayer
             }
         }
 
+        readonly IConfigurationSection restAPISection;
+
+        public int EnableRestAPI { get; }
+
         public HttpXy(IConfiguration configuration)
         {
-
+            restAPISection = configuration.GetSection("network");
+            EnableRestAPI = restAPISection.GetValue<int>("enabled_restAPI");
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            return BuildWebHost(null).RunAsync(stoppingToken);
+            if (EnableRestAPI == 1)
+            {
+                return BuildWebHost(null).RunAsync(stoppingToken);
+            }
+
+            return Task.CompletedTask;
         }
 
         public static IWebHost BuildWebHost(string[] args) =>
