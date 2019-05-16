@@ -351,12 +351,14 @@ namespace TangramCypher.ApplicationLayer.Actor
             if (payment)
             {
                 var availableBal = await CheckBalance();
+                var lastAmount = await walletService.LastTransactionAmount(Identifier(), MasterKey(), TransactionType.Receive);
                 return JObject.FromObject(new
                 {
                     success = true,
                     message = new
                     {
                         previous = previousBal,
+                        received = lastAmount,
                         available = availableBal
                     }
                 });
