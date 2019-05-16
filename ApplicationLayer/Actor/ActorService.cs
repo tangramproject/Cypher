@@ -341,7 +341,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             Guard.Argument(address, nameof(address)).NotNull().NotEmpty();
             Guard.Argument(cypher, nameof(cypher)).NotNull().NotEmpty();
 
-            var pk = DecodeAddress(address).ToArray();
+            var pk = Util.FormatNetworkAddress(DecodeAddress(address).ToArray());
             var notification = JObject.Parse(cypher).ToObject<NotificationDto>();
             var message = await ReadMessage(notification.Body, pk);
             var (isPayment, store) = ParseMessage(message);
