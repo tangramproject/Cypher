@@ -499,19 +499,28 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// </summary>
         /// <returns>The split.</returns>
         /// <param name="blinding">Blinding.</param>
-        public (byte[], byte[]) Split(byte[] blinding)
+        public (byte[], byte[]) Split(byte[] blinding, bool isReceiver = false)
         {
             Guard.Argument(blinding, nameof(blinding)).NotNull().MaxCount(32);
 
             using (var pedersen = new Pedersen())
             {
-                var naTChange = NaT(Change());
+                ulong naTInput = 0, naTOutput = 0, naTChange = 0;
+
+                if (isReceiver)
+                    naTChange = NaT(Output());
+                else
+                {
+                    naTInput = NaT(Input());
+                    naTOutput = NaT(Output());
+                    naTChange = naTInput - naTOutput;
+                }
+
                 var skey1 = DeriveKey(naTChange);
                 var skey2 = pedersen.BlindSum(new List<byte[]> { blinding }, new List<byte[]> { skey1 });
 
                 return (skey1, skey2);
             }
-
         }
 
         /// <summary>
@@ -688,7 +697,7 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// <param name="blindSum">Blind sum.</param>
         /// <param name="commitPos">Commit position.</param>
         /// <param name="commitNeg">Commit neg.</param>
-        private CoinDto BuildCoin(byte[] blindSum, byte[] commitPos, byte[] commitNeg, bool receiver = false)
+        private CoinDto BuildCoin(byte[] blindSum, byte[] commitPos, byte[] commitNeg, bool isReceiver = false)
         {
             Guard.Argument(blindSum, nameof(blindSum)).NotNull().MaxCount(32);
             Guard.Argument(commitPos, nameof(commitPos)).NotNull().MaxCount(33);
@@ -702,35 +711,36 @@ namespace TangramCypher.ApplicationLayer.Coin
             using (var rangeProof = new RangeProof())
             {
                 var commitSum = pedersen.CommitSum(new List<byte[]> { commitPos }, new List<byte[]> { commitNeg });
+                var naTInput = NaT(Input());
                 var naTOutput = NaT(Output());
-                var naTChange = NaT(Change());
+                var naTChange = naTInput - naTOutput;
 
-                isVerified = receiver
+                isVerified = isReceiver
                     ? pedersen.VerifyCommitSum(new List<byte[]> { commitPos, commitNeg }, new List<byte[]> { Commit(naTOutput, blindSum) })
                     : pedersen.VerifyCommitSum(new List<byte[]> { commitPos }, new List<byte[]> { commitNeg, commitSum });
 
                 if (!isVerified)
-                    throw new Exception(nameof(isVerified));
+                    throw new ArgumentOutOfRangeException(nameof(isVerified), "Verify commit sum failed.");
 
-                var (k1, k2) = Split(blindSum);
+                var (k1, k2) = Split(blindSum, isReceiver);
 
                 coin = MakeSingleCoin();
 
-                coin.Envelope.Commitment = receiver ? Commit(naTOutput, blindSum).ToHex() : commitSum.ToHex();
+                coin.Envelope.Commitment = isReceiver ? Commit(naTOutput, blindSum).ToHex() : commitSum.ToHex();
                 coin.Envelope.Proof = k2.ToHex();
                 coin.Envelope.PublicKey = pedersen.ToPublicKey(Commit(0, k1)).ToHex();
                 coin.Envelope.Signature = secp256k1.Sign(Hash(coin), k1).ToHex();
 
                 coin.Hash = Hash(coin).ToHex();
 
-                proofStruct = receiver
+                proofStruct = isReceiver
                     ? rangeProof.Proof(0, naTOutput, blindSum, coin.Envelope.Commitment.FromHex(), coin.Hash.FromHex())
                     : rangeProof.Proof(0, naTChange, blindSum, coin.Envelope.Commitment.FromHex(), coin.Hash.FromHex());
 
                 isVerified = rangeProof.Verify(coin.Envelope.Commitment.FromHex(), proofStruct);
 
                 if (!isVerified)
-                    throw new Exception(nameof(isVerified));
+                    throw new ArgumentOutOfRangeException(nameof(isVerified), "Range proof failed.");
             }
 
             return coin;

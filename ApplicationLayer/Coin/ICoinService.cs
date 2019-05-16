@@ -48,7 +48,7 @@ namespace TangramCypher.ApplicationLayer.Coin
         byte[] Sign(ulong amount, int version, string stamp, SecureString password, byte[] msg);
         byte[] Sign(ulong amount, byte[] msg);
         byte[] SignWithBlinding(byte[] msg, byte[] blinding);
-        (byte[], byte[]) Split(byte[] blinding);
+        (byte[], byte[]) Split(byte[] blinding, bool isReceiver = false);
         string Stamp();
         CoinService Stamp(string stamp);
         CoinDto SwapPartialOne(SecureString password, CoinDto coin, RedemptionKeyDto redemptionKey);
