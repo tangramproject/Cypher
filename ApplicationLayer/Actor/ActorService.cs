@@ -76,7 +76,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <typeparam name="T">The 1st type parameter.</typeparam>
         public async Task<T> AddAsync<T>(T payload, RestApiMethod apiMethod)
         {
-            Guard.Argument<T>(payload, nameof(payload)).Equals(null);
+            Guard.Argument(payload, nameof(payload)).Equals(null);
 
             var baseAddress = GetBaseAddress();
             var path = apiRestSection.GetSection(Constant.Routing).GetValue<string>(apiMethod.ToString());
@@ -119,7 +119,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             var baseAddress = GetBaseAddress();
             var path = string.Format(apiRestSection.GetSection(Constant.Routing).GetValue<string>(apiMethod.ToString()), address, skip, take);
             var returnMessages = await client.GetRangeAsync(baseAddress, path, new CancellationToken());
-            var messages = returnMessages == null ? null : returnMessages.Select(m => m.ToObject<T>());
+            var messages = returnMessages?.Select(m => m.ToObject<T>());
 
             return Task.FromResult(messages).Result;
         }
@@ -235,7 +235,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// Sets the specified memo text.
         /// </summary>
         /// <returns>The memo.</returns>
-        /// <param name="text">Text.</param>
+        /// <param name="memo">Text.</param>
         public ActorService Memo(string memo)
         {
             if (memo == null)

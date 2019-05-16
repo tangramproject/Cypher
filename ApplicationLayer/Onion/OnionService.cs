@@ -253,9 +253,6 @@ namespace Cypher.ApplicationLayer.Onion
 
         void CreateTorrc()
         {
-            if (string.IsNullOrEmpty(hashedPassword))
-                throw new ArgumentException("Hashed control password is not set.", nameof(hashedPassword));
-
             if (!Directory.Exists(onionDirectory))
             {
                 try
@@ -271,6 +268,8 @@ namespace Cypher.ApplicationLayer.Onion
 
             if (File.Exists(torrcPath))
                 return;
+
+            GenerateHashPassword("ILoveTangram".ToSecureString());
 
             var torrcContent = new string[] {
                 "AvoidDiskWrites 1",
@@ -377,7 +376,6 @@ namespace Cypher.ApplicationLayer.Onion
             {
                 console.WriteLine("Starting Onion Service");
                 logger.LogInformation("Starting Onion Service");
-                GenerateHashPassword("ILoveTangram".ToSecureString());
                 await Task.Run(() => StartOnion());
             }
 

@@ -596,7 +596,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
                         Balance = balance,
                         Change = balance - amountFor,
                         Stamp = transaction.Stamp,
-                        Version = transactions.Where(s => s.Stamp.Equals(transaction.Stamp)).Last().Version
+                        Version = transactions.Last(s => s.Stamp.Equals(transaction.Stamp)).Version
                     };
                     break;
                 }
@@ -714,7 +714,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
             }
 
             var sum = tempTxs.Sum(s => Math.Abs(s.Amount));
-            var remainder = amount - sum;
+            var remainder = Math.Abs(amount - sum);
             var closest = transactions.Select(x => Math.Abs(x.Amount)).Aggregate((x, y) => Math.Abs(x - remainder) < Math.Abs(y - remainder) ? x : y);
             var tx = transactions.FirstOrDefault(a => a.Amount.Equals(closest));
 
