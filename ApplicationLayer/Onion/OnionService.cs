@@ -274,11 +274,14 @@ namespace Cypher.ApplicationLayer.Onion
             var torrcContent = new string[] {
                 "AvoidDiskWrites 1",
                 $"HashedControlPassword {hashedPassword}",
-                "CircuitBuildTimeout 10",
-                "KeepalivePeriod 60",
+                "CircuitBuildTimeout 2",
+                "KeepalivePeriod 2",
+                "NewCircuitPeriod 15",
                 "NumEntryGuards 8",
                 $"ControlPort {ControlPort}",
                 "Log notice stdout",
+                "SafeSocks 1",
+                "TestSocks 1",
                 $"DataDirectory {onionDirectory}",
                 $"ControlPortWriteToFile {controlPortPath}",
                 $"ClientTransportPlugin obfs4 exec {obfs4proxy}"
