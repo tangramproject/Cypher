@@ -319,7 +319,15 @@ namespace TangramCypher.ApplicationLayer.Actor
             if (sharedKey)
                 pk = Util.FormatNetworkAddress(receiverPk);
 
-            await CheckNotifications(address, notifications, pk);
+            switch (notifications)
+            {
+                case null:
+                    await ReceivePayment();
+                    break;
+                default:
+                    await CheckNotifications(address, notifications, pk);
+                    break;
+            }
         }
 
         /// <summary>
@@ -404,7 +412,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         private async Task CheckNotifications(string address, IEnumerable<NotificationDto> notifications, byte[] pk)
         {
             Guard.Argument(address, nameof(address)).NotNull().NotEmpty();
-            Guard.Argument(notifications, nameof(notifications)).NotNull("Tor failed to get notification messages.");
+            Guard.Argument(notifications, nameof(notifications)).NotNull("Failed to get notification messages.");
             Guard.Argument(pk, nameof(pk)).NotNull().MaxCount(32);
 
             int skip = 1;
