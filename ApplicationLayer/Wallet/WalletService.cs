@@ -58,7 +58,10 @@ namespace TangramCypher.ApplicationLayer.Wallet
             Guard.Argument(password, nameof(password)).NotNull();
             Guard.Argument(stamp, nameof(stamp)).NotNull().NotEmpty();
 
-            var transactions = await Transactions(identifier, password, stamp);
+            var transactions = await Transactions(identifier, password);
+
+            if (transactions != null)
+                transactions = transactions.Where(tx => tx.Stamp == stamp).ToList();
 
             return Balance(identifier, password, transactions);
         }
@@ -392,6 +395,25 @@ namespace TangramCypher.ApplicationLayer.Wallet
         }
 
         /// <summary>
+        /// Last transaction amount.
+        /// </summary>
+        /// <returns>The transaction amount.</returns>
+        /// <param name="identifier">Identifier.</param>
+        /// <param name="password">Password.</param>
+        public async Task<double> LastTransactionAmount(SecureString identifier, SecureString password, TransactionType transactionType)
+        {
+            Guard.Argument(identifier, nameof(identifier)).NotNull();
+            Guard.Argument(password, nameof(password)).NotNull();
+
+            var transactions = await Transactions(identifier, password);
+
+            if (transactions == null)
+                return -1;
+
+            return transactions.Last(tx => tx.TransactionType.Equals(transactionType)).Amount;
+        }
+
+        /// <summary>
         /// Gets the envelope.
         /// </summary>
         /// <returns>The envelope.</returns>
@@ -419,26 +441,6 @@ namespace TangramCypher.ApplicationLayer.Wallet
                     logger.LogError(ex.Message);
                 }
             }
-
-            return transactions;
-        }
-
-        /// <summary>
-        /// Gets the transactions by stamp.
-        /// </summary>
-        /// <returns>The transactions.</returns>
-        /// <param name="identifier">Identifier.</param>
-        /// <param name="password">Password.</param>
-        /// <param name="stamp">Stamp.</param>
-        public async Task<List<TransactionDto>> Transactions(SecureString identifier, SecureString password, string stamp)
-        {
-            Guard.Argument(identifier, nameof(identifier)).NotNull();
-            Guard.Argument(password, nameof(password)).NotNull();
-
-            var transactions = await Transactions(identifier, password);
-
-            if (transactions != null)
-                transactions = transactions.Where(tx => tx.Stamp == stamp).ToList();
 
             return transactions;
         }

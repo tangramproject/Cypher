@@ -24,8 +24,8 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
     public class WalletReceivePaymentCommand : Command
     {
         readonly IActorService actorService;
+        readonly IWalletService walletService;
         readonly IConsole console;
-        readonly IVaultService vaultService;
         readonly ILogger logger;
 
         private Spinner spinner;
@@ -33,8 +33,8 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
         public WalletReceivePaymentCommand(IServiceProvider serviceProvider)
         {
             actorService = serviceProvider.GetService<IActorService>();
+            walletService = serviceProvider.GetService<IWalletService>();
             console = serviceProvider.GetService<IConsole>();
-            vaultService = serviceProvider.GetService<IVaultService>();
             logger = serviceProvider.GetService<ILogger>();
 
             actorService.MessagePump += ActorService_MessagePump;
@@ -71,7 +71,10 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                         }
                         finally
                         {
-                            spinner.Text = $"Available Balance: {Convert.ToString(await actorService.CheckBalance())}";
+                            var lastAmount = Convert.ToString(await walletService.LastTransactionAmount(identifier, password, TransactionType.Receive));
+                            var balance = Convert.ToString(await actorService.CheckBalance());
+
+                            spinner.Text = $"Received:{lastAmount }  Available Balance: {balance}";
                         }
                     });
                 }
