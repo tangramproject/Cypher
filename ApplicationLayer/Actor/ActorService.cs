@@ -336,12 +336,12 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <returns>The payment redemption key.</returns>
         /// <param name="address">Address.</param>
         /// <param name="cypher">Cypher.</param>
-        public async Task<JObject> ReceivePaymentRedemptionKey(string address, string cypher)
+        public async Task<JObject> ReceivePaymentRedemptionKey(string cypher)
         {
-            Guard.Argument(address, nameof(address)).NotNull().NotEmpty();
+            Guard.Argument(fromAddress, nameof(fromAddress)).NotNull().NotEmpty();
             Guard.Argument(cypher, nameof(cypher)).NotNull().NotEmpty();
 
-            var pk = Util.FormatNetworkAddress(DecodeAddress(address).ToArray());
+            var pk = Util.FormatNetworkAddress(DecodeAddress(fromAddress).ToArray());
             var notification = JObject.Parse(cypher).ToObject<NotificationDto>();
             var message = await ReadMessage(notification.Body, pk);
             var (isPayment, store) = ParseMessage(message);

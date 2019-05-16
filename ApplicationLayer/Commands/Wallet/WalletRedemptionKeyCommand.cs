@@ -51,7 +51,8 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                     var message = await actorService
                         .MasterKey(password)
                         .Identifier(identifier)
-                        .ReceivePaymentRedemptionKey(address, line);
+                        .FromAddress(address)
+                        .ReceivePaymentRedemptionKey(line);
 
                     console.WriteLine(JsonConvert.SerializeObject(message));
                 }
