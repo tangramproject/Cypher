@@ -18,6 +18,7 @@ using System.Linq;
 using System.Text;
 using TangramCypher.ApplicationLayer.Wallet;
 using Dawn;
+using Microsoft.Extensions.Logging;
 
 namespace TangramCypher.ApplicationLayer.Coin
 {
@@ -28,6 +29,8 @@ namespace TangramCypher.ApplicationLayer.Coin
         public const int NanoTan = 1000_000_000;
         public const long AttoTan = 1000_000_000_000_000_000;
 
+        private readonly ILogger logger;
+
         private double input;
         private double output;
         private double change;
@@ -37,6 +40,11 @@ namespace TangramCypher.ApplicationLayer.Coin
         private ReceiverOutput receiverOutput;
         private CoinDto mintedCoin;
         private ProofStruct proofStruct;
+
+        public CoinService(ILogger logger)
+        {
+            this.logger = logger;
+        }
 
         /// <summary>
         /// Builds the receiver.
@@ -49,7 +57,19 @@ namespace TangramCypher.ApplicationLayer.Coin
             {
                 var naTOutput = NaT(Output());
                 var blind = DeriveKey(naTOutput);
-                var blindSum = pedersen.BlindSum(new List<byte[]> { blind, blind }, new List<byte[]> { });
+
+                byte[] blindSum = new byte[32];
+
+                try
+                {
+                    blindSum = pedersen.BlindSum(new List<byte[]> { blind, blind }, new List<byte[]> { });
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
+                    throw ex;
+                }
+
                 var commitPos = Commit(naTOutput, blind);
                 var commitNeg = Commit(0, blind);
 
@@ -74,9 +94,23 @@ namespace TangramCypher.ApplicationLayer.Coin
             {
                 var naTInput = NaT(Input());
                 var naTOutput = NaT(Output());
-                var blindPos = pedersen.BlindSwitch(naTInput, DeriveKey(naTInput));
-                var blindNeg = pedersen.BlindSwitch(naTOutput, DeriveKey(naTOutput));
-                var blindSum = pedersen.BlindSum(new List<byte[]> { blindPos }, new List<byte[]> { blindNeg });
+
+                byte[] blindPos = new byte[32];
+                byte[] blindNeg = new byte[32];
+                byte[] blindSum = new byte[32];
+
+                try
+                {
+                    blindPos = pedersen.BlindSwitch(naTInput, DeriveKey(naTInput));
+                    blindNeg = pedersen.BlindSwitch(naTOutput, DeriveKey(naTOutput));
+                    blindSum = pedersen.BlindSum(new List<byte[]> { blindPos }, new List<byte[]> { blindNeg });
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
+                    throw ex;
+                }
+
                 var commitPos = Commit(naTInput, blindPos);
                 var commitNeg = Commit(naTOutput, blindNeg);
 
@@ -158,9 +192,20 @@ namespace TangramCypher.ApplicationLayer.Coin
         {
             Guard.Argument(blind, nameof(blind)).NotNull().MaxCount(32);
 
+            byte[] commit = new byte[33];
+
             using (var pedersen = new Pedersen())
             {
-                var commit = pedersen.Commit(amount, blind);
+                try
+                {
+                    commit = pedersen.Commit(amount, blind);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
+                    throw ex;
+                }
+
                 return commit;
             }
         }
@@ -517,7 +562,18 @@ namespace TangramCypher.ApplicationLayer.Coin
                 }
 
                 var skey1 = DeriveKey(naTChange);
-                var skey2 = pedersen.BlindSum(new List<byte[]> { blinding }, new List<byte[]> { skey1 });
+
+                byte[] skey2 = new byte[32];
+
+                try
+                {
+                    skey2 =pedersen.BlindSum(new List<byte[]> { blinding }, new List<byte[]> { skey1 });
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
+                    throw ex;
+                }
 
                 return (skey1, skey2);
             }
@@ -703,44 +759,51 @@ namespace TangramCypher.ApplicationLayer.Coin
             Guard.Argument(commitPos, nameof(commitPos)).NotNull().MaxCount(33);
             Guard.Argument(commitNeg, nameof(commitNeg)).NotNull().MaxCount(33);
 
-            CoinDto coin;
+            CoinDto coin = null;
             bool isVerified;
 
             using (var secp256k1 = new Secp256k1())
             using (var pedersen = new Pedersen())
             using (var rangeProof = new RangeProof())
             {
-                var commitSum = pedersen.CommitSum(new List<byte[]> { commitPos }, new List<byte[]> { commitNeg });
-                var naTInput = NaT(Input());
-                var naTOutput = NaT(Output());
-                var naTChange = naTInput - naTOutput;
+                try
+                {
+                    var commitSum = pedersen.CommitSum(new List<byte[]> { commitPos }, new List<byte[]> { commitNeg });
+                    var naTInput = NaT(Input());
+                    var naTOutput = NaT(Output());
+                    var naTChange = naTInput - naTOutput;
 
-                isVerified = isReceiver
-                    ? pedersen.VerifyCommitSum(new List<byte[]> { commitPos, commitNeg }, new List<byte[]> { Commit(naTOutput, blindSum) })
-                    : pedersen.VerifyCommitSum(new List<byte[]> { commitPos }, new List<byte[]> { commitNeg, commitSum });
+                    isVerified = isReceiver
+                        ? pedersen.VerifyCommitSum(new List<byte[]> { commitPos, commitNeg }, new List<byte[]> { Commit(naTOutput, blindSum) })
+                        : pedersen.VerifyCommitSum(new List<byte[]> { commitPos }, new List<byte[]> { commitNeg, commitSum });
 
-                if (!isVerified)
-                    throw new ArgumentOutOfRangeException(nameof(isVerified), "Verify commit sum failed.");
+                    if (!isVerified)
+                        throw new ArgumentOutOfRangeException(nameof(isVerified), "Verify commit sum failed.");
 
-                var (k1, k2) = Split(blindSum, isReceiver);
+                    var (k1, k2) = Split(blindSum, isReceiver);
 
-                coin = MakeSingleCoin();
+                    coin = MakeSingleCoin();
 
-                coin.Envelope.Commitment = isReceiver ? Commit(naTOutput, blindSum).ToHex() : commitSum.ToHex();
-                coin.Envelope.Proof = k2.ToHex();
-                coin.Envelope.PublicKey = pedersen.ToPublicKey(Commit(0, k1)).ToHex();
-                coin.Envelope.Signature = secp256k1.Sign(Hash(coin), k1).ToHex();
+                    coin.Envelope.Commitment = isReceiver ? Commit(naTOutput, blindSum).ToHex() : commitSum.ToHex();
+                    coin.Envelope.Proof = k2.ToHex();
+                    coin.Envelope.PublicKey = pedersen.ToPublicKey(Commit(0, k1)).ToHex();
+                    coin.Envelope.Signature = secp256k1.Sign(Hash(coin), k1).ToHex();
 
-                coin.Hash = Hash(coin).ToHex();
+                    coin.Hash = Hash(coin).ToHex();
 
-                proofStruct = isReceiver
-                    ? rangeProof.Proof(0, naTOutput, blindSum, coin.Envelope.Commitment.FromHex(), coin.Hash.FromHex())
-                    : rangeProof.Proof(0, naTChange, blindSum, coin.Envelope.Commitment.FromHex(), coin.Hash.FromHex());
+                    proofStruct = isReceiver
+                        ? rangeProof.Proof(0, naTOutput, blindSum, coin.Envelope.Commitment.FromHex(), coin.Hash.FromHex())
+                        : rangeProof.Proof(0, naTChange, blindSum, coin.Envelope.Commitment.FromHex(), coin.Hash.FromHex());
 
-                isVerified = rangeProof.Verify(coin.Envelope.Commitment.FromHex(), proofStruct);
+                    isVerified = rangeProof.Verify(coin.Envelope.Commitment.FromHex(), proofStruct);
 
-                if (!isVerified)
-                    throw new ArgumentOutOfRangeException(nameof(isVerified), "Range proof failed.");
+                    if (!isVerified)
+                        throw new ArgumentOutOfRangeException(nameof(isVerified), "Range proof failed.");
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
+                }
             }
 
             return coin;
