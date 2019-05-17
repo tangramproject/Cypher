@@ -10,6 +10,8 @@ using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using Cypher.ApplicationLayer.Onion;
+using McMaster.Extensions.CommandLineUtils;
 using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -18,6 +20,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Swashbuckle.AspNetCore.Swagger;
+using TangramCypher.ApplicationLayer.Actor;
+using TangramCypher.ApplicationLayer.Coin;
+using TangramCypher.ApplicationLayer.Vault;
+using TangramCypher.ApplicationLayer.Wallet;
 
 namespace TangramCypher.ApplicationLayer
 {
@@ -62,6 +68,16 @@ namespace TangramCypher.ApplicationLayer
                 });
 
                 services.AddHttpContextAccessor();
+
+                services
+                    .AddSingleton<IActorService, ActorService>()
+                    .AddSingleton<IWalletService, WalletService>()
+                    .AddSingleton<ICoinService, CoinService>()
+                    .AddSingleton<IOnionService, OnionService>()
+                    .AddSingleton<IVaultService, VaultService>();
+
+
+                services.Add(new ServiceDescriptor(typeof(IConsole), PhysicalConsole.Singleton));
 
                 var logger = new LoggerFactory()
                                 .AddFile("HttpXy.log")

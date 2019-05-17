@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 using TangramCypher.ApplicationLayer.Actor;
+using TangramCypher.ApplicationLayer.Vault;
 using TangramCypher.ApplicationLayer.Wallet;
 using TangramCypher.Helper;
 
@@ -23,13 +24,13 @@ namespace TangramCypher.ApplicationLayer.Controllers
     {
         private readonly IActorService actorService;
         private readonly IWalletService walletService;
-        private readonly IHostingEnvironment hostingEnvironment;
+        private readonly IVaultService vaultService;
 
-        public WalletController(IActorService actorService, IWalletService walletService, IHostingEnvironment hostingEnvironment)
+        public WalletController(IActorService actorService, IWalletService walletService, IVaultService vaultService)
         {
             this.actorService = actorService;
             this.walletService = walletService;
-            this.hostingEnvironment = hostingEnvironment;
+            this.vaultService = vaultService;
         }
 
         [HttpPost("address", Name = "CreateWalletAddress")]
@@ -105,7 +106,7 @@ namespace TangramCypher.ApplicationLayer.Controllers
             {
                 var sent = await actorService
                                  .MasterKey(sendPaymentDto.Credentials.Password.ToSecureString())
-                                 .Identifier(sendPaymentDto.Credentials.Password.ToSecureString())
+                                 .Identifier(sendPaymentDto.Credentials.Identifier.ToSecureString())
                                  .Amount(sendPaymentDto.Amount)
                                  .ToAddress(sendPaymentDto.ToAddress)
                                  .Memo(sendPaymentDto.Memo)
@@ -140,5 +141,13 @@ namespace TangramCypher.ApplicationLayer.Controllers
             var creds = await walletService.Transactions(credentials.Identifier.ToSecureString(), credentials.Password.ToSecureString());
             return new OkObjectResult(creds);
         }
+
+        [HttpPost("vaultunseal", Name = "VaultUnseal")]
+        public async Task<IActionResult> VaultUnseal([FromBody] ShardDto key)
+        {
+            await vaultService.Unseal(key.Shard.ToSecureString());
+            return new OkObjectResult(true);
+        }
+
     }
 }
