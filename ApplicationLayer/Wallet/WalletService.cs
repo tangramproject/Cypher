@@ -408,7 +408,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
             var transactions = await Transactions(identifier, password);
 
             if (transactions == null)
-                return -1;
+                return 0;
 
             return transactions.Last(tx => tx.TransactionType.Equals(transactionType)).Amount;
         }
