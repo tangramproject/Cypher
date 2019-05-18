@@ -56,8 +56,10 @@ namespace TangramCypher.ApplicationLayer.Coin
                 Stamp(GetNewStamp());
                 Version(-1);
 
+                mintedCoin = MakeSingleCoin();
+
                 var naTInput = NaT(transactionCoin.Input);
-                var blind = DeriveKey(naTInput, stamp, 0);
+                var blind = DeriveKey(naTInput, stamp, mintedCoin.Version);
 
                 byte[] blindSum = new byte[32];
 
@@ -74,16 +76,13 @@ namespace TangramCypher.ApplicationLayer.Coin
                 var commitPos = Commit(naTInput, blind);
                 var commitSum = pedersen.CommitSum(new List<byte[]> { commitPos }, new List<byte[]> { });
 
-                mintedCoin = MakeSingleCoin();
-
                 var (k1, k2) = Split(blindSum);
 
-                mintedCoin.Envelope.Commit = commitPos.ToHex();
+                mintedCoin.Envelope.Commitment = commitSum.ToHex();
                 mintedCoin.Envelope.Proof = k2.ToHex();
                 mintedCoin.Envelope.PublicKey = pedersen.ToPublicKey(Commit(0, k1)).ToHex();
-                mintedCoin.Envelope.Signature = secp256k1.Sign(Hash(mintedCoin), k1).ToHex();
-
                 mintedCoin.Hash = Hash(mintedCoin).ToHex();
+                mintedCoin.Envelope.Signature = secp256k1.Sign(mintedCoin.Hash.FromHex(), k1).ToHex();
 
                 proofStruct = rangeProof.Proof(0, NaT(transactionCoin.Input), blindSum, commitSum, mintedCoin.Hash.FromHex());
 
@@ -92,7 +91,7 @@ namespace TangramCypher.ApplicationLayer.Coin
                 if (!isVerified)
                     throw new ArgumentOutOfRangeException(nameof(isVerified), "Range proof failed.");
 
-                receiverOutput = new ReceiverOutput(transactionCoin.Input, commitPos, blindSum);
+                receiverOutput = new ReceiverOutput(transactionCoin.Input, commitSum, blindSum);
             }
 
             return this;
@@ -111,12 +110,14 @@ namespace TangramCypher.ApplicationLayer.Coin
                 Stamp(transactionCoin.Stamp);
                 Version(transactionCoin.Version);
 
+                mintedCoin = MakeSingleCoin();
+
                 var commitNegs = new List<byte[]>();
                 var blindNegSums = new List<byte[]>();
 
                 var received = transactionCoin.Chain.FirstOrDefault(tx => tx.TransactionType == TransactionType.Receive);
 
-                var blindNeg = DeriveKey(transactionCoin.Input, received.Stamp, received.Version);
+                var blindNeg = DeriveKey(transactionCoin.Input, received.Stamp, mintedCoin.Version);
                 var commitNeg = pedersen.Commit(NaT(transactionCoin.Input), blindNeg);
 
                 commitNegs = transactionCoin.Chain
@@ -134,14 +135,13 @@ namespace TangramCypher.ApplicationLayer.Coin
                 var blindSum = pedersen.BlindSum(new List<byte[]> { received.Blind.FromHex() }, blindNegSums);
                 var commitSum = pedersen.CommitSum(new List<byte[]> { received.Commitment.FromHex() }, commitNegs);
 
-                mintedCoin = MakeSingleCoin();
-
                 var (k1, k2) = Split(blindSum);
 
-                mintedCoin.Envelope.Commit = commitNeg.ToHex();
+                mintedCoin.Envelope.Commitment = commitSum.ToHex();
                 mintedCoin.Envelope.Proof = k2.ToHex();
                 mintedCoin.Envelope.PublicKey = pedersen.ToPublicKey(Commit(0, k1)).ToHex();
-                mintedCoin.Envelope.Signature = secp256k1.Sign(Hash(mintedCoin), k1).ToHex();
+                mintedCoin.Hash = Hash(mintedCoin).ToHex();
+                mintedCoin.Envelope.Signature = secp256k1.Sign(mintedCoin.Hash.FromHex(), k1).ToHex();
 
                 proofStruct = rangeProof.Proof(0, NaT(transactionCoin.Output), blindSum, commitSum, mintedCoin.Hash.FromHex());
 
@@ -352,7 +352,7 @@ namespace TangramCypher.ApplicationLayer.Coin
 
             return Cryptography.GenericHashNoKey(
                 string.Format("{0} {1} {2} {3} {4} {5} {6}",
-                    coin.Envelope.Commit,
+                    coin.Envelope.Commitment,
                     coin.Envelope.Proof,
                     coin.Envelope.PublicKey,
                     coin.Hint,
