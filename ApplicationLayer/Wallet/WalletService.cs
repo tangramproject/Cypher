@@ -746,7 +746,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
             address[0] = env == Constant.Mainnet ? (byte)0x1 : (byte)74;
 
             var hash = Cryptography.GenericHashWithKey(
-                $"{coin.Envelope.Commit}" +
+                $"{coin.Envelope.Commitment}" +
                 $" {coin.Envelope.Proof}" +
                 $" {coin.Envelope.PublicKey}" +
                 $" {coin.Envelope.Signature}" +

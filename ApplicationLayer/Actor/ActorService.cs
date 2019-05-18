@@ -899,7 +899,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             {
                 Amount = total,
                 Blind = blind == null ? string.Empty : blind.ToHex(),
-                Commitment = formattedCoin.Envelope.Commit,
+                Commitment = formattedCoin.Envelope.Commitment,
                 Hash = formattedCoin.Hash,
                 Stamp = formattedCoin.Stamp,
                 Version = formattedCoin.Version,
