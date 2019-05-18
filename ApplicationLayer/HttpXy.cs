@@ -10,7 +10,6 @@ using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using Cypher.ApplicationLayer.Onion;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Builder;
@@ -22,6 +21,7 @@ using Microsoft.Extensions.Logging;
 using Swashbuckle.AspNetCore.Swagger;
 using TangramCypher.ApplicationLayer.Actor;
 using TangramCypher.ApplicationLayer.Coin;
+using TangramCypher.ApplicationLayer.Onion;
 using TangramCypher.ApplicationLayer.Vault;
 using TangramCypher.ApplicationLayer.Wallet;
 

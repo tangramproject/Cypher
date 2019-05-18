@@ -30,14 +30,14 @@ namespace TangramCypher.ApplicationLayer.Wallet
 {
     public class WalletService : IWalletService
     {
-        private readonly IVaultService vaultService;
+        private readonly IVaultServiceClient vaultServiceClient;
         private readonly IConfigurationSection apiNetworkSection;
         private readonly ILogger logger;
         private readonly string environment;
 
-        public WalletService(IVaultService vaultService, IConfiguration configuration, ILogger logger)
+        public WalletService(IVaultServiceClient vaultServiceClient, IConfiguration configuration, ILogger logger)
         {
-            this.vaultService = vaultService;
+            this.vaultServiceClient = vaultServiceClient;
 
             apiNetworkSection = configuration.GetSection(Constant.ApiNetwork);
             environment = apiNetworkSection.GetValue<string>(Constant.Environment);
@@ -101,13 +101,13 @@ namespace TangramCypher.ApplicationLayer.Wallet
             {
                 try
                 {
-                    var data = await vaultService.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
+                    var data = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
 
                     if (data.Data.TryGetValue("storeKeys", out object keys))
                     {
                         ((JArray)keys).Add(JObject.FromObject(pkSk));
 
-                        await vaultService.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", data.Data);
+                        await vaultServiceClient.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", data.Data);
 
                         added = true;
                     }
@@ -152,14 +152,14 @@ namespace TangramCypher.ApplicationLayer.Wallet
 
             try
             {
-                await vaultService.CreateUserAsync(walletId, passphrase);
+                await vaultServiceClient.CreateUserAsync(walletId, passphrase);
 
                 var dic = new Dictionary<string, object>
                 {
                     { "storeKeys", new List<PkSkDto> { pkSk } }
                 };
 
-                await vaultService.SaveDataAsync(
+                await vaultServiceClient.SaveDataAsync(
                     walletId,
                     passphrase,
                             $"wallets/{walletId.ToUnSecureString()}/wallet",
@@ -230,7 +230,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
                 try
                 {
                     var found = false;
-                    var data = await vaultService.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
+                    var data = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
 
                     if (data.Data.TryGetValue("transactions", out object txs))
                     {
@@ -245,7 +245,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
                     else
                         data.Data.Add("transactions", new List<TransactionDto> { transaction });
 
-                    await vaultService.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", data.Data);
+                    await vaultServiceClient.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", data.Data);
 
                     added = true;
                 }
@@ -278,7 +278,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
                 try
                 {
                     var found = false;
-                    var data = await vaultService.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
+                    var data = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
 
                     if (data.Data.TryGetValue("messages", out object msgs))
                     {
@@ -296,7 +296,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
                     else
                         data.Data.Add("messages", new List<MessageTrackDto> { messageTrack });
 
-                    await vaultService.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", data.Data);
+                    await vaultServiceClient.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", data.Data);
 
                     added = true;
                 }
@@ -327,7 +327,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
             {
                 try
                 {
-                    var data = await vaultService.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
+                    var data = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
                     if (data.Data.TryGetValue("messages", out object msgs))
                     {
                         messageTrack = ((JArray)msgs).ToObject<List<MessageTrackDto>>().FirstOrDefault(msg => msg.PublicKey.Equals(pk));
@@ -430,7 +430,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
             {
                 try
                 {
-                    var data = await vaultService.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
+                    var data = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
                     if (data.Data.TryGetValue("transactions", out object txs))
                     {
                         transactions = ((JArray)txs).ToObject<List<TransactionDto>>();
@@ -464,7 +464,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
             {
                 try
                 {
-                    var data = await vaultService.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
+                    var data = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
                     var storeKeys = JObject.FromObject(data.Data["storeKeys"]);
                     var key = storeKeys.GetValue(storeKey).Value<string>();
 
@@ -499,7 +499,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
             {
                 try
                 {
-                    var data = await vaultService.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
+                    var data = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
 
                     if (data.Data.TryGetValue("storeKeys", out object keys))
                     {
@@ -543,7 +543,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
             {
                 try
                 {
-                    var data = await vaultService.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
+                    var data = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
 
                     if (data.Data.TryGetValue("storeKeys", out object keys))
                     {
@@ -624,7 +624,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
             {
                 using (var id = identifier.Insecure())
                 {
-                    var data = await vaultService.GetDataAsync(identifier, password, $"wallets/{id.Value}/wallet");
+                    var data = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{id.Value}/wallet");
                     profile = JsonConvert.SerializeObject(data);
                 }
             }
@@ -643,7 +643,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <returns>The identifier list.</returns>
         public async Task<IEnumerable<string>> WalletList()
         {
-            var data = await vaultService.GetListAsync($"wallets/");
+            var data = await vaultServiceClient.GetListAsync($"wallets/");
             var keys = data.Data?.Keys;
             return keys;
         }
@@ -807,14 +807,14 @@ namespace TangramCypher.ApplicationLayer.Wallet
             {
                 try
                 {
-                    var data = await vaultService.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
+                    var data = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
 
                     if (data.Data.TryGetValue("transactions", out object txs))
                     {
                         data.Data.Add("transactions", new List<TransactionDto>());
                     }
 
-                    await vaultService.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", data.Data);
+                    await vaultServiceClient.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", data.Data);
 
                     cleared = true;
                 }
