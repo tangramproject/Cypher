@@ -104,7 +104,7 @@ namespace TangramCypher.Helper
             {
                 Envelope = new EnvelopeDto()
                 {
-                    Commitment = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Envelope.Commitment)),
+                    Commit = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Envelope.Commit)),
                     Proof = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Envelope.Proof)),
                     PublicKey = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Envelope.PublicKey)),
                     Signature = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Envelope.Signature))
@@ -126,7 +126,7 @@ namespace TangramCypher.Helper
             {
                 Envelope = new EnvelopeDto()
                 {
-                    Commitment = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Envelope.Commitment)),
+                    Commit = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Envelope.Commit)),
                     Proof = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Envelope.Proof)),
                     PublicKey = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Envelope.PublicKey)),
                     Signature = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Envelope.Signature))

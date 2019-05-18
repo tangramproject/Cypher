@@ -51,7 +51,11 @@ namespace TangramCypher.ApplicationLayer.Actor
         private readonly Client client;
 
         public event MessagePumpEventHandler MessagePump;
-        protected void OnMessagePump(MessagePumpEventArgs e) => MessagePump?.Invoke(this, e);
+        protected void OnMessagePump(MessagePumpEventArgs e)
+        {
+            if (MessagePump != null)
+                MessagePump.Invoke(this, e);
+        }
 
         public ActorService(IOnionService onionService, IWalletService walletService, ICoinService coinService, IConfiguration configuration, ILogger logger)
         {
@@ -486,7 +490,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                     return false;
 
                 //TODO: Could possibility fail.. need recovery..
-                var added = await AddWalletTransaction(coin, redemptionKey.Amount, TransactionType.Receive);
+                var added = await AddWalletTransaction(coin, redemptionKey.Amount, TransactionType.Receive, redemptionKey.Blind.FromHex());
                 if (added.Equals(false))
                     return false;
 
@@ -635,7 +639,21 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             var spendCoin = await Spend();
             if (spendCoin == null)
-                return false;
+            {
+                for (int i = 1; i < 10; i++)
+                {
+                    UpdateMessagePump($"Retrying {i} of 10");
+
+                    spendCoin = await Spend();
+                    await Task.Delay(100);
+
+                    if (i == 10)
+                    {
+                        if (spendCoin == null)
+                            return false;
+                    }
+                }
+            }
 
             //TODO: Receiver coin could possibility fail.. need recovery..
             var receiverSent = await SendReceiverCoin();
@@ -808,9 +826,9 @@ namespace TangramCypher.ApplicationLayer.Actor
         private async Task<CoinDto> Spend()
         {
             CoinDto coin = null;
-            var sortChange = await walletService.SortChange(Identifier(), MasterKey(), Amount());
+            var transactionCoin = await walletService.SortChange(Identifier(), MasterKey(), Amount());
 
-            if (sortChange == null)
+            if (transactionCoin == null)
             {
                 lastError = JObject.FromObject(new
                 {
@@ -823,25 +841,22 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             var senderCoin = coinService
                              .Password(MasterKey())
-                             .Input(sortChange.Balance)
-                             .Output(sortChange.Amount)
-                             .Stamp(sortChange.Stamp)
-                             .Version(sortChange.Version)
+                             .TransactionCoin(transactionCoin)
                              .BuildSender()
                              .Coin();
 
-            senderCoin.Network = walletService.NetworkAddress(senderCoin).ToHex();
-
-            if (!sortChange.Change.Equals(coinService.Change()))
+            if (senderCoin == null)
             {
                 lastError = JObject.FromObject(new
                 {
                     success = false,
-                    message = "Calculated change does not equal the coin change!"
+                    message = "Failed to build sender coin!"
                 });
 
                 return null;
             }
+
+            senderCoin.Network = walletService.NetworkAddress(senderCoin).ToHex();
 
             coin = await AddAsync(senderCoin.FormatCoinToBase64(), RestApiMethod.PostCoin);
 
@@ -857,7 +872,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             }
 
             //TODO: Could possibility fail.. need recovery..
-            var added = await AddWalletTransaction(coin, coinService.Output(), TransactionType.Send);
+            var added = await AddWalletTransaction(coin, transactionCoin.Input, TransactionType.Send);
 
             return coin;
         }
@@ -868,7 +883,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <returns>The Wallet transaction.</returns>
         /// <param name="coin">Coin.</param>
         /// <param name="transactionType">Transaction type.</param>
-        private async Task<bool> AddWalletTransaction(CoinDto coin, double total, TransactionType transactionType)
+        private async Task<bool> AddWalletTransaction(CoinDto coin, double total, TransactionType transactionType, byte[] blind = null)
         {
             Guard.Argument(coin, nameof(coin)).NotNull();
             Guard.Argument(total, nameof(total)).NotNegative();
@@ -883,7 +898,8 @@ namespace TangramCypher.ApplicationLayer.Actor
             var transaction = new TransactionDto
             {
                 Amount = total,
-                Commitment = formattedCoin.Envelope.Commitment,
+                Blind = blind == null ? string.Empty : blind.ToHex(),
+                Commitment = formattedCoin.Envelope.Commit,
                 Hash = formattedCoin.Hash,
                 Stamp = formattedCoin.Stamp,
                 Version = formattedCoin.Version,

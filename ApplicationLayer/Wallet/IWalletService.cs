@@ -31,7 +31,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
         Task<double> LastTransactionAmount(SecureString identifier, SecureString password, TransactionType transactionType);
         Task<SecureString> StoreKey(SecureString identifier, SecureString password, string storeKey);
         Task<SecureString> StoreKey(SecureString identifier, SecureString password, StoreKeyApiMethod storeKeyApi, string address);
-        Task<TransactionIndicator> SortChange(SecureString identifier, SecureString password, double amount);
+        Task<TransactionCoin> SortChange(SecureString identifier, SecureString password, double amount);
         Task<bool> AddMessageTracking(SecureString identifier, SecureString password, MessageTrackDto messageTrack);
         Task<MessageTrackDto> MessageTrack(SecureString identifier, SecureString password, string pk);
         byte[] NetworkAddress(CoinDto coin, NetworkApiMethod networkApi = null);

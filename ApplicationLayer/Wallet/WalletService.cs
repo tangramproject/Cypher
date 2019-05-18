@@ -569,7 +569,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <param name="identifier">Identifier.</param>
         /// <param name="password">Password.</param>
         /// <param name="amount">Amount.</param>
-        public async Task<TransactionIndicator> SortChange(SecureString identifier, SecureString password, double amount)
+        public async Task<TransactionCoin> SortChange(SecureString identifier, SecureString password, double amount)
         {
             Guard.Argument(identifier, nameof(identifier)).NotNull();
             Guard.Argument(password, nameof(password)).NotNull();
@@ -580,7 +580,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
             if (transactions == null)
                 return null;
 
-            TransactionIndicator indicator = null;
+            TransactionCoin transactionCoin = null;
             TransactionDto[] txsIn = transactions.Where(tx => tx.TransactionType == TransactionType.Receive).OrderBy(tx => tx.Version).ToArray();
             TransactionDto[] target = new TransactionDto[txsIn.Length];
 
@@ -592,14 +592,20 @@ namespace TangramCypher.ApplicationLayer.Wallet
 
                 if (balance >= amountFor)
                 {
-                    indicator = new TransactionIndicator
+                    transactionCoin = new TransactionCoin
                     {
-                        Amount = amountFor,
                         Balance = balance,
-                        Change = balance - amountFor,
-                        Stamp = transaction.Stamp,
-                        Version = transactions.Last(s => s.Stamp.Equals(transaction.Stamp)).Version
+                        Input = amount,
+                        Output = balance - amountFor,
+                        Stamp = transaction.Stamp
                     };
+
+                    transactionCoin.Chain = transactions.Where(tx => tx.Stamp.Equals(transaction.Stamp)).ToList();
+                    transactionCoin.Version = transactionCoin.Chain.Last().Version;
+
+                    if (transactionCoin.Input.Equals(0))
+                        transactionCoin.Spent = true;
+
                     break;
                 }
 
@@ -607,7 +613,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
                 txsIn = txsIn.Where((source, index) => index != idx).ToArray();
             }
 
-            return indicator;
+            return transactionCoin;
         }
 
         /// <summary>
@@ -740,7 +746,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
             address[0] = env == Constant.Mainnet ? (byte)0x1 : (byte)74;
 
             var hash = Cryptography.GenericHashWithKey(
-                $"{coin.Envelope.Commitment}" +
+                $"{coin.Envelope.Commit}" +
                 $" {coin.Envelope.Proof}" +
                 $" {coin.Envelope.PublicKey}" +
                 $" {coin.Envelope.Signature}" +

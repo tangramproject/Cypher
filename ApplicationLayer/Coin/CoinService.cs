@@ -30,16 +30,13 @@ namespace TangramCypher.ApplicationLayer.Coin
         public const long AttoTan = 1000_000_000_000_000_000;
 
         private readonly ILogger logger;
-
-        private double input;
-        private double output;
-        private double change;
-        private int version;
         private string stamp;
+        private int version;
         private SecureString password;
         private ReceiverOutput receiverOutput;
         private CoinDto mintedCoin;
         private ProofStruct proofStruct;
+        private TransactionCoin transactionCoin;
 
         public CoinService(ILogger logger)
         {
@@ -54,15 +51,19 @@ namespace TangramCypher.ApplicationLayer.Coin
         {
             using (var secp256k1 = new Secp256k1())
             using (var pedersen = new Pedersen())
+            using (var rangeProof = new RangeProof())
             {
-                var naTOutput = NaT(Output());
-                var blind = DeriveKey(naTOutput);
+                Stamp(GetNewStamp());
+                Version(-1);
+
+                var naTInput = NaT(transactionCoin.Input);
+                var blind = DeriveKey(naTInput, stamp, 0);
 
                 byte[] blindSum = new byte[32];
 
                 try
                 {
-                    blindSum = pedersen.BlindSum(new List<byte[]> { blind, blind }, new List<byte[]> { });
+                    blindSum = pedersen.BlindSum(new List<byte[]> { blind }, new List<byte[]> { });
                 }
                 catch (Exception ex)
                 {
@@ -70,14 +71,28 @@ namespace TangramCypher.ApplicationLayer.Coin
                     throw ex;
                 }
 
-                var commitPos = Commit(naTOutput, blind);
-                var commitNeg = Commit(0, blind);
+                var commitPos = Commit(naTInput, blind);
+                var commitSum = pedersen.CommitSum(new List<byte[]> { commitPos }, new List<byte[]> { });
 
-                Stamp(GetNewStamp());
-                Version(-1);
+                mintedCoin = MakeSingleCoin();
 
-                mintedCoin = BuildCoin(blindSum, commitPos, commitNeg, true);
-                receiverOutput = new ReceiverOutput(Output(), commitPos, blindSum);
+                var (k1, k2) = Split(blindSum);
+
+                mintedCoin.Envelope.Commit = commitPos.ToHex();
+                mintedCoin.Envelope.Proof = k2.ToHex();
+                mintedCoin.Envelope.PublicKey = pedersen.ToPublicKey(Commit(0, k1)).ToHex();
+                mintedCoin.Envelope.Signature = secp256k1.Sign(Hash(mintedCoin), k1).ToHex();
+
+                mintedCoin.Hash = Hash(mintedCoin).ToHex();
+
+                proofStruct = rangeProof.Proof(0, NaT(transactionCoin.Input), blindSum, commitSum, mintedCoin.Hash.FromHex());
+
+                var isVerified = rangeProof.Verify(commitSum, proofStruct);
+
+                if (!isVerified)
+                    throw new ArgumentOutOfRangeException(nameof(isVerified), "Range proof failed.");
+
+                receiverOutput = new ReceiverOutput(transactionCoin.Input, commitPos, blindSum);
             }
 
             return this;
@@ -91,50 +106,60 @@ namespace TangramCypher.ApplicationLayer.Coin
         {
             using (var secp256k1 = new Secp256k1())
             using (var pedersen = new Pedersen())
+            using (var rangeProof = new RangeProof())
             {
-                var naTInput = NaT(Input());
-                var naTOutput = NaT(Output());
+                Stamp(transactionCoin.Stamp);
+                Version(transactionCoin.Version);
 
-                byte[] blindPos = new byte[32];
-                byte[] blindNeg = new byte[32];
-                byte[] blindSum = new byte[32];
+                var commitNegs = new List<byte[]>();
+                var blindNegSums = new List<byte[]>();
 
-                try
-                {
-                    blindPos = pedersen.BlindSwitch(naTInput, DeriveKey(naTInput));
-                    blindNeg = pedersen.BlindSwitch(naTOutput, DeriveKey(naTOutput));
-                    blindSum = pedersen.BlindSum(new List<byte[]> { blindPos }, new List<byte[]> { blindNeg });
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
-                    throw ex;
-                }
+                var received = transactionCoin.Chain.FirstOrDefault(tx => tx.TransactionType == TransactionType.Receive);
 
-                var commitPos = Commit(naTInput, blindPos);
-                var commitNeg = Commit(naTOutput, blindNeg);
+                var blindNeg = DeriveKey(transactionCoin.Input, received.Stamp, received.Version);
+                var commitNeg = pedersen.Commit(NaT(transactionCoin.Input), blindNeg);
 
-                mintedCoin = BuildCoin(blindSum, commitPos, commitNeg);
+                commitNegs = transactionCoin.Chain
+                               .Where(tx => tx.TransactionType == TransactionType.Send)
+                               .Select(c => pedersen.Commit(NaT(c.Amount), DeriveKey(c.Amount, c.Stamp, c.Version))).ToList();
+
+                commitNegs.Add(commitNeg);
+
+                blindNegSums = transactionCoin.Chain
+                                .Where(tx => tx.TransactionType == TransactionType.Send)
+                                .Select(c => DeriveKey(c.Amount, c.Stamp, c.Version)).ToList();
+
+                blindNegSums.Add(blindNeg);
+
+                var blindSum = pedersen.BlindSum(new List<byte[]> { received.Blind.FromHex() }, blindNegSums);
+                var commitSum = pedersen.CommitSum(new List<byte[]> { received.Commitment.FromHex() }, commitNegs);
+
+                mintedCoin = MakeSingleCoin();
+
+                var (k1, k2) = Split(blindSum);
+
+                mintedCoin.Envelope.Commit = commitNeg.ToHex();
+                mintedCoin.Envelope.Proof = k2.ToHex();
+                mintedCoin.Envelope.PublicKey = pedersen.ToPublicKey(Commit(0, k1)).ToHex();
+                mintedCoin.Envelope.Signature = secp256k1.Sign(Hash(mintedCoin), k1).ToHex();
+
+                proofStruct = rangeProof.Proof(0, NaT(transactionCoin.Output), blindSum, commitSum, mintedCoin.Hash.FromHex());
+
+                var isVerified = rangeProof.Verify(commitSum, proofStruct);
+
+                if (!isVerified)
+                    throw new ArgumentOutOfRangeException(nameof(isVerified), "Range proof failed.");
             }
 
             return this;
         }
 
         /// <summary>
-        /// Change this instance.
-        /// </summary>
-        /// <returns>The change.</returns>
-        public double Change() => change = Math.Abs(input) - Math.Abs(output);
-
-        /// <summary>
         /// Clears the change, imputs, minted coin, outputs, password, receiver output, stamp and version cache.
         /// </summary>
         public void ClearCache()
         {
-            change = 0;
-            Input(0);
             mintedCoin = null;
-            Output(0);
             Password(null);
             receiverOutput = null;
             Stamp(string.Empty);
@@ -286,40 +311,18 @@ namespace TangramCypher.ApplicationLayer.Coin
 
             using (var insecurePassword = password.Insecure())
             {
-                return Cryptography.GenericHashNoKey(string.Format("{0} {1} {2}", version, stamp, insecurePassword.Value), bytes).ToHex();
+                return Cryptography.GenericHashNoKey($"{version} {stamp} {insecurePassword.Value}", bytes).ToHex();
             }
         }
 
-        /// <summary>
-        /// Derives the key.
-        /// </summary>
-        /// <returns>The key.</returns>
-        /// <param name="bytes">Bytes.</param>
-        public byte[] DeriveKey(int bytes = 32)
+        public byte[] DeriveKey(double amount, string stamp, int version)
         {
-            Guard.Argument(stamp, nameof(stamp)).NotNull().NotEmpty();
+            Guard.Argument(amount, nameof(amount)).NotNegative();
             Guard.Argument(password, nameof(password)).NotNull();
 
             using (var insecurePassword = Password().Insecure())
             {
-                return Cryptography.GenericHashNoKey(string.Format("{0} {1} {2}", Version(), Stamp(), insecurePassword.Value), bytes);
-            }
-        }
-
-        /// <summary>
-        /// Derives the key.
-        /// </summary>
-        /// <returns>The key.</returns>
-        /// <param name="value">Value.</param>
-        /// <param name="bytes">Bytes.</param>
-        public byte[] DeriveKey(double value, int bytes = 32)
-        {
-            Guard.Argument(value, nameof(value)).NotNegative();
-            Guard.Argument(password, nameof(password)).NotNull();
-
-            using (var insecurePassword = Password().Insecure())
-            {
-                return Cryptography.GenericHashNoKey(string.Format("{0} {1} {2}", Version(), value, insecurePassword.Value), bytes);
+                return Cryptography.GenericHashNoKey($"{amount} {stamp} {version} {insecurePassword.Value}", 32);
             }
         }
 
@@ -349,7 +352,7 @@ namespace TangramCypher.ApplicationLayer.Coin
 
             return Cryptography.GenericHashNoKey(
                 string.Format("{0} {1} {2} {3} {4} {5} {6}",
-                    coin.Envelope.Commitment,
+                    coin.Envelope.Commit,
                     coin.Envelope.Proof,
                     coin.Envelope.PublicKey,
                     coin.Hint,
@@ -544,30 +547,19 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// </summary>
         /// <returns>The split.</returns>
         /// <param name="blinding">Blinding.</param>
-        public (byte[], byte[]) Split(byte[] blinding, bool isReceiver = false)
+        public (byte[], byte[]) Split(byte[] blinding)
         {
             Guard.Argument(blinding, nameof(blinding)).NotNull().MaxCount(32);
 
             using (var pedersen = new Pedersen())
             {
-                ulong naTInput = 0, naTOutput = 0, naTChange = 0;
-
-                if (isReceiver)
-                    naTChange = NaT(Output());
-                else
-                {
-                    naTInput = NaT(Input());
-                    naTOutput = NaT(Output());
-                    naTChange = naTInput - naTOutput;
-                }
-
-                var skey1 = DeriveKey(naTChange);
+                var skey1 = DeriveKey(transactionCoin.Input, stamp, version);
 
                 byte[] skey2 = new byte[32];
 
                 try
                 {
-                    skey2 =pedersen.BlindSum(new List<byte[]> { blinding }, new List<byte[]> { skey1 });
+                    skey2 = pedersen.BlindSum(new List<byte[]> { blinding }, new List<byte[]> { skey1 });
                 }
                 catch (Exception ex)
                 {
@@ -593,8 +585,8 @@ namespace TangramCypher.ApplicationLayer.Coin
             return DeriveCoin(password,
                 new CoinDto
                 {
-                    Version = transaction.Version,
-                    Stamp = transaction.Stamp,
+                    Version = version,
+                    Stamp = stamp,
                     Envelope = new EnvelopeDto()
                 });
         }
@@ -609,8 +601,8 @@ namespace TangramCypher.ApplicationLayer.Coin
 
             return DeriveCoin(new CoinDto
             {
-                Version = Version() + 1,
-                Stamp = Stamp(),
+                Version = version + 1,
+                Stamp = stamp,
                 Envelope = new EnvelopeDto()
             });
         }
@@ -633,40 +625,6 @@ namespace TangramCypher.ApplicationLayer.Coin
                     Stamp = tx.Stamp,
                     Envelope = new EnvelopeDto()
                 }));
-        }
-
-        /// <summary>
-        /// Inputs this instance.
-        /// </summary>
-        /// <returns>The inputs.</returns>
-        public double Input() => input;
-
-        /// <summary>
-        /// Input the specified value.
-        /// </summary>
-        /// <returns>The input.</returns>
-        /// <param name="value">Value.</param>
-        public CoinService Input(double value)
-        {
-            input = Guard.Argument(value, nameof(value)).NotNegative();
-            return this;
-        }
-
-        /// <summary>
-        /// Outputs this instance.
-        /// </summary>
-        /// <returns>The outputs.</returns>
-        public double Output() => output;
-
-        /// <summary>
-        /// Output the specified value.
-        /// </summary>
-        /// <returns>The output.</returns>
-        /// <param name="value">Value.</param>
-        public CoinService Output(double value)
-        {
-            output = Guard.Argument(value, nameof(value)).NotNegative();
-            return this;
         }
 
         /// <summary>
@@ -729,6 +687,14 @@ namespace TangramCypher.ApplicationLayer.Coin
             return this;
         }
 
+        public TransactionCoin TransactionCoin() => transactionCoin;
+
+        public CoinService TransactionCoin(TransactionCoin transactionCoin)
+        {
+            this.transactionCoin = transactionCoin;
+            return this;
+        }
+
         /// <summary>
         /// Password this instance.
         /// </summary>
@@ -744,69 +710,6 @@ namespace TangramCypher.ApplicationLayer.Coin
         {
             this.password = password;
             return this;
-        }
-
-        /// <summary>
-        /// Builds the coin.
-        /// </summary>
-        /// <returns>The coin.</returns>
-        /// <param name="blindSum">Blind sum.</param>
-        /// <param name="commitPos">Commit position.</param>
-        /// <param name="commitNeg">Commit neg.</param>
-        private CoinDto BuildCoin(byte[] blindSum, byte[] commitPos, byte[] commitNeg, bool isReceiver = false)
-        {
-            Guard.Argument(blindSum, nameof(blindSum)).NotNull().MaxCount(32);
-            Guard.Argument(commitPos, nameof(commitPos)).NotNull().MaxCount(33);
-            Guard.Argument(commitNeg, nameof(commitNeg)).NotNull().MaxCount(33);
-
-            CoinDto coin = null;
-            bool isVerified;
-
-            using (var secp256k1 = new Secp256k1())
-            using (var pedersen = new Pedersen())
-            using (var rangeProof = new RangeProof())
-            {
-                try
-                {
-                    var commitSum = pedersen.CommitSum(new List<byte[]> { commitPos }, new List<byte[]> { commitNeg });
-                    var naTInput = NaT(Input());
-                    var naTOutput = NaT(Output());
-                    var naTChange = naTInput - naTOutput;
-
-                    isVerified = isReceiver
-                        ? pedersen.VerifyCommitSum(new List<byte[]> { commitPos, commitNeg }, new List<byte[]> { Commit(naTOutput, blindSum) })
-                        : pedersen.VerifyCommitSum(new List<byte[]> { commitPos }, new List<byte[]> { commitNeg, commitSum });
-
-                    if (!isVerified)
-                        throw new ArgumentOutOfRangeException(nameof(isVerified), "Verify commit sum failed.");
-
-                    var (k1, k2) = Split(blindSum, isReceiver);
-
-                    coin = MakeSingleCoin();
-
-                    coin.Envelope.Commitment = isReceiver ? Commit(naTOutput, blindSum).ToHex() : commitSum.ToHex();
-                    coin.Envelope.Proof = k2.ToHex();
-                    coin.Envelope.PublicKey = pedersen.ToPublicKey(Commit(0, k1)).ToHex();
-                    coin.Envelope.Signature = secp256k1.Sign(Hash(coin), k1).ToHex();
-
-                    coin.Hash = Hash(coin).ToHex();
-
-                    proofStruct = isReceiver
-                        ? rangeProof.Proof(0, naTOutput, blindSum, coin.Envelope.Commitment.FromHex(), coin.Hash.FromHex())
-                        : rangeProof.Proof(0, naTChange, blindSum, coin.Envelope.Commitment.FromHex(), coin.Hash.FromHex());
-
-                    isVerified = rangeProof.Verify(coin.Envelope.Commitment.FromHex(), proofStruct);
-
-                    if (!isVerified)
-                        throw new ArgumentOutOfRangeException(nameof(isVerified), "Range proof failed.");
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
-                }
-            }
-
-            return coin;
         }
 
         /// <summary>

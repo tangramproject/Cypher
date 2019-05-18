@@ -6,13 +6,17 @@
 // You should have received a copy of the license along with this
 // work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
 
+using System.Collections.Generic;
+
 namespace TangramCypher.ApplicationLayer.Wallet
 {
-    public class TransactionIndicator
+    public class TransactionCoin
     {
-        public double Amount { get; set; }
+        public IList<TransactionDto> Chain { get; set; }
         public double Balance { get; set; }
-        public double Change { get; set; }
+        public double Input { get; set; }
+        public double Output { get; set; }
+        public bool Spent { get; set; }
         public string Stamp { get; set; }
         public int Version { get; set; }
     }
