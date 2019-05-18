@@ -17,6 +17,8 @@ namespace TangramCypher.ApplicationLayer.Onion
 
         public OnionServiceClient(IConfiguration configuration, ILogger logger, IConsole console)
         {
+            onionSection = configuration.GetSection(Constants.ONION);
+
             SocksHost = onionSection.GetValue<string>(Constants.SOCKS_HOST);
             SocksPort = onionSection.GetValue<int>(Constants.SOCKS_PORT);
             OnionEnabled = onionSection.GetValue<int>(Constants.ONION_ENABLED);
