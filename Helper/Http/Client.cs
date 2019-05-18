@@ -69,6 +69,7 @@ namespace TangramCypher.Helper.Http
                         else
                         {
                             var content = await Util.StreamToStringAsync(stream);
+                            logger.LogError($"Message: {content}\n StatusCode: {(int)response.StatusCode}");
                             throw new ApiException
                             {
                                 StatusCode = (int)response.StatusCode,
@@ -118,6 +119,7 @@ namespace TangramCypher.Helper.Http
                         else
                         {
                             var content = await Util.StreamToStringAsync(stream);
+                            logger.LogError($"Message: {content}\n StatusCode: {(int)response.StatusCode}");
                             throw new ApiException
                             {
                                 StatusCode = (int)response.StatusCode,
@@ -176,6 +178,7 @@ namespace TangramCypher.Helper.Http
                             else
                             {
                                 var contentResult = await Util.StreamToStringAsync(stream);
+                                logger.LogError($"Result: {contentResult}\n Content: {content}\n StatusCode: {(int)response.StatusCode}");
                                 throw new ApiException
                                 {
                                     StatusCode = (int)response.StatusCode,
