@@ -22,20 +22,10 @@ using Microsoft.Extensions.Logging;
 using TangramCypher.ApplicationLayer;
 using TangramCypher.Helper;
 
-namespace Cypher.ApplicationLayer.Onion
+namespace TangramCypher.ApplicationLayer.Onion
 {
     public class OnionService : HostedService, IOnionService, IDisposable
     {
-        const string ONION = "onion";
-        const string TORRC = "torrc";
-        const string SOCKS_HOST = "onion_socks_host";
-        const string SOCKS_PORT = "onion_socks_port";
-        const string CONTROL_HOST = "onion_control_host";
-        const string CONTROL_PORT = "onion_control_port";
-        const string HASHED_CONTROL_PASSWORD = "onion_hashed_control_password";
-        const string HIDDEN_SERVICE_PORT = "onion_hidden_service_port";
-        const string ONION_ENABLED = "onion_enabled";
-
         private static readonly DirectoryInfo tangramDirectory = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
 
         readonly IConfigurationSection onionSection;
@@ -60,20 +50,20 @@ namespace Cypher.ApplicationLayer.Onion
 
         public OnionService(IConfiguration configuration, ILogger logger, IConsole console)
         {
-            onionSection = configuration.GetSection(ONION);
+            onionSection = configuration.GetSection(Constants.ONION);
 
             this.logger = logger;
             this.console = console;
 
-            SocksHost = onionSection.GetValue<string>(SOCKS_HOST);
-            SocksPort = onionSection.GetValue<int>(SOCKS_PORT);
-            controlHost = onionSection.GetValue<string>(CONTROL_HOST);
-            ControlPort = onionSection.GetValue<int>(CONTROL_PORT);
-            hiddenServicePort = onionSection.GetValue<string>(HIDDEN_SERVICE_PORT);
-            OnionEnabled = onionSection.GetValue<int>(ONION_ENABLED);
+            SocksHost = onionSection.GetValue<string>(Constants.SOCKS_HOST);
+            SocksPort = onionSection.GetValue<int>(Constants.SOCKS_PORT);
+            controlHost = onionSection.GetValue<string>(Constants.CONTROL_HOST);
+            ControlPort = onionSection.GetValue<int>(Constants.CONTROL_PORT);
+            hiddenServicePort = onionSection.GetValue<string>(Constants.HIDDEN_SERVICE_PORT);
+            OnionEnabled = onionSection.GetValue<int>(Constants.ONION_ENABLED);
 
-            onionDirectory = Path.Combine(Path.GetDirectoryName(AppDomain.CurrentDomain.BaseDirectory), ONION);
-            torrcPath = Path.Combine(onionDirectory, TORRC);
+            onionDirectory = Path.Combine(Path.GetDirectoryName(AppDomain.CurrentDomain.BaseDirectory), Constants.ONION);
+            torrcPath = Path.Combine(onionDirectory, Constants.TORRC);
             controlPortPath = Path.Combine(onionDirectory, "control-port");
             hiddenServicePath = Path.Combine(onionDirectory, "hidden_service");
             var pluggableTransports = Path.Combine(tangramDirectory.FullName, "PluggableTransports");
@@ -375,6 +365,8 @@ namespace Cypher.ApplicationLayer.Onion
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
+            Debug.WriteLine("EXECUTE ASYNC ONION");
+
             if (OnionEnabled == 1)
             {
                 console.WriteLine("Starting Onion Service");

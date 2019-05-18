@@ -13,7 +13,6 @@ using System.Security;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Cypher.ApplicationLayer.Onion;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
@@ -26,6 +25,7 @@ using TangramCypher.Helper.Http;
 using TangramCypher.Helper.LibSodium;
 using TangramCypher.ApplicationLayer.Coin;
 using Dawn;
+using TangramCypher.ApplicationLayer.Onion;
 
 namespace TangramCypher.ApplicationLayer.Actor
 {
@@ -45,7 +45,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
         private readonly IConfigurationSection apiRestSection;
         private readonly ILogger logger;
-        private readonly IOnionService onionService;
+        private readonly IOnionServiceClient onionService;
         private readonly IWalletService walletService;
         private readonly ICoinService coinService;
         private readonly Client client;
@@ -57,7 +57,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                 MessagePump.Invoke(this, e);
         }
 
-        public ActorService(IOnionService onionService, IWalletService walletService, ICoinService coinService, IConfiguration configuration, ILogger logger)
+        public ActorService(IOnionServiceClient onionService, IWalletService walletService, ICoinService coinService, IConfiguration configuration, ILogger logger)
         {
             this.onionService = onionService;
             this.walletService = walletService;

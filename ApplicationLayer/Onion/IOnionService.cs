@@ -10,7 +10,7 @@ using Microsoft.Extensions.Hosting;
 using System.Security;
 using System.Threading.Tasks;
 
-namespace Cypher.ApplicationLayer.Onion
+namespace TangramCypher.ApplicationLayer.Onion
 {
     public interface IOnionService : IHostedService
     {

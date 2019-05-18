@@ -24,13 +24,13 @@ namespace TangramCypher.ApplicationLayer.Controllers
     {
         private readonly IActorService actorService;
         private readonly IWalletService walletService;
-        private readonly IVaultService vaultService;
+        private readonly IVaultServiceClient vaultServiceClient;
 
-        public WalletController(IActorService actorService, IWalletService walletService, IVaultService vaultService)
+        public WalletController(IActorService actorService, IWalletService walletService, IVaultServiceClient vaultServiceClient)
         {
             this.actorService = actorService;
             this.walletService = walletService;
-            this.vaultService = vaultService;
+            this.vaultServiceClient = vaultServiceClient;
         }
 
         [HttpPost("address", Name = "CreateWalletAddress")]
@@ -145,9 +145,8 @@ namespace TangramCypher.ApplicationLayer.Controllers
         [HttpPost("vaultunseal", Name = "VaultUnseal")]
         public async Task<IActionResult> VaultUnseal([FromBody] ShardDto key)
         {
-            await vaultService.Unseal(key.Shard.ToSecureString());
+            await vaultServiceClient.Unseal(key.Shard.ToSecureString());
             return new OkObjectResult(true);
         }
-
     }
 }

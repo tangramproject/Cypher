@@ -28,7 +28,6 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
     {
         readonly IActorService actorService;
         readonly IConsole console;
-        readonly IVaultService vaultService;
         readonly ILogger logger;
 
         private Spinner spinner;
@@ -39,7 +38,6 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
         {
             actorService = serviceProvider.GetService<IActorService>();
             console = serviceProvider.GetService<IConsole>();
-            vaultService = serviceProvider.GetService<IVaultService>();
             logger = serviceProvider.GetService<ILogger>();
 
             actorService.MessagePump += ActorService_MessagePump;
