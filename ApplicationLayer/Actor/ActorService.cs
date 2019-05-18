@@ -595,7 +595,21 @@ namespace TangramCypher.ApplicationLayer.Actor
                 Address = notificationAddress.ToBase64(),
                 Body = cypher.ToBase64()
             };
+
             var msg = await AddAsync(payload, RestApiMethod.PostMessage);
+            if (msg == null)
+            {
+                for (int i = 0; i < 10; i++)
+                {
+                    UpdateMessagePump($"Retrying public key agreement message {i} of 10");
+
+                    msg = await AddAsync(payload, RestApiMethod.PostMessage);
+                    await Task.Delay(100);
+
+                    if (msg != null)
+                        break;
+                }
+            }
 
             return msg;
         }
@@ -948,18 +962,31 @@ namespace TangramCypher.ApplicationLayer.Actor
                 return JObject.FromObject(new
                 {
                     success = false,
-                    message = "First established public key message failed to send!"
+                    message = "Public key agreement message failed to send!"
                 });
 
             await Task.Delay(500);
 
             msg = await AddAsync(message, RestApiMethod.PostMessage);
+            if (msg == null)
+            {
+                for (int i = 0; i < 10; i++)
+                {
+                    UpdateMessagePump($"Retrying payment message {i} of 10");
+
+                    msg = await AddAsync(message, RestApiMethod.PostMessage);
+                    await Task.Delay(100);
+
+                    if (msg != null)
+                        break;
+                }
+            }
 
             if (msg == null)
                 return JObject.FromObject(new
                 {
                     success = false,
-                    message = "Second established public key message failed to send!"
+                    message = "Payment message failed to send!"
                 });
 
             return JObject.FromObject(new
