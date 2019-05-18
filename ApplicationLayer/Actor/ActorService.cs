@@ -640,14 +640,14 @@ namespace TangramCypher.ApplicationLayer.Actor
             var spendCoin = await Spend();
             if (spendCoin == null)
             {
-                for (int i = 1; i < 10; i++)
+                for (int i = 0; i < 10; i++)
                 {
                     UpdateMessagePump($"Retrying {i} of 10");
 
                     spendCoin = await Spend();
                     await Task.Delay(100);
 
-                    if (i == 10)
+                    if (i == 9)
                     {
                         if (spendCoin == null)
                             return false;
