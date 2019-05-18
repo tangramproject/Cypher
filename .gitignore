@@ -14,5 +14,6 @@
 wallet
 servicetoken
 shard
-vault
 *.zip
+vault.exe
+vault.json
