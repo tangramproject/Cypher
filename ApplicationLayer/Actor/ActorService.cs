@@ -624,6 +624,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             return address;
         }
 
+        //TODO Needs refactoring..
         /// <summary>
         /// Sends the payment.
         /// </summary>
@@ -642,10 +643,13 @@ namespace TangramCypher.ApplicationLayer.Actor
             {
                 for (int i = 0; i < 10; i++)
                 {
-                    UpdateMessagePump($"Retrying {i} of 10");
+                    UpdateMessagePump($"Retrying sender {i} of 10");
 
                     spendCoin = await Spend();
                     await Task.Delay(100);
+
+                    if (spendCoin != null)
+                        break;
 
                     if (i == 9)
                     {
@@ -655,10 +659,26 @@ namespace TangramCypher.ApplicationLayer.Actor
                 }
             }
 
-            //TODO: Receiver coin could possibility fail.. need recovery..
             var receiverSent = await SendReceiverCoin();
             if (receiverSent.Equals(false))
-                return false;
+            {
+                for (int i = 0; i < 10; i++)
+                {
+                    UpdateMessagePump($"Retrying receiver {i} of 10");
+
+                    receiverSent = await SendReceiverCoin();
+                    await Task.Delay(100);
+
+                    if (receiverSent.Equals(true))
+                        break;
+
+                    if (i == 9)
+                    {
+                        if (receiverSent.Equals(false))
+                            return false;
+                    }
+                }
+            }
 
             return true;
         }
