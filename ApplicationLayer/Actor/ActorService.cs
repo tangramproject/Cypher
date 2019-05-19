@@ -59,11 +59,9 @@ namespace TangramCypher.ApplicationLayer.Actor
                 {
                     MessagePump.Invoke(this, e);
                 }
-#pragma warning disable RECS0022 // A catch clause that catches System.Exception and has an empty body
-                catch
-#pragma warning restore RECS0022 // A catch clause that catches System.Exception and has an empty body
+                catch( Exception ex)
                 {
-
+                    logger.LogError(ex.Message);
                 }
             }
         }
@@ -188,7 +186,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <param name="password">Password.</param>
         public ActorService MasterKey(SecureString password)
         {
-            masterKey = password ?? throw new ArgumentNullException(nameof(masterKey));
+            masterKey = Guard.Argument(password, nameof(password)).NotNull();
             return this;
         }
 
@@ -211,11 +209,9 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// </summary>
         /// <returns>The shared key.</returns>
         /// <param name="pk">Pk.</param>
-        public async Task<byte[]> ToSharedKey(byte[] pk)
+        public byte[] ToSharedKey(byte[] pk)
         {
             Guard.Argument(pk, nameof(pk)).NotNull().MaxCount(32);
-
-            await SetSecretKey();
 
             using (var insecure = SecretKey().Insecure())
             {
@@ -236,7 +232,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <param name="walletId">Wallet identifier.</param>
         public ActorService Identifier(SecureString walletId)
         {
-            identifier = walletId ?? throw new ArgumentNullException(nameof(walletId));
+            identifier = Guard.Argument(walletId, nameof(walletId)).NotNull();
             return this;
         }
 
@@ -292,7 +288,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <param name="pk">Pk.</param>
         public ActorService PublicKey(SecureString pk)
         {
-            publicKey = pk ?? throw new ArgumentNullException(nameof(pk));
+            publicKey = Guard.Argument(pk, nameof(pk)).NotNull("Public key cannot be null!");
             return this;
         }
 
@@ -302,6 +298,8 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <returns>The payment.</returns>
         public async Task ReceivePayment()
         {
+            await SetSecretKey();
+            await SetPublicKey();
             await ReceivePayment(fromAddress);
         }
 
@@ -359,9 +357,21 @@ namespace TangramCypher.ApplicationLayer.Actor
             Guard.Argument(fromAddress, nameof(fromAddress)).NotNull().NotEmpty();
             Guard.Argument(cypher, nameof(cypher)).NotNull().NotEmpty();
 
-            var pk = Util.FormatNetworkAddress(DecodeAddress(fromAddress).ToArray());
+            bool TestFromAddress() => Util.FormatNetworkAddress(DecodeAddress(FromAddress()).ToArray()) != null;
+            if (TestFromAddress().Equals(false))
+            {
+                return JObject.FromObject(new
+                {
+                    success = false,
+                    message = "Failed to read the recipient public key!"
+                });
+            }
+
+            await SetSecretKey();
+
+            var pk = Util.FormatNetworkAddress(DecodeAddress(FromAddress()).ToArray());
             var notification = JObject.Parse(cypher).ToObject<NotificationDto>();
-            var message = await ReadMessage(notification.Body, pk);
+            var message = ReadMessage(notification.Body, pk);
             var (isPayment, store) = ParseMessage(message);
             var previousBal = await CheckBalance();
             var payment = await Payment(store);
@@ -440,12 +450,12 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             foreach (var notification in notifications)
             {
-                var message = await ReadMessage(notification.Body, pk);
+                var message = ReadMessage(notification.Body, pk);
                 var (isPayment, store) = ParseMessage(message);
 
                 if (!isPayment)
                 {
-                    var sharedKey = await ToSharedKey(DecodeAddress(store).ToArray());
+                    var sharedKey = ToSharedKey(DecodeAddress(store).ToArray());
                     var notificationAddress = EncodeAddress(Cryptography.GenericHashWithKey(sharedKey.ToHex(), pk).ToHex());
                     var decode = DecodeAddress(address).ToArray();
 
@@ -580,7 +590,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <param name="sk">Sk.</param>
         public ActorService SecretKey(SecureString sk)
         {
-            secretKey = sk ?? throw new ArgumentNullException(nameof(sk));
+            secretKey = Guard.Argument(sk, nameof(sk)).NotNull("Secret key cannot be null!");
             return this;
         }
 
@@ -590,8 +600,6 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <returns>The pub key message.</returns>
         public async Task<MessageDto> EstablishPubKeyMessage()
         {
-            await SetPublicKey();
-
             var pk = Util.FormatNetworkAddress(DecodeAddress(ToAddress()).ToArray());
             var notificationAddress = Cryptography.GenericHashWithKey(pk.ToHex(), pk);
             var senderPk = PublicKey().ToUnSecureString();
@@ -657,12 +665,25 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <returns>The payment.</returns>
         public async Task<bool> SendPayment()
         {
+            bool TestToAddress() => Util.FormatNetworkAddress(DecodeAddress(ToAddress()).ToArray()) != null;
+            if (TestToAddress().Equals(false))
+            {
+                lastError = JObject.FromObject(new
+                {
+                    success = false,
+                    message = "Failed to read the recipient public key!"
+                });
+
+                return false;
+            }
+
             var isSpendable = await Spendable();
             if (isSpendable.Equals(false))
                 return false;
 
             await SetRandomAddress();
             await SetSecretKey();
+            await SetPublicKey();
 
             var spendCoin = await Spend();
             if (spendCoin == null)
@@ -715,15 +736,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <returns>The random address.</returns>
         private async Task SetRandomAddress()
         {
-            try
-            {
-                FromAddress(await walletService.RandomAddress(Identifier(), MasterKey()));
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex.Message);
-                throw ex;
-            }
+            FromAddress(await walletService.RandomAddress(Identifier(), MasterKey()));
         }
 
         /// <summary>
@@ -774,7 +787,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <param name="send">If set to <c>true</c> send.</param>
         public async Task<JObject> SendPaymentMessage(bool send)
         {
-            var message = await BuildRedemptionKeyMessage();
+            var message = BuildRedemptionKeyMessage();
 
             if (send)
             {
@@ -795,15 +808,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <returns>The secret key.</returns>
         private async Task SetSecretKey()
         {
-            try
-            {
-                SecretKey(await walletService.StoreKey(Identifier(), MasterKey(), StoreKeyApiMethod.SecretKey, FromAddress()));
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex.Message);
-                throw ex;
-            }
+            SecretKey(await walletService.StoreKey(Identifier(), MasterKey(), StoreKeyApiMethod.SecretKey, FromAddress()));
         }
 
         /// <summary>
@@ -812,29 +817,20 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <returns>The public key.</returns>
         private async Task SetPublicKey()
         {
-            try
-            {
-                PublicKey(await walletService.StoreKey(Identifier(), MasterKey(), StoreKeyApiMethod.PublicKey, FromAddress()));
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex.Message);
-                throw ex;
-            }
+            PublicKey(await walletService.StoreKey(Identifier(), MasterKey(), StoreKeyApiMethod.PublicKey, FromAddress()));
         }
 
         /// <summary>
         /// Builds the redemption key message.
         /// </summary>
         /// <returns>The redemption key message.</returns>
-        /// <param name="coin">Coin.</param>
-        private async Task<MessageDto> BuildRedemptionKeyMessage()
+        private MessageDto BuildRedemptionKeyMessage()
         {
             var (key1, key2) = coinService.HotRelease(coinService.Coin().Version, coinService.Coin().Stamp, MasterKey());
             var redemption = new RedemptionKeyDto
             {
-                Amount = coinService.ReceiverOutput().Amount,
-                Blind = coinService.ReceiverOutput().Blind.ToHex(),
+                Amount = coinService.TransactionCoin().Input,
+                Blind = coinService.TransactionCoin().Blind,
                 Hash = coinService.Coin().Hash,
                 Key1 = key1,
                 Key2 = key2,
@@ -849,7 +845,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             var paddedBuf = Cryptography.Pad(innerMessage.ToString());
             var pk = Util.FormatNetworkAddress(DecodeAddress(ToAddress()).ToArray());
             var cypher = Cypher(Encoding.UTF8.GetString(paddedBuf), pk);
-            var sharedKey = await ToSharedKey(pk.ToArray());
+            var sharedKey = ToSharedKey(pk.ToArray());
             var notificationAddress = Cryptography.GenericHashWithKey(sharedKey.ToHex(), pk);
             var message = new MessageDto
             {
@@ -956,6 +952,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             return added;
         }
 
+        //TODO:.. needs refactoring
         /// <summary>
         /// Sends the message.
         /// </summary>
@@ -1011,12 +1008,10 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <returns>The message.</returns>
         /// <param name="body">Body.</param>
         /// <param name="pk">Pk.</param>
-        private async Task<string> ReadMessage(string body, byte[] pk)
+        private string ReadMessage(string body, byte[] pk)
         {
             Guard.Argument(body, nameof(body)).NotNull().NotEmpty();
             Guard.Argument(pk, nameof(pk)).NotNull().MaxCount(32);
-
-            await SetSecretKey();
 
             string unpadded = null;
 

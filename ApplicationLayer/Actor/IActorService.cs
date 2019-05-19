@@ -31,7 +31,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         SecureString MasterKey();
         ActorService MasterKey(SecureString password);
         byte[] Cypher(string message, byte[] pk);
-        Task<byte[]> ToSharedKey(byte[] pk);
+        byte[] ToSharedKey(byte[] pk);
         SecureString Identifier();
         ActorService Identifier(SecureString walletId);
         string Memo();

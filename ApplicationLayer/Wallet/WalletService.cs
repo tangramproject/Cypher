@@ -452,6 +452,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
                 catch (Exception ex)
                 {
                     logger.LogError(ex.Message);
+                    throw ex;
                 }
             }
 
@@ -535,6 +536,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
                 catch (Exception ex)
                 {
                     logger.LogError(ex.Message);
+                    throw ex;
                 }
             }
 

@@ -205,9 +205,10 @@ namespace TangramCypher.Helper
                 Array.Copy(networkAddress, 1, pk, 0, 32);
                 return pk;
             }
-            catch { }
-
-            return networkAddress;
+            catch
+            {
+                return null;
+            }
         }
     }
 }
