@@ -29,7 +29,6 @@ namespace TangramCypher.ApplicationLayer.Coin
         byte[] DeriveKey(double amount, string stamp, int version);
         string DeriveKey(int version, string stamp, SecureString password, int bytes = 32);
         string NewStamp();
-        ReceiverOutput ReceiverOutput();
         byte[] Hash(CoinDto coin);
         (string, string) HotRelease(int version, string stamp, SecureString password);
         IEnumerable<CoinDto> MakeMultipleCoins(IEnumerable<TransactionDto> transactions, SecureString password);

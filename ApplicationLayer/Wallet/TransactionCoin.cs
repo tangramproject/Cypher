@@ -12,8 +12,9 @@ namespace TangramCypher.ApplicationLayer.Wallet
 {
     public class TransactionCoin
     {
-        public IList<TransactionDto> Chain { get; set; }
         public double Balance { get; set; }
+        public string Blind { get; set; }
+        public IList<TransactionDto> Chain { get; set; }
         public double Input { get; set; }
         public double Output { get; set; }
         public bool Spent { get; set; }

@@ -66,7 +66,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                         }
                         catch (Exception ex)
                         {
-                            logger.LogError(ex.StackTrace);
+                            logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
                             throw ex;
                         }
                         finally

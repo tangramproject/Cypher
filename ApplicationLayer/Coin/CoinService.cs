@@ -33,7 +33,6 @@ namespace TangramCypher.ApplicationLayer.Coin
         private string stamp;
         private int version;
         private SecureString password;
-        private ReceiverOutput receiverOutput;
         private CoinDto mintedCoin;
         private ProofStruct proofStruct;
         private TransactionCoin transactionCoin;
@@ -78,7 +77,7 @@ namespace TangramCypher.ApplicationLayer.Coin
 
                 AttachEnvelope(secp256k1, pedersen, rangeProof, blindSum, commitSum, TransactionCoin().Input);
 
-                receiverOutput = new ReceiverOutput(TransactionCoin().Input, commitSum, blindSum);
+                TransactionCoin().Blind = blindSum.ToHex();
             }
 
             return this;
@@ -132,7 +131,6 @@ namespace TangramCypher.ApplicationLayer.Coin
         {
             mintedCoin = null;
             password = null;
-            receiverOutput = null;
             stamp = null;
             version = 0;
             transactionCoin = null;
@@ -306,12 +304,6 @@ namespace TangramCypher.ApplicationLayer.Coin
         {
             return Cryptography.GenericHashNoKey(Cryptography.RandomKey()).ToHex();
         }
-
-        /// <summary>
-        /// Gets the receivers output.
-        /// </summary>
-        /// <returns>The output.</returns>
-        public ReceiverOutput ReceiverOutput() => receiverOutput;
 
         /// <summary>
         /// Hash the specified coin.
