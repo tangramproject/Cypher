@@ -72,8 +72,10 @@ namespace TangramCypher.ApplicationLayer
                 services
                     .AddSingleton<IActorService, ActorService>()
                     .AddSingleton<IWalletService, WalletService>()
+                    .AddSingleton<IOnionServiceClient, OnionServiceClient>()
                     .AddSingleton<ICoinService, CoinService>()
                     .AddSingleton<IOnionService, OnionService>()
+                    .AddSingleton<IVaultServiceClient, VaultServiceClient>()
                     .AddSingleton<IVaultService, VaultService>();
 
 
