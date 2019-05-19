@@ -504,11 +504,9 @@ namespace TangramCypher.ApplicationLayer.Actor
                     return false;
 
                 //TODO: Could possibility fail.. need recovery..
-                var added = await AddWalletTransaction(coin, redemptionKey.Amount, TransactionType.Receive, redemptionKey.Blind.FromHex());
+                var added = await AddWalletTransaction(coin, redemptionKey.Amount, redemptionKey.Memo, redemptionKey.Blind.FromHex(), TransactionType.Receive);
                 if (added.Equals(false))
                     return false;
-
-                Memo(redemptionKey.Memo);
 
                 return true;
             }
@@ -917,7 +915,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             }
 
             //TODO: Could possibility fail.. need recovery..
-            var added = await AddWalletTransaction(coin, transactionCoin.Input, TransactionType.Send);
+            var added = await AddWalletTransaction(coin, transactionCoin.Input, Memo(), null, TransactionType.Send);
 
             return coin;
         }
@@ -928,7 +926,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <returns>The Wallet transaction.</returns>
         /// <param name="coin">Coin.</param>
         /// <param name="transactionType">Transaction type.</param>
-        private async Task<bool> AddWalletTransaction(CoinDto coin, double total, TransactionType transactionType, byte[] blind = null)
+        private async Task<bool> AddWalletTransaction(CoinDto coin, double total, string memoText, byte[] blind, TransactionType transactionType)
         {
             Guard.Argument(coin, nameof(coin)).NotNull();
             Guard.Argument(total, nameof(total)).NotNegative();
@@ -949,7 +947,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                 Stamp = formattedCoin.Stamp,
                 Version = formattedCoin.Version,
                 TransactionType = transactionType,
-                Memo = Memo(),
+                Memo = memoText,
                 DateTime = DateTime.Now
             };
 
