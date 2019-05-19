@@ -52,8 +52,8 @@ namespace TangramCypher.ApplicationLayer.Controllers
             return new OkObjectResult(new { balance = total });
         }
 
-        [HttpPost("create", Name = "CreateWallet")]
-        public async Task<IActionResult> CreateWallet([FromBody] CredentialsDto credentials)
+        [HttpGet("create", Name = "CreateWallet")]
+        public async Task<IActionResult> CreateWallet()
         {
             var creds = await walletService.CreateWallet();
             return new OkObjectResult(creds);
