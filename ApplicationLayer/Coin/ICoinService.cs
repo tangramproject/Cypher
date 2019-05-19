@@ -28,13 +28,13 @@ namespace TangramCypher.ApplicationLayer.Coin
         CoinDto DeriveCoin(CoinDto coin);
         byte[] DeriveKey(double amount, string stamp, int version);
         string DeriveKey(int version, string stamp, SecureString password, int bytes = 32);
-        string GetNewStamp();
+        string NewStamp();
         ReceiverOutput ReceiverOutput();
         byte[] Hash(CoinDto coin);
         (string, string) HotRelease(int version, string stamp, SecureString password);
         IEnumerable<CoinDto> MakeMultipleCoins(IEnumerable<TransactionDto> transactions, SecureString password);
         CoinDto MakeSingleCoin(TransactionDto transaction, SecureString password);
-        CoinDto MakeSingleCoin();
+        void MakeSingleCoin();
         ProofStruct ProofStruct();
         string PartialRelease(int version, string stamp, string memo, SecureString password);
         SecureString Password();

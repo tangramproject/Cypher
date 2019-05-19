@@ -54,7 +54,18 @@ namespace TangramCypher.ApplicationLayer.Actor
         protected void OnMessagePump(MessagePumpEventArgs e)
         {
             if (MessagePump != null)
-                MessagePump.Invoke(this, e);
+            {
+                try
+                {
+                    MessagePump.Invoke(this, e);
+                }
+#pragma warning disable RECS0022 // A catch clause that catches System.Exception and has an empty body
+                catch
+#pragma warning restore RECS0022 // A catch clause that catches System.Exception and has an empty body
+                {
+
+                }
+            }
         }
 
         public ActorService(IOnionServiceClient onionService, IWalletService walletService, ICoinService coinService, IConfiguration configuration, ILogger logger)
@@ -141,7 +152,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <param name="value">Value.</param>
         public ActorService Amount(double value)
         {
-            amount = Guard.Argument(value, nameof(value)).NotNegative();
+            amount = Guard.Argument(value, nameof(value)).NotZero().NotNegative();
             return this;
         }
 
@@ -155,7 +166,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// Checks the balance.
         /// </summary>
         /// <returns>The balance.</returns>
-        public async Task<double> CheckBalance() => await walletService.AvailableBalanceGeneric(Identifier(), MasterKey());
+        public async Task<double> CheckBalance() => await walletService.AvailableBalance(Identifier(), MasterKey());
 
         /// <summary>
         /// Decodes the address.
@@ -313,12 +324,16 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             UpdateMessagePump("Downloading messages ...");
 
-            var count = await GetAsync<JObject>(notificationAddress, RestApiMethod.MessageCount);
-            int countValue = count == null ? 1 : count.Value<int>("count");
+            JObject count = null;
+            int countValue = 0;
+            if (messageTrack == null)
+                count = await GetAsync<JObject>(notificationAddress, RestApiMethod.MessageCount);
+
+            countValue = count == null ? 1 : count.Value<int>("count");
 
             notifications = messageTrack == null
                 ? await GetRangeAsync<NotificationDto>(notificationAddress, 0, countValue, RestApiMethod.MessageRange)
-                : await GetRangeAsync<NotificationDto>(notificationAddress, messageTrack.Skip, messageTrack.Take, RestApiMethod.MessageRange);
+                : await GetRangeAsync<NotificationDto>(notificationAddress, messageTrack.Skip, messageTrack.Take + 1, RestApiMethod.MessageRange);
 
             if (sharedKey)
                 pk = Util.FormatNetworkAddress(receiverPk);
@@ -338,7 +353,6 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// Receives payment from redemption key.
         /// </summary>
         /// <returns>The payment redemption key.</returns>
-        /// <param name="address">Address.</param>
         /// <param name="cypher">Cypher.</param>
         public async Task<JObject> ReceivePaymentRedemptionKey(string cypher)
         {
@@ -762,9 +776,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <param name="send">If set to <c>true</c> send.</param>
         public async Task<JObject> SendPaymentMessage(bool send)
         {
-            var message = await BuildRedemptionKeyMessage(coinService.ReceiverOutput(), coinService.Coin());
-
-            coinService.ClearCache();
+            var message = await BuildRedemptionKeyMessage();
 
             if (send)
             {
@@ -818,21 +830,18 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// </summary>
         /// <returns>The redemption key message.</returns>
         /// <param name="coin">Coin.</param>
-        private async Task<MessageDto> BuildRedemptionKeyMessage(ReceiverOutput receiverOutput, CoinDto coin)
+        private async Task<MessageDto> BuildRedemptionKeyMessage()
         {
-            Guard.Argument(receiverOutput, nameof(receiverOutput)).NotNull();
-            Guard.Argument(coin, nameof(coin)).NotNull();
-
-            var (key1, key2) = coinService.HotRelease(coin.Version, coin.Stamp, MasterKey());
+            var (key1, key2) = coinService.HotRelease(coinService.Coin().Version, coinService.Coin().Stamp, MasterKey());
             var redemption = new RedemptionKeyDto
             {
-                Amount = receiverOutput.Amount,
-                Blind = receiverOutput.Blind.ToHex(),
-                Hash = coin.Hash,
+                Amount = coinService.ReceiverOutput().Amount,
+                Blind = coinService.ReceiverOutput().Blind.ToHex(),
+                Hash = coinService.Coin().Hash,
                 Key1 = key1,
                 Key2 = key2,
                 Memo = Memo(),
-                Stamp = coin.Stamp
+                Stamp = coinService.Coin().Stamp
             };
             var innerMessage = JObject.FromObject(new
             {
@@ -849,6 +858,8 @@ namespace TangramCypher.ApplicationLayer.Actor
                 Address = notificationAddress.ToBase64(),
                 Body = cypher.ToBase64()
             };
+
+            coinService.ClearCache();
 
             return message;
         }

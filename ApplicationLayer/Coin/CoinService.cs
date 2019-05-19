@@ -53,13 +53,13 @@ namespace TangramCypher.ApplicationLayer.Coin
             using (var pedersen = new Pedersen())
             using (var rangeProof = new RangeProof())
             {
-                Stamp(GetNewStamp());
+                Stamp(NewStamp());
                 Version(-1);
 
-                mintedCoin = MakeSingleCoin();
+                MakeSingleCoin();
 
-                var naTInput = NaT(transactionCoin.Input);
-                var blind = DeriveKey(naTInput, stamp, mintedCoin.Version);
+                var naTInput = NaT(TransactionCoin().Input);
+                var blind = DeriveKey(naTInput, Stamp(), Coin().Version);
 
                 byte[] blindSum = new byte[32];
 
@@ -76,22 +76,9 @@ namespace TangramCypher.ApplicationLayer.Coin
                 var commitPos = Commit(naTInput, blind);
                 var commitSum = pedersen.CommitSum(new List<byte[]> { commitPos }, new List<byte[]> { });
 
-                var (k1, k2) = Split(blindSum);
+                AttachEnvelope(secp256k1, pedersen, rangeProof, blindSum, commitSum, TransactionCoin().Input);
 
-                mintedCoin.Envelope.Commitment = commitSum.ToHex();
-                mintedCoin.Envelope.Proof = k2.ToHex();
-                mintedCoin.Envelope.PublicKey = pedersen.ToPublicKey(Commit(0, k1)).ToHex();
-                mintedCoin.Hash = Hash(mintedCoin).ToHex();
-                mintedCoin.Envelope.Signature = secp256k1.Sign(mintedCoin.Hash.FromHex(), k1).ToHex();
-
-                proofStruct = rangeProof.Proof(0, NaT(transactionCoin.Input), blindSum, commitSum, mintedCoin.Hash.FromHex());
-
-                var isVerified = rangeProof.Verify(commitSum, proofStruct);
-
-                if (!isVerified)
-                    throw new ArgumentOutOfRangeException(nameof(isVerified), "Range proof failed.");
-
-                receiverOutput = new ReceiverOutput(transactionCoin.Input, commitSum, blindSum);
+                receiverOutput = new ReceiverOutput(TransactionCoin().Input, commitSum, blindSum);
             }
 
             return this;
@@ -107,26 +94,23 @@ namespace TangramCypher.ApplicationLayer.Coin
             using (var pedersen = new Pedersen())
             using (var rangeProof = new RangeProof())
             {
-                Stamp(transactionCoin.Stamp);
-                Version(transactionCoin.Version);
+                Stamp(TransactionCoin().Stamp);
+                Version(TransactionCoin().Version);
 
-                mintedCoin = MakeSingleCoin();
+                MakeSingleCoin();
 
-                var commitNegs = new List<byte[]>();
-                var blindNegSums = new List<byte[]>();
+                var received = TransactionCoin().Chain.FirstOrDefault(tx => tx.TransactionType == TransactionType.Receive);
 
-                var received = transactionCoin.Chain.FirstOrDefault(tx => tx.TransactionType == TransactionType.Receive);
-
-                var blindNeg = DeriveKey(transactionCoin.Input, received.Stamp, mintedCoin.Version);
+                var blindNeg = DeriveKey(TransactionCoin().Input, received.Stamp, Coin().Version);
                 var commitNeg = pedersen.Commit(NaT(transactionCoin.Input), blindNeg);
 
-                commitNegs = transactionCoin.Chain
+                var commitNegs = TransactionCoin().Chain
                                .Where(tx => tx.TransactionType == TransactionType.Send)
                                .Select(c => pedersen.Commit(NaT(c.Amount), DeriveKey(c.Amount, c.Stamp, c.Version))).ToList();
 
                 commitNegs.Add(commitNeg);
 
-                blindNegSums = transactionCoin.Chain
+                var blindNegSums = TransactionCoin().Chain
                                 .Where(tx => tx.TransactionType == TransactionType.Send)
                                 .Select(c => DeriveKey(c.Amount, c.Stamp, c.Version)).ToList();
 
@@ -135,20 +119,7 @@ namespace TangramCypher.ApplicationLayer.Coin
                 var blindSum = pedersen.BlindSum(new List<byte[]> { received.Blind.FromHex() }, blindNegSums);
                 var commitSum = pedersen.CommitSum(new List<byte[]> { received.Commitment.FromHex() }, commitNegs);
 
-                var (k1, k2) = Split(blindSum);
-
-                mintedCoin.Envelope.Commitment = commitSum.ToHex();
-                mintedCoin.Envelope.Proof = k2.ToHex();
-                mintedCoin.Envelope.PublicKey = pedersen.ToPublicKey(Commit(0, k1)).ToHex();
-                mintedCoin.Hash = Hash(mintedCoin).ToHex();
-                mintedCoin.Envelope.Signature = secp256k1.Sign(mintedCoin.Hash.FromHex(), k1).ToHex();
-
-                proofStruct = rangeProof.Proof(0, NaT(transactionCoin.Output), blindSum, commitSum, mintedCoin.Hash.FromHex());
-
-                var isVerified = rangeProof.Verify(commitSum, proofStruct);
-
-                if (!isVerified)
-                    throw new ArgumentOutOfRangeException(nameof(isVerified), "Range proof failed.");
+                AttachEnvelope(secp256k1, pedersen, rangeProof, blindSum, commitSum, TransactionCoin().Output);
             }
 
             return this;
@@ -160,10 +131,11 @@ namespace TangramCypher.ApplicationLayer.Coin
         public void ClearCache()
         {
             mintedCoin = null;
-            Password(null);
+            password = null;
             receiverOutput = null;
-            Stamp(string.Empty);
-            Version(0);
+            stamp = null;
+            version = 0;
+            transactionCoin = null;
         }
 
         /// <summary>
@@ -330,7 +302,7 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// Gets the new stamp.
         /// </summary>
         /// <returns>The new stamp.</returns>
-        public string GetNewStamp()
+        public string NewStamp()
         {
             return Cryptography.GenericHashNoKey(Cryptography.RandomKey()).ToHex();
         }
@@ -541,9 +513,9 @@ namespace TangramCypher.ApplicationLayer.Coin
             }
         }
 
+        //TODO.. possibly remove?
         /// <summary>
-        /// Split the specified blinding factor. We use one of these (k1) to sign the tx_kernel (k1G)
-        /// and the other gets aggregated in the block as the "offset".
+        /// Split coin.
         /// </summary>
         /// <returns>The split.</returns>
         /// <param name="blinding">Blinding.</param>
@@ -595,11 +567,11 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// Makes the single coin.
         /// </summary>
         /// <returns>The single coin.</returns>
-        public CoinDto MakeSingleCoin()
+        public void MakeSingleCoin()
         {
             Guard.Argument(password, nameof(password)).NotNull();
 
-            return DeriveCoin(new CoinDto
+            mintedCoin = DeriveCoin(new CoinDto
             {
                 Version = version + 1,
                 Stamp = stamp,
@@ -720,6 +692,32 @@ namespace TangramCypher.ApplicationLayer.Coin
         private ulong NaT(double value)
         {
             return (ulong)(value * NanoTan);
+        }
+
+        /// <summary>
+        /// Attaches the envelope.
+        /// </summary>
+        /// <param name="secp256k1">Secp256k1.</param>
+        /// <param name="pedersen">Pedersen.</param>
+        /// <param name="rangeProof">Range proof.</param>
+        /// <param name="blindSum">Blind sum.</param>
+        /// <param name="commitSum">Commit sum.</param>
+        private void AttachEnvelope(Secp256k1 secp256k1, Pedersen pedersen, RangeProof rangeProof, byte[] blindSum, byte[] commitSum, double blance)
+        {
+            var (k1, k2) = Split(blindSum);
+
+            Coin().Envelope.Commitment = commitSum.ToHex();
+            Coin().Envelope.Proof = k2.ToHex();
+            Coin().Envelope.PublicKey = pedersen.ToPublicKey(Commit(0, k1)).ToHex();
+            Coin().Hash = Hash(Coin()).ToHex();
+            Coin().Envelope.Signature = secp256k1.Sign(Coin().Hash.FromHex(), k1).ToHex();
+
+            proofStruct = rangeProof.Proof(0, NaT(blance), blindSum, commitSum, Coin().Hash.FromHex());
+
+            var isVerified = rangeProof.Verify(commitSum, proofStruct);
+
+            if (!isVerified)
+                throw new ArgumentOutOfRangeException(nameof(isVerified), "Range proof failed.");
         }
     }
 }
