@@ -46,33 +46,12 @@ namespace TangramCypher.ApplicationLayer.Wallet
         }
 
         /// <summary>
-        ///Gets the available balance from associated stamp.
-        /// </summary>
-        /// <returns>The balance in chain stamp.</returns>
-        /// <param name="identifier">Identifier.</param>
-        /// <param name="password">Password.</param>
-        /// <param name="stamp">Stamp.</param>
-        public async Task<double> AvailableBalanceFromStamp(SecureString identifier, SecureString password, string stamp)
-        {
-            Guard.Argument(identifier, nameof(identifier)).NotNull();
-            Guard.Argument(password, nameof(password)).NotNull();
-            Guard.Argument(stamp, nameof(stamp)).NotNull().NotEmpty();
-
-            var transactions = await Transactions(identifier, password);
-
-            if (transactions != null)
-                transactions = transactions.Where(tx => tx.Stamp == stamp).ToList();
-
-            return Balance(identifier, password, transactions);
-        }
-
-        /// <summary>
         /// Gets the generic available balance.
         /// </summary>
         /// <returns>The balance.</returns>
         /// <param name="identifier">Identifier.</param>
         /// <param name="password">Password.</param>
-        public async Task<double> AvailableBalanceGeneric(SecureString identifier, SecureString password)
+        public async Task<double> AvailableBalance(SecureString identifier, SecureString password)
         {
             Guard.Argument(identifier, nameof(identifier)).NotNull();
             Guard.Argument(password, nameof(password)).NotNull();
@@ -588,7 +567,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
             for (int i = 0, targetLength = target.Length; i < targetLength; i++)
             {
                 (TransactionDto transaction, double amountFor) = CalculateChange(amount, txsIn);
-                var balance = await AvailableBalanceFromStamp(identifier, password, transaction.Stamp);
+                var balance = Balance(identifier, password, transactions.Where(tx => tx.Stamp == transaction.Stamp).ToList());
 
                 if (balance >= amountFor)
                 {
@@ -596,14 +575,14 @@ namespace TangramCypher.ApplicationLayer.Wallet
                     {
                         Balance = balance,
                         Input = amount,
-                        Output = balance - amountFor,
+                        Output = balance - amount,
                         Stamp = transaction.Stamp
                     };
 
                     transactionCoin.Chain = transactions.Where(tx => tx.Stamp.Equals(transaction.Stamp)).ToList();
                     transactionCoin.Version = transactionCoin.Chain.Last().Version;
 
-                    if (transactionCoin.Input.Equals(0))
+                    if (transactionCoin.Output.Equals(0))
                         transactionCoin.Spent = true;
 
                     break;

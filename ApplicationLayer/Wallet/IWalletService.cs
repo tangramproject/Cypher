@@ -16,8 +16,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
 {
     public interface IWalletService
     {
-        Task<double> AvailableBalanceFromStamp(SecureString identifier, SecureString password, string stamp);
-        Task<double> AvailableBalanceGeneric(SecureString identifier, SecureString password);
+        Task<double> AvailableBalance(SecureString identifier, SecureString password);
         Task<bool> AddKey(SecureString identifier, SecureString password, PkSkDto pkSk);
         PkSkDto CreatePkSk();
         Task<CredentialsDto> CreateWallet();

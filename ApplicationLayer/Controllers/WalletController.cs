@@ -48,7 +48,7 @@ namespace TangramCypher.ApplicationLayer.Controllers
         [HttpPost("balance", Name = "WalletBalance")]
         public async Task<IActionResult> WalletBalance([FromBody] CredentialsDto credentials)
         {
-            var total = await walletService.AvailableBalanceGeneric(credentials.Identifier.ToSecureString(), credentials.Password.ToSecureString());
+            var total = await walletService.AvailableBalance(credentials.Identifier.ToSecureString(), credentials.Password.ToSecureString());
             return new OkObjectResult(new { balance = total });
         }
 
@@ -94,7 +94,7 @@ namespace TangramCypher.ApplicationLayer.Controllers
                 return new ObjectResult(new { error = ex.Message, statusCode = 500, balance });
             }
 
-            return new OkObjectResult(balance);
+            return new OkObjectResult(new { balance });
         }
 
         [HttpPost("send", Name = "WalletTransfer")]
@@ -132,7 +132,7 @@ namespace TangramCypher.ApplicationLayer.Controllers
                 return new ObjectResult(new { error = ex.Message, statusCode = 500, balance });
             }
 
-            return new OkObjectResult(balance);
+            return new OkObjectResult(new { balance });
         }
 
         [HttpPost("transactions", Name = "WalletTransactions")]
