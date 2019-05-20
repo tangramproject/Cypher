@@ -8,6 +8,7 @@ using System.IO;
 using Newtonsoft.Json;
 using System.Net;
 using System.Text;
+using System.Net.Http;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
 {
@@ -46,7 +47,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
 
                     string line = string.Empty;
 
-                    line = option == 1 ? LocalFile(path) : WebFile(path);
+                    line = option == 1 ? LocalFile(path) : await WebFile(path);
 
                     var message = await actorService
                         .MasterKey(password)
@@ -69,24 +70,20 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
             return readLines[1];
         }
 
-        private string WebFile(string url)
+        private async Task<string> WebFile(string url)
         {
-            using (WebClient client = new WebClient())
+            using (HttpClient client = new HttpClient())
             {
-                ServicePointManager.Expect100Continue = false;
-                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
+                ServicePointManager.ServerCertificateValidationCallback += (sender, certificate, chain, sslPolicyErrors) => true;
 
-                client.CachePolicy = new System.Net.Cache.RequestCachePolicy(System.Net.Cache.RequestCacheLevel.BypassCache);
-                client.Headers.Add("Cache-Control", "no-cache");
-                client.Encoding = Encoding.UTF8;
-
+                var response = await client.GetAsync(url);
+                string xml = await response.Content.ReadAsStringAsync();
+                var xmlByteArray = await response.Content.ReadAsByteArrayAsync();
+                var xmlStream = await response.Content.ReadAsStreamAsync();
                 var path = $"{tangramDirectory}redem{DateTime.Now.GetHashCode()}.rdkey";
 
                 if (!File.Exists(path))
-                {
-                    var bytes = client.DownloadData(url);
-                    File.WriteAllBytes(path, bytes);
-                }
+                    File.WriteAllBytes(path, xmlByteArray);
 
                 return LocalFile(path);
             }
