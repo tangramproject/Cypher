@@ -207,8 +207,9 @@ namespace TangramCypher.Helper
             }
             catch
             {
-                return null;
             }
+
+            return networkAddress;
         }
     }
 }
