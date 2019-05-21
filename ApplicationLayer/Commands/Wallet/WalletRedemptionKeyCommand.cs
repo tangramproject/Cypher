@@ -79,7 +79,6 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                 var response = await client.GetAsync(url);
                 string xml = await response.Content.ReadAsStringAsync();
                 var xmlByteArray = await response.Content.ReadAsByteArrayAsync();
-                var xmlStream = await response.Content.ReadAsStreamAsync();
                 var path = $"{tangramDirectory}redem{DateTime.Now.GetHashCode()}.rdkey";
 
                 if (!File.Exists(path))
