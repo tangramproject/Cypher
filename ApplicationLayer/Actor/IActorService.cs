@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.Security;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
+using TangramCypher.ApplicationLayer.Coin;
 using TangramCypher.ApplicationLayer.Wallet;
 
 namespace TangramCypher.ApplicationLayer.Actor
@@ -51,5 +52,6 @@ namespace TangramCypher.ApplicationLayer.Actor
         Task<List<TransactionDto>> Sync();
         string FromAddress();
         ActorService FromAddress(string address);
+        Task<bool> Payment(RedemptionKeyDto redemptionKey, CoinDto coin);
     }
 }
