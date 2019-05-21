@@ -500,6 +500,14 @@ namespace TangramCypher.ApplicationLayer.Actor
             if (coin == null)
                 return false;
 
+            return await Payment(redemptionKey, coin);
+        }
+
+        public async Task<bool> Payment(RedemptionKeyDto redemptionKey, CoinDto coin)
+        {
+            Guard.Argument(coin, nameof(coin)).NotNull();
+            Guard.Argument(redemptionKey, nameof(redemptionKey)).NotNull();
+
             try
             {
                 var (swap1, swap2) = coinService.CoinSwap(MasterKey(), coin, redemptionKey);
