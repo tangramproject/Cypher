@@ -53,5 +53,8 @@ namespace TangramCypher.ApplicationLayer.Actor
         string FromAddress();
         ActorService FromAddress(string address);
         Task<bool> Payment(RedemptionKeyDto redemptionKey, CoinDto coin);
+        Task SetRandomAddress();
+        Task SetSecretKey();
+        Task SetPublicKey();
     }
 }

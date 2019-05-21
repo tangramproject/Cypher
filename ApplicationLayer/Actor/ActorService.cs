@@ -742,7 +742,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// Sets random address.
         /// </summary>
         /// <returns>The random address.</returns>
-        private async Task SetRandomAddress()
+        public async Task SetRandomAddress()
         {
             FromAddress(await walletService.RandomAddress(Identifier(), MasterKey()));
         }
@@ -814,7 +814,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// Sets the secret key.
         /// </summary>
         /// <returns>The secret key.</returns>
-        private async Task SetSecretKey()
+        public async Task SetSecretKey()
         {
             SecretKey(await walletService.StoreKey(Identifier(), MasterKey(), StoreKeyApiMethod.SecretKey, FromAddress()));
         }
@@ -823,7 +823,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// Sets the public key.
         /// </summary>
         /// <returns>The public key.</returns>
-        private async Task SetPublicKey()
+        public async Task SetPublicKey()
         {
             PublicKey(await walletService.StoreKey(Identifier(), MasterKey(), StoreKeyApiMethod.PublicKey, FromAddress()));
         }

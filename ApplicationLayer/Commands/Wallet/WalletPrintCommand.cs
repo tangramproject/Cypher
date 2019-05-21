@@ -44,36 +44,13 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
             actorService.MessagePump += ActorService_MessagePump;
         }
 
-        private (RedemptionKeyDto, CoinDto) PrintTheMoney(double amount) {
-            var txCoin = new TransactionCoin();
-            // Right now, only the Input field is used for BuildReceiver
-            txCoin.Input = amount;
-            var coin = coinService
-                .TransactionCoin(txCoin)
-                .BuildReceiver()
-                .Coin();
-            var (key1, key2) = coinService.HotRelease(coin.Version, coin.Stamp, coinService.Password());
-            txCoin = coinService.TransactionCoin();
-            var redemption = new RedemptionKeyDto
-            {
-                Amount = txCoin.Input,
-                Blind = txCoin.Blind,
-                Hash = coin.Hash,
-                Key1 = key1,
-                Key2 = key2,
-                Memo = "Completely legitimate money that was not printed! Guaranteed or your money back (literally).",
-                Stamp = coin.Stamp
-            };
-
-            return (redemption, coin);
-        }
-
         public override async Task Execute()
         {
 
             using (var identifier = Prompt.GetPasswordAsSecureString("Identifier:", ConsoleColor.Yellow))
             using (var password = Prompt.GetPasswordAsSecureString("Password:", ConsoleColor.Yellow))
             {
+                var memo = Prompt.GetString("Memo:", null, ConsoleColor.Green);
                 var address = Prompt.GetString("Address:", null, ConsoleColor.Red);
                 var amountStr = Prompt.GetString("Amount:", null, ConsoleColor.Red);
 
@@ -87,32 +64,74 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
 
                         try
                         {
-                            coinService.Password("printer".ToSecureString());
-                            var (redemption, coin) = PrintTheMoney(amount);
-
                             spinner.Text = "Transferring money";
+
                             actorService
                                   .MasterKey(password)
                                   .Identifier(identifier)
-                                  .FromAddress(address);
-                            await actorService.Payment(redemption, coin);
+                                  .ToAddress(address)
+                                  .Memo(memo);
+
+                            await actorService.SetRandomAddress();
+                            await actorService.SetSecretKey();
+                            await actorService.SetPublicKey();
+
+                            var coin = coinService
+                                .Password(password)
+                                .TransactionCoin(new TransactionCoin { Input = amount })
+                                .BuildReceiver()
+                                .Coin();
+
+                            coin.Hash = coinService.Hash(coin).ToHex();
+                            coin.Network = walletService.NetworkAddress(coin).ToHex();
+
+                            var c = SendCoin(coin);
+
+                            if (c == null)
+                                spinner.Fail("Something went wrong ;(");
+
+                            var networkMessage = await actorService.SendPaymentMessage(true);
+                            var success = networkMessage.GetValue("success").ToObject<bool>();
+
+                            if (success.Equals(false))
+                                spinner.Fail(JsonConvert.SerializeObject(networkMessage.GetValue("message")));
+
                         }
                         catch (Exception ex)
                         {
                             logger.LogError(ex.Message);
                             logger.LogError(ex.StackTrace);
-                            amount = 0;
                             throw ex;
                         }
                         finally
                         {
-                            var balance = Convert.ToString(await actorService.CheckBalance());
-
-                            spinner.Text = $"Printed: {amount}  Available Balance: {balance}";
+                            spinner.Text = "Printed...";
                         }
                     });
                 }
             }
+        }
+
+        private CoinDto SendCoin(CoinDto coin)
+        {
+            spinner.Text = "Sending printed coin ;)";
+
+            var coinResult = actorService.AddAsync(coin.FormatCoinToBase64(), RestApiMethod.PostCoin).GetAwaiter().GetResult();
+            if (coinResult == null)
+            {
+                for (int i = 0; i < 10; i++)
+                {
+                    spinner.Text = $"Retrying sending coin {i} of 10";
+                    coinResult = actorService.AddAsync(coin.FormatCoinToBase64(), RestApiMethod.PostCoin).GetAwaiter().GetResult();
+
+                    Task.Delay(100).Wait();
+
+                    if (coinResult != null)
+                        break;
+                }
+            }
+
+            return coinResult;
         }
 
         private void ActorService_MessagePump(object sender, MessagePumpEventArgs e)
