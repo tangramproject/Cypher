@@ -8,17 +8,22 @@
 
 using Microsoft.Extensions.Hosting;
 using System.Security;
+using System.Threading.Tasks;
 
-namespace Cypher.ApplicationLayer.Onion
+namespace TangramCypher.ApplicationLayer.Onion
 {
     public interface IOnionService : IHostedService
     {
         bool OnionStarted { get; }
         string SocksHost { get; }
         int SocksPort { get; }
+        int ControlPort { get; }
         int OnionEnabled { get; }
 
         void ChangeCircuit(SecureString password);
+        Task<bool> CircuitEstablished(SecureString password);
+        void DisconnectDisposeSocket(SecureString password);
+        void InitializeConnectSocket(SecureString password);
         void Dispose();
         void GenerateHashPassword(SecureString password);
         void SendCommands(string command, SecureString password);

@@ -10,10 +10,15 @@ using System.Collections.Generic;
 
 namespace TangramCypher.ApplicationLayer.Wallet
 {
-    public class TransactionChange
+    public class TransactionCoin
     {
-        public List<TransactionDto> Transactions { get; set; } = new List<TransactionDto>();
-        public TransactionDto Transaction { get; set; }
-        public double AmountFor { get; set; }
+        public double Balance { get; set; }
+        public string Blind { get; set; }
+        public IList<TransactionDto> Chain { get; set; }
+        public double Input { get; set; }
+        public double Output { get; set; }
+        public bool Spent { get; set; }
+        public string Stamp { get; set; }
+        public int Version { get; set; }
     }
 }

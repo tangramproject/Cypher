@@ -14,13 +14,13 @@ using TangramCypher.ApplicationLayer.Wallet;
 using TangramCypher.Helper.LibSodium;
 using Microsoft.Extensions.Logging;
 using System.Threading.Tasks;
-using Cypher.ApplicationLayer.Onion;
 using Microsoft.Extensions.Configuration;
 using System.IO;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Hosting;
 using TangramCypher.ApplicationLayer.Coin;
 using System;
+using TangramCypher.ApplicationLayer.Onion;
 
 namespace TangramCypher
 {
@@ -46,22 +46,18 @@ namespace TangramCypher
                     services
                         .AddSingleton<IActorService, ActorService>()
                         .AddSingleton<IWalletService, WalletService>()
-                        .AddSingleton<IOnionService, OnionService>()
-                        .AddSingleton<IVaultService, VaultService>()
+                        .AddSingleton<IOnionServiceClient, OnionServiceClient>()
+                        .AddSingleton<IVaultServiceClient, VaultServiceClient>()
                         .AddSingleton<ICommandService, CommandService>()
                         .AddSingleton<ICoinService, CoinService>()
-                        .AddSingleton<IHostedService, OnionService>(sp =>
-                        {
-                            return sp.GetService<IOnionService>() as OnionService;
-                        })
-                        .AddSingleton<IHostedService, VaultService>(sp =>
-                        {
-                            return sp.GetService<IVaultService>() as VaultService;
-                        })
+                        .AddSingleton<IHostedService, OnionService>()
+                        .AddSingleton<IHostedService, VaultService>()
                         .AddSingleton<IHostedService, CommandService>(sp =>
                         {
                             return sp.GetService<ICommandService>() as CommandService;
                         });
+
+                    services.AddSingleton<IHostedService, ApplicationLayer.HttpXy>();
 
                     services.Add(new ServiceDescriptor(typeof(IConsole), PhysicalConsole.Singleton));
 
@@ -74,7 +70,7 @@ namespace TangramCypher
                     services.Add(new ServiceDescriptor(typeof(ILogger),
                                                                 provider => logger,
                                                                 ServiceLifetime.Singleton));
-                                                               
+
                 })
                 .UseConsoleLifetime();
 

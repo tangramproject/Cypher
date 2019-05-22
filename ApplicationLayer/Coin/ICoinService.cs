@@ -8,6 +8,7 @@
 
 using System.Collections.Generic;
 using System.Security;
+using Secp256k1_ZKP.Net;
 using TangramCypher.ApplicationLayer.Actor;
 using TangramCypher.ApplicationLayer.Wallet;
 
@@ -15,29 +16,25 @@ namespace TangramCypher.ApplicationLayer.Coin
 {
     public interface ICoinService
     {
-        (ReceiverOutput, CoinDto) BuildReceiver();
-        CoinDto BuildSender();
+        CoinService BuildReceiver();
+        CoinService BuildSender();
         void ClearCache();
-        double Change();
         (CoinDto, CoinDto) CoinSwap(SecureString password, CoinDto coin, RedemptionKeyDto redemptionKey);
         byte[] Commit(ulong amount, int version, string stamp, SecureString password);
         byte[] Commit(ulong amount);
         byte[] Commit(ulong amount, byte[] blind);
+        CoinDto Coin();
         CoinDto DeriveCoin(SecureString password, CoinDto coin);
         CoinDto DeriveCoin(CoinDto coin);
+        byte[] DeriveKey(double amount, string stamp, int version);
         string DeriveKey(int version, string stamp, SecureString password, int bytes = 32);
-        byte[] DeriveKey(int bytes = 32);
-        byte[] DeriveKey(double value, int bytes = 32);
-        string GetNewStamp();
+        string NewStamp();
         byte[] Hash(CoinDto coin);
         (string, string) HotRelease(int version, string stamp, SecureString password);
-        double Input();
-        CoinService Input(double value);
         IEnumerable<CoinDto> MakeMultipleCoins(IEnumerable<TransactionDto> transactions, SecureString password);
         CoinDto MakeSingleCoin(TransactionDto transaction, SecureString password);
-        CoinDto MakeSingleCoin();
-        double Output();
-        CoinService Output(double value);
+        void MakeSingleCoin();
+        ProofStruct ProofStruct();
         string PartialRelease(int version, string stamp, string memo, SecureString password);
         SecureString Password();
         CoinService Password(SecureString password);
@@ -47,6 +44,8 @@ namespace TangramCypher.ApplicationLayer.Coin
         (byte[], byte[]) Split(byte[] blinding);
         string Stamp();
         CoinService Stamp(string stamp);
+        TransactionCoin TransactionCoin();
+        CoinService TransactionCoin(TransactionCoin transactionCoin);
         CoinDto SwapPartialOne(SecureString password, CoinDto coin, RedemptionKeyDto redemptionKey);
         int VerifyCoin(CoinDto terminal, CoinDto current);
         int Version();

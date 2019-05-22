@@ -29,5 +29,12 @@ namespace TangramCypher.ApplicationLayer.Actor
         public const string GetMessages = "getMessages";
         public const string GetMessageRange = "getMessageRange";
         public const string GetMessageCount = "getMessageCount";
+        public const string ApiNetwork = "network";
+        public const string Environment = "environment";
+        public const string Mainnet = "mainnet";
+        public const string Testnet = "testnet";
+        public const string PublicKey = "PublicKey";
+        public const string SecretKey = "SecretKey";
+        public const string AddressKey = "Address";
     }
 }

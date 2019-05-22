@@ -7,12 +7,15 @@
 // work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
 
 using System;
+using System.ComponentModel.DataAnnotations;
+
 namespace TangramCypher.ApplicationLayer.Wallet
 {
-    public class MessageTrackDto
+    public class CredentialsDto
     {
-        public string PublicKey { get; set; }
-        public int Skip { get; set; }
-        public int Take { get; set; }
+        [Required]
+        public string Identifier { get; set; }
+        [Required]
+        public string Password { get; set; }
     }
 }

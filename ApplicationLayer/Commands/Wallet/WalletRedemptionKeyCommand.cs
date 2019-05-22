@@ -6,6 +6,9 @@ using TangramCypher.ApplicationLayer.Actor;
 using Microsoft.Extensions.DependencyInjection;
 using System.IO;
 using Newtonsoft.Json;
+using System.Net;
+using System.Text;
+using System.Net.Http;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
 {
@@ -14,6 +17,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
     {
         readonly IActorService actorService;
         readonly IConsole console;
+        private static readonly DirectoryInfo tangramDirectory = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
 
         public WalletRedemptionKeyCommand(IServiceProvider serviceProvider)
         {
@@ -29,15 +33,27 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                 using (var password = Prompt.GetPasswordAsSecureString("Password:", ConsoleColor.Yellow))
                 {
                     var address = Prompt.GetString("Address:", null, ConsoleColor.Red);
+
+                    console.ForegroundColor = ConsoleColor.Magenta;
+                    console.WriteLine("\nOptions:");
+                    console.WriteLine("Local file [1]");
+                    console.WriteLine("Web [2]\n");
+
+                    var option = Prompt.GetInt("Select option:", 1, ConsoleColor.Yellow);
+
+                    console.ForegroundColor = ConsoleColor.White;
+
                     var path = Prompt.GetString("File Path:", null, ConsoleColor.Green);
 
-                    var readLines = File.ReadLines(path).ToArray();
-                    var line = readLines[1];
+                    string line = string.Empty;
+
+                    line = option == 1 ? LocalFile(path) : await WebFile(path);
 
                     var message = await actorService
-                        .From(password)
+                        .MasterKey(password)
                         .Identifier(identifier)
-                        .ReceivePaymentRedemptionKey(address, line);
+                        .FromAddress(address)
+                        .ReceivePaymentRedemptionKey(line);
 
                     console.WriteLine(JsonConvert.SerializeObject(message));
                 }
@@ -45,6 +61,30 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
             catch (Exception ex)
             {
                 throw ex;
+            }
+        }
+
+        private string LocalFile(string path)
+        {
+            var readLines = File.ReadLines(path).ToArray();
+            return readLines[1];
+        }
+
+        private async Task<string> WebFile(string url)
+        {
+            using (HttpClient client = new HttpClient())
+            {
+                ServicePointManager.ServerCertificateValidationCallback += (sender, certificate, chain, sslPolicyErrors) => true;
+
+                var response = await client.GetAsync(url);
+                string xml = await response.Content.ReadAsStringAsync();
+                var xmlByteArray = await response.Content.ReadAsByteArrayAsync();
+                var path = $"{tangramDirectory}redem{DateTime.Now.GetHashCode()}.rdkey";
+
+                if (!File.Exists(path))
+                    File.WriteAllBytes(path, xmlByteArray);
+
+                return LocalFile(path);
             }
         }
     }

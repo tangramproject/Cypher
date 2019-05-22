@@ -22,27 +22,16 @@ using Microsoft.Extensions.Logging;
 using TangramCypher.ApplicationLayer;
 using TangramCypher.Helper;
 
-namespace Cypher.ApplicationLayer.Onion
+namespace TangramCypher.ApplicationLayer.Onion
 {
     public class OnionService : HostedService, IOnionService, IDisposable
     {
-        const string ONION = "onion";
-        const string TORRC = "torrc";
-        const string SOCKS_HOST = "onion_socks_host";
-        const string SOCKS_PORT = "onion_socks_port";
-        const string CONTROL_HOST = "onion_control_host";
-        const string CONTROL_PORT = "onion_control_port";
-        const string HASHED_CONTROL_PASSWORD = "onion_hashed_control_password";
-        const string HIDDEN_SERVICE_PORT = "onion_hidden_service_port";
-        const string ONION_ENABLED = "onion_enabled";
-
         private static readonly DirectoryInfo tangramDirectory = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
 
         readonly IConfigurationSection onionSection;
         readonly ILogger logger;
         readonly IConsole console;
         readonly string controlHost;
-        readonly int controlPort;
         readonly string onionDirectory;
         readonly string torrcPath;
         readonly string controlPortPath;
@@ -57,23 +46,24 @@ namespace Cypher.ApplicationLayer.Onion
         public string SocksHost { get; }
         public int SocksPort { get; }
         public int OnionEnabled { get; }
+        public int ControlPort { get; }
 
         public OnionService(IConfiguration configuration, ILogger logger, IConsole console)
         {
-            onionSection = configuration.GetSection(ONION);
+            onionSection = configuration.GetSection(Constants.ONION);
 
             this.logger = logger;
             this.console = console;
 
-            SocksHost = onionSection.GetValue<string>(SOCKS_HOST);
-            SocksPort = onionSection.GetValue<int>(SOCKS_PORT);
-            controlHost = onionSection.GetValue<string>(CONTROL_HOST);
-            controlPort = onionSection.GetValue<int>(CONTROL_PORT);
-            hiddenServicePort = onionSection.GetValue<string>(HIDDEN_SERVICE_PORT);
-            OnionEnabled = onionSection.GetValue<int>(ONION_ENABLED);
+            SocksHost = onionSection.GetValue<string>(Constants.SOCKS_HOST);
+            SocksPort = onionSection.GetValue<int>(Constants.SOCKS_PORT);
+            controlHost = onionSection.GetValue<string>(Constants.CONTROL_HOST);
+            ControlPort = onionSection.GetValue<int>(Constants.CONTROL_PORT);
+            hiddenServicePort = onionSection.GetValue<string>(Constants.HIDDEN_SERVICE_PORT);
+            OnionEnabled = onionSection.GetValue<int>(Constants.ONION_ENABLED);
 
-            onionDirectory = Path.Combine(Path.GetDirectoryName(AppDomain.CurrentDomain.BaseDirectory), ONION);
-            torrcPath = Path.Combine(onionDirectory, TORRC);
+            onionDirectory = Path.Combine(Path.GetDirectoryName(AppDomain.CurrentDomain.BaseDirectory), Constants.ONION);
+            torrcPath = Path.Combine(onionDirectory, Constants.TORRC);
             controlPortPath = Path.Combine(onionDirectory, "control-port");
             hiddenServicePath = Path.Combine(onionDirectory, "hidden_service");
             var pluggableTransports = Path.Combine(tangramDirectory.FullName, "PluggableTransports");
@@ -89,7 +79,7 @@ namespace Cypher.ApplicationLayer.Onion
             {
                 using (var insecurePassword = password.Insecure())
                 {
-                    var controlPortClient = new DotNetTor.ControlPort.Client(controlHost, controlPort, insecurePassword.Value);
+                    var controlPortClient = new DotNetTor.ControlPort.Client(controlHost, ControlPort, insecurePassword.Value);
                     controlPortClient.ChangeCircuitAsync().Wait();
                 }
             }
@@ -97,6 +87,67 @@ namespace Cypher.ApplicationLayer.Onion
             {
                 console.WriteLine(ex.Message);
             }
+        }
+
+        public void DisconnectDisposeSocket(SecureString password)
+        {
+            if (password == null)
+                throw new ArgumentNullException(nameof(password));
+
+            try
+            {
+                using (var insecurePassword = password.Insecure())
+                {
+                    var controlPortClient = new DotNetTor.ControlPort.Client(controlHost, ControlPort, insecurePassword.Value);
+                    controlPortClient.DisconnectDisposeSocket();
+                }
+            }
+            catch (DotNetTor.TorException ex)
+            {
+                console.WriteLine(ex.Message);
+            }
+        }
+
+        public void InitializeConnectSocket(SecureString password)
+        {
+            if (password == null)
+                throw new ArgumentNullException(nameof(password));
+
+            try
+            {
+                using (var insecurePassword = password.Insecure())
+                {
+                    var controlPortClient = new DotNetTor.ControlPort.Client(controlHost, ControlPort, insecurePassword.Value);
+                    controlPortClient.InitializeConnectSocketAsync(new CancellationToken()).Wait();
+                }
+            }
+            catch (DotNetTor.TorException ex)
+            {
+                console.WriteLine(ex.Message);
+            }
+        }
+
+        public async Task<bool> CircuitEstablished(SecureString password)
+        {
+            if (password == null)
+                throw new ArgumentNullException(nameof(password));
+
+            bool hasCircuit = false;
+
+            try
+            {
+                using (var insecurePassword = password.Insecure())
+                {
+                    var controlPortClient = new DotNetTor.ControlPort.Client(controlHost, ControlPort, insecurePassword.Value);
+                    hasCircuit = await controlPortClient.IsCircuitEstablishedAsync();
+                }
+            }
+            catch (DotNetTor.TorException ex)
+            {
+                console.WriteLine(ex.Message);
+            }
+
+            return hasCircuit;
         }
 
         public void GenerateHashPassword(SecureString password)
@@ -162,7 +213,7 @@ namespace Cypher.ApplicationLayer.Onion
             {
                 using (var insecurePassword = password.Insecure())
                 {
-                    var controlPortClient = new DotNetTor.ControlPort.Client(controlHost, controlPort, insecurePassword.Value);
+                    var controlPortClient = new DotNetTor.ControlPort.Client(controlHost, ControlPort, insecurePassword.Value);
                     var result = controlPortClient.SendCommandAsync(command).GetAwaiter().GetResult();
                 }
             }
@@ -192,9 +243,6 @@ namespace Cypher.ApplicationLayer.Onion
 
         void CreateTorrc()
         {
-            if (string.IsNullOrEmpty(hashedPassword))
-                throw new ArgumentException("Hashed control password is not set.", nameof(hashedPassword));
-
             if (!Directory.Exists(onionDirectory))
             {
                 try
@@ -211,23 +259,22 @@ namespace Cypher.ApplicationLayer.Onion
             if (File.Exists(torrcPath))
                 return;
 
+            GenerateHashPassword("ILoveTangram".ToSecureString());
+
             var torrcContent = new string[] {
                 "AvoidDiskWrites 1",
                 $"HashedControlPassword {hashedPassword}",
-                "SocksPort auto IPv6Traffic PreferIPv6 KeepAliveIsolateSOCKSAuth",
-                "ControlPort auto",
-                "CookieAuthentication 1",
-                $"HiddenServiceDir {hiddenServicePath}",
-                $"HiddenServicePort {hiddenServicePort}",
-                "HiddenServiceVersion 3",
-                "CircuitBuildTimeout 10",
-                "KeepalivePeriod 60",
+                "CircuitBuildTimeout 2",
+                "KeepalivePeriod 2",
+                "NewCircuitPeriod 15",
                 "NumEntryGuards 8",
-                $"SocksPort {SocksPort}",
+                $"ControlPort {ControlPort}",
                 "Log notice stdout",
+                "SafeSocks 1",
+                "TestSocks 1",
                 $"DataDirectory {onionDirectory}",
                 $"ControlPortWriteToFile {controlPortPath}",
-                $"ClientTransportPlugin obfs4 exec {obfs4proxy} managed"
+                $"ClientTransportPlugin obfs4 exec {obfs4proxy}"
             };
 
             try
@@ -260,38 +307,41 @@ namespace Cypher.ApplicationLayer.Onion
                 catch { }
             }
 
-            return port == 0 ? controlPort : port;
+            return port == 0 ? ControlPort : port;
         }
 
         async Task StartTorProcess()
         {
-            TorProcess = new Process();
-            TorProcess.StartInfo.FileName = GetTorFileName();
-            TorProcess.StartInfo.Arguments = $"-f \"{torrcPath}\"";
-            TorProcess.StartInfo.UseShellExecute = false;
-            TorProcess.StartInfo.CreateNoWindow = true;
-            TorProcess.StartInfo.RedirectStandardOutput = true;
-            TorProcess.OutputDataReceived += (sender, e) =>
-            {
-                if (!string.IsNullOrEmpty(e.Data))
-                {
-                    if (e.Data.Contains("Bootstrapped 100%: Done"))
-                    {
-                        OnionStarted = true;
-                        console.ResetColor();
-                        logger.LogInformation("tor Started!");
-                    }
-
-                    logger.LogInformation(e.Data);
-                }
-            };
-
-            TorProcess.Start();
-
             if (torId.Equals(0))
+            {
+                TorProcess = new Process();
+                TorProcess.StartInfo.FileName = GetTorFileName();
+                TorProcess.StartInfo.Arguments = $"-f \"{torrcPath}\"";
+                TorProcess.StartInfo.UseShellExecute = false;
+                TorProcess.StartInfo.CreateNoWindow = true;
+                TorProcess.StartInfo.RedirectStandardOutput = true;
+                TorProcess.OutputDataReceived += (sender, e) =>
+                {
+                    if (!string.IsNullOrEmpty(e.Data))
+                    {
+                        if (e.Data.Contains("Bootstrapped 100%: Done"))
+                        {
+                            OnionStarted = true;
+                            console.ResetColor();
+                            logger.LogInformation("tor Started!");
+                        }
+
+                        logger.LogInformation(e.Data);
+                    }
+                };
+
+                TorProcess.Start();
+
                 torId = TorProcess.Id;
 
-            await Task.Run(() => TorProcess.BeginOutputReadLine());
+                await Task.Run(() => TorProcess.BeginOutputReadLine());
+            }
+
         }
 
         public override void Dispose()
@@ -315,11 +365,12 @@ namespace Cypher.ApplicationLayer.Onion
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
+            Debug.WriteLine("EXECUTE ASYNC ONION");
+
             if (OnionEnabled == 1)
             {
                 console.WriteLine("Starting Onion Service");
                 logger.LogInformation("Starting Onion Service");
-                GenerateHashPassword("ILoveTangram".ToSecureString());
                 await Task.Run(() => StartOnion());
             }
 

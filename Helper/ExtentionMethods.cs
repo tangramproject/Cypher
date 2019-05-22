@@ -113,6 +113,7 @@ namespace TangramCypher.Helper
             formattedCoin.Hash = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Hash));
             formattedCoin.Hint = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Hint));
             formattedCoin.Keeper = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Keeper));
+            formattedCoin.Network = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Network));
             formattedCoin.Principle = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Principle));
             formattedCoin.Stamp = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Stamp));
             formattedCoin.Version = coin.Version;
@@ -134,6 +135,7 @@ namespace TangramCypher.Helper
             formattedCoin.Hash = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Hash));
             formattedCoin.Hint = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Hint));
             formattedCoin.Keeper = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Keeper));
+            // formattedCoin.Network = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Network));
             formattedCoin.Principle = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Principle));
             formattedCoin.Stamp = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Stamp));
             formattedCoin.Version = coin.Version;

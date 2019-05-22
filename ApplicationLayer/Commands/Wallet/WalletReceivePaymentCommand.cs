@@ -14,8 +14,9 @@ using Microsoft.Extensions.DependencyInjection;
 using TangramCypher.ApplicationLayer.Actor;
 using TangramCypher.Helper;
 using TangramCypher.ApplicationLayer.Wallet;
-using TangramCypher.Helper.LibSodium;
-using System.Collections.Generic;
+using Kurukuru;
+using System.Security;
+using Microsoft.Extensions.Logging;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
 {
@@ -23,52 +24,67 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
     public class WalletReceivePaymentCommand : Command
     {
         readonly IActorService actorService;
-        readonly IConsole console;
-        readonly IVaultService vaultService;
         readonly IWalletService walletService;
+        readonly IConsole console;
+        readonly ILogger logger;
+
+        private Spinner spinner;
 
         public WalletReceivePaymentCommand(IServiceProvider serviceProvider)
         {
             actorService = serviceProvider.GetService<IActorService>();
-            console = serviceProvider.GetService<IConsole>();
-            vaultService = serviceProvider.GetService<IVaultService>();
             walletService = serviceProvider.GetService<IWalletService>();
+            console = serviceProvider.GetService<IConsole>();
+            logger = serviceProvider.GetService<ILogger>();
+
+            actorService.MessagePump += ActorService_MessagePump;
         }
 
         public override async Task Execute()
         {
-            try
+
+            using (var identifier = Prompt.GetPasswordAsSecureString("Identifier:", ConsoleColor.Yellow))
+            using (var password = Prompt.GetPasswordAsSecureString("Password:", ConsoleColor.Yellow))
             {
-                using (var identifier = Prompt.GetPasswordAsSecureString("Identifier:", ConsoleColor.Yellow))
-                using (var password = Prompt.GetPasswordAsSecureString("Password:", ConsoleColor.Yellow))
+                var address = Prompt.GetString("Address:", null, ConsoleColor.Red);
+
+                if (!string.IsNullOrEmpty(address))
                 {
-                    var address = Prompt.GetString("Address:", null, ConsoleColor.Red);
-
-                    using (var insecureIdentifier = identifier.Insecure())
-                    using (var insecurePassword = password.Insecure())
+                    await Spinner.StartAsync("Processing receive payment(s) ...", async spinner =>
                     {
-                        await vaultService.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
-                    }
+                        this.spinner = spinner;
 
-                    if (!string.IsNullOrEmpty(address))
-                    {
-                        await actorService
-                          .From(password)
-                          .Identifier(identifier)
-                          .ReceivePayment(address);
+                        await Task.Delay(500);
 
-                        var total = await walletService.AvailableBalance(identifier, password);
+                        try
+                        {
+                            await actorService
+                                  .MasterKey(password)
+                                  .Identifier(identifier)
+                                  .FromAddress(address)
+                                  .ReceivePayment();
+                        }
+                        catch (Exception ex)
+                        {
+                            logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
+                            throw ex;
+                        }
+                        finally
+                        {
+                            var lastAmount = Convert.ToString(await walletService.LastTransactionAmount(identifier, password, TransactionType.Receive));
+                            var balance = Convert.ToString(await actorService.CheckBalance());
 
-                        console.ForegroundColor = ConsoleColor.Magenta;
-                        console.WriteLine($"\nWallet balance: {total}\n");
-                        console.ForegroundColor = ConsoleColor.White;
-                    }
+                            spinner.Text = $"Received:{lastAmount }  Available Balance: {balance}";
+                        }
+                    });
                 }
             }
-            catch (Exception ex)
-            {
-                throw ex;
-            }
+        }
+
+        private void ActorService_MessagePump(object sender, MessagePumpEventArgs e)
+        {
+            spinner.Text = e.Message;
         }
     }
 }
+

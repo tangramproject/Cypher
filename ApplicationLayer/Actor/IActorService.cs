@@ -11,24 +11,28 @@ using System.Collections.Generic;
 using System.Security;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
+using TangramCypher.ApplicationLayer.Coin;
 using TangramCypher.ApplicationLayer.Wallet;
 
 namespace TangramCypher.ApplicationLayer.Actor
 {
     public interface IActorService
     {
+        event MessagePumpEventHandler MessagePump;
+
         Task<T> AddAsync<T>(T payload, RestApiMethod apiMethod);
         double Amount();
         ActorService Amount(double value);
         Task<T> GetAsync<T>(string address, RestApiMethod apiMethod);
         Task<double> CheckBalance();
         double GetChange();
+        JObject GetLastError();
         Task<IEnumerable<T>> GetRangeAsync<T>(string address, int skip, int take, RestApiMethod apiMethod);
         Span<byte> DecodeAddress(string key);
-        SecureString From();
-        ActorService From(SecureString password);
+        SecureString MasterKey();
+        ActorService MasterKey(SecureString password);
         byte[] Cypher(string message, byte[] pk);
-        Task<byte[]> ToSharedKey(byte[] pk);
+        byte[] ToSharedKey(byte[] pk);
         SecureString Identifier();
         ActorService Identifier(SecureString walletId);
         string Memo();
@@ -36,14 +40,21 @@ namespace TangramCypher.ApplicationLayer.Actor
         string OpenBoxSeal(string cypher, PkSkDto pkSkDto);
         SecureString PublicKey();
         ActorService PublicKey(SecureString pk);
-        Task ReceivePayment(string address, bool sharedKey = false, byte[] receiverPk = null);
-        Task<JObject> ReceivePaymentRedemptionKey(string address, string cypher);
+        Task ReceivePayment();
+        Task<JObject> ReceivePaymentRedemptionKey(string cypher);
         SecureString SecretKey();
         ActorService SecretKey(SecureString sk);
         Task<MessageDto> EstablishPubKeyMessage();
-        Task<JObject> SendPayment(bool sendMessage);
-        string To();
-        ActorService To(string address);
-        string ProverPassword(SecureString password, int version);
+        Task<bool> SendPayment();
+        Task<JObject> SendPaymentMessage(bool send);
+        string ToAddress();
+        ActorService ToAddress(string address);
+        Task<List<TransactionDto>> Sync();
+        string FromAddress();
+        ActorService FromAddress(string address);
+        Task<bool> Payment(RedemptionKeyDto redemptionKey, CoinDto coin);
+        Task SetRandomAddress();
+        Task SetSecretKey();
+        Task SetPublicKey();
     }
 }

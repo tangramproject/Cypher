@@ -14,8 +14,12 @@ using Microsoft.Extensions.DependencyInjection;
 using TangramCypher.ApplicationLayer.Actor;
 using TangramCypher.Helper;
 using Newtonsoft.Json;
-using System.Text;
 using System.IO;
+using Kurukuru;
+using Newtonsoft.Json.Linq;
+using TangramCypher.ApplicationLayer.Wallet;
+using System.Security;
+using Microsoft.Extensions.Logging;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
 {
@@ -24,7 +28,9 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
     {
         readonly IActorService actorService;
         readonly IConsole console;
-        readonly IVaultService vaultService;
+        readonly ILogger logger;
+
+        private Spinner spinner;
 
         private static readonly DirectoryInfo tangramDirectory = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
 
@@ -32,76 +38,113 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
         {
             actorService = serviceProvider.GetService<IActorService>();
             console = serviceProvider.GetService<IConsole>();
-            vaultService = serviceProvider.GetService<IVaultService>();
+            logger = serviceProvider.GetService<ILogger>();
+
+            actorService.MessagePump += ActorService_MessagePump;
         }
+
         public override async Task Execute()
         {
-            try
+
+            using (var identifier = Prompt.GetPasswordAsSecureString("Identifier:", ConsoleColor.Yellow))
+            using (var password = Prompt.GetPasswordAsSecureString("Password:", ConsoleColor.Yellow))
             {
-                using (var identifier = Prompt.GetPasswordAsSecureString("Identifier:", ConsoleColor.Yellow))
-                using (var password = Prompt.GetPasswordAsSecureString("Password:", ConsoleColor.Yellow))
+                var address = Prompt.GetString("To:", null, ConsoleColor.Red);
+                var amount = Prompt.GetString("Amount:", null, ConsoleColor.Red);
+                var memo = Prompt.GetString("Memo:", null, ConsoleColor.Green);
+                var yesNo = Prompt.GetYesNo("Send redemption key to message pool?", true, ConsoleColor.Yellow);
+
+
+                if (double.TryParse(amount, out double t))
                 {
-                    var amount = Prompt.GetString("Amount:", null, ConsoleColor.Red);
-                    var address = Prompt.GetString("To:", null, ConsoleColor.Red);
-                    var memo = Prompt.GetString("Memo:", null, ConsoleColor.Green);
-                    var yesNo = Prompt.GetYesNo("Send redemption key to message pool?", true, ConsoleColor.Yellow);
-
-                    using (var insecureIdentifier = identifier.Insecure())
+                    await Spinner.StartAsync("Processing payment ...", async spinner =>
                     {
-                        await vaultService.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
-                    }
+                        this.spinner = spinner;
 
-                    if (double.TryParse(amount, out double t))
-                    {
-                        var message =
-                            await actorService
-                                    .From(password)
-                                    .Identifier(identifier)
-                                    .Amount(t)
-                                    .To(address)
-                                    .Memo(memo)
-                                    .SendPayment(yesNo);
-
-                        if (yesNo.Equals(false))
+                        try
                         {
-                            var notification = message.ToObject<NotificationDto>();
+                            var sent = await actorService
+                                      .MasterKey(password)
+                                      .Identifier(identifier)
+                                      .Amount(t)
+                                      .ToAddress(address)
+                                      .Memo(memo)
+                                      .SendPayment();
 
-                            console.ForegroundColor = ConsoleColor.Magenta;
-                            console.WriteLine("\nOptions:");
-                            console.WriteLine("Save redemption key to file [1]");
-                            console.WriteLine("Copy redemption key from console [2]\n");
-
-                            var option = Prompt.GetInt("Select option:", 1, ConsoleColor.Yellow);
-
-                            console.ForegroundColor = ConsoleColor.White;
-
-                            var content =
-                                "--------------Begin Redemption Key--------------" +
-                                Environment.NewLine +
-                                JsonConvert.SerializeObject(notification) +
-                                Environment.NewLine +
-                                "--------------End Redemption Key----------------";
-
-                            if (option.Equals(1))
+                            if (sent.Equals(false))
                             {
-                                var path = $"{tangramDirectory}redem{DateTime.Now.GetHashCode()}.rdkey";
-                                File.WriteAllText(path, content);
-                                console.WriteLine($"\nSaved path: {path}\n");
+                                var failedMessage = JsonConvert.SerializeObject(actorService.GetLastError().GetValue("message"));
+                                logger.LogCritical(failedMessage);
+                                spinner.Fail(failedMessage);
+                                return;
                             }
-                            else
-                                console.WriteLine($"\n{content}\n");
 
-                            return;
+                            switch (yesNo)
+                            {
+                                case true:
+                                    var networkMessage = await actorService.SendPaymentMessage(true);
+                                    var success = networkMessage.GetValue("success").ToObject<bool>();
+
+                                    if (success.Equals(false))
+                                        spinner.Fail(JsonConvert.SerializeObject(networkMessage.GetValue("message")));
+
+                                    break;
+
+                                case false:
+                                    var localMessage = await actorService.SendPaymentMessage(false);
+
+                                    SaveRedemptionKeyLocal(localMessage);
+
+                                    break;
+                            }
                         }
-
-                        console.WriteLine(JsonConvert.SerializeObject(message));
-                    }
+                        catch (Exception ex)
+                        {
+                            logger.LogError(ex.StackTrace);
+                            throw ex;
+                        }
+                        finally
+                        {
+                            spinner.Text = $"Available Balance: {Convert.ToString(await actorService.CheckBalance())}";
+                        }
+                    });
                 }
             }
-            catch (Exception ex)
+        }
+
+        private void SaveRedemptionKeyLocal(JObject message)
+        {
+            var notification = message.GetValue("message").ToObject<NotificationDto>();
+
+            console.ForegroundColor = ConsoleColor.Magenta;
+            console.WriteLine("\nOptions:");
+            console.WriteLine("Save redemption key to file [1]");
+            console.WriteLine("Copy redemption key from console [2]\n");
+
+            var option = Prompt.GetInt("Select option:", 1, ConsoleColor.Yellow);
+
+            console.ForegroundColor = ConsoleColor.White;
+
+            var content =
+                "--------------Begin Redemption Key--------------" +
+                Environment.NewLine +
+                JsonConvert.SerializeObject(notification) +
+                Environment.NewLine +
+                "--------------End Redemption Key----------------";
+
+            if (option.Equals(1))
             {
-                throw ex;
+                var path = $"{tangramDirectory}redem{DateTime.Now.GetHashCode()}.rdkey";
+                File.WriteAllText(path, content);
+                console.WriteLine($"\nSaved path: {path}\n");
             }
+            else
+                console.WriteLine($"\n{content}\n");
+        }
+
+        private void ActorService_MessagePump(object sender, MessagePumpEventArgs e)
+        {
+            spinner.Text = e.Message;
         }
     }
 }

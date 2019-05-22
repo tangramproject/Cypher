@@ -9,25 +9,36 @@
 using System.Collections.Generic;
 using System.Security;
 using System.Threading.Tasks;
+using TangramCypher.ApplicationLayer.Actor;
+using TangramCypher.ApplicationLayer.Coin;
 
 namespace TangramCypher.ApplicationLayer.Wallet
 {
     public interface IWalletService
     {
         Task<double> AvailableBalance(SecureString identifier, SecureString password);
+        Task<bool> AddKey(SecureString identifier, SecureString password, PkSkDto pkSk);
         PkSkDto CreatePkSk();
+        Task<CredentialsDto> CreateWallet();
         SecureString NewID(int bytes = 32);
         SecureString Passphrase();
         byte[] HashPassword(SecureString passphrase);
-        Task AddTransaction(SecureString identifier, SecureString password, TransactionDto transaction);
+        Task<bool> AddTransaction(SecureString identifier, SecureString password, TransactionDto transaction);
         Task<TransactionDto> Transaction(SecureString identifier, SecureString password, string hash);
         Task<List<TransactionDto>> Transactions(SecureString identifier, SecureString password);
-        Task<List<TransactionDto>> Transactions(SecureString identifier, SecureString password, string stamp);
         Task<double> TransactionAmount(SecureString identifier, SecureString password, string stamp);
+        Task<double> LastTransactionAmount(SecureString identifier, SecureString password, TransactionType transactionType);
         Task<SecureString> StoreKey(SecureString identifier, SecureString password, string storeKey);
-        Task<TransactionChange> MakeChange(SecureString identifier, SecureString password, double amount);
-        Task<TransactionChange> MakeChange(SecureString identifier, SecureString password, double amount, string stamp);
-        Task AddMessageTracking(SecureString identifier, SecureString password, MessageTrackDto messageTrack);
+        Task<SecureString> StoreKey(SecureString identifier, SecureString password, StoreKeyApiMethod storeKeyApi, string address);
+        Task<TransactionCoin> SortChange(SecureString identifier, SecureString password, double amount);
+        Task<bool> AddMessageTracking(SecureString identifier, SecureString password, MessageTrackDto messageTrack);
         Task<MessageTrackDto> MessageTrack(SecureString identifier, SecureString password, string pk);
+        byte[] NetworkAddress(CoinDto coin, NetworkApiMethod networkApi = null);
+        byte[] NetworkAddress(byte[] pk, NetworkApiMethod networkApi = null);
+        string ProverPassword(SecureString password, int version);
+        Task<bool> ClearTransactions(SecureString identifier, SecureString password);
+        Task<string> RandomAddress(SecureString identifier, SecureString password);
+        Task<string> Profile(SecureString identifier, SecureString password);
+        Task<IEnumerable<string>> WalletList();
     }
 }

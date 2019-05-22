@@ -1,8 +1,8 @@
 ﻿// Cypher (c) by Tangram Inc
-// 
+//
 // Cypher is licensed under a
 // Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International License.
-// 
+//
 // You should have received a copy of the license along with this
 // work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
 
@@ -17,85 +17,123 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using TangramCypher.ApplicationLayer.Wallet;
+using Dawn;
+using Microsoft.Extensions.Logging;
 
 namespace TangramCypher.ApplicationLayer.Coin
 {
     public class CoinService : ICoinService
     {
-        private double input;
-        private double output;
-        private double change;
-        private int version;
+        public const int Tan = 1;
+        public const int MicroTan = 100;
+        public const int NanoTan = 1000_000_000;
+        public const long AttoTan = 1000_000_000_000_000_000;
+
+        private readonly ILogger logger;
         private string stamp;
+        private int version;
         private SecureString password;
+        private CoinDto mintedCoin;
+        private ProofStruct proofStruct;
+        private TransactionCoin transactionCoin;
+
+        public CoinService(ILogger logger)
+        {
+            this.logger = logger;
+        }
 
         /// <summary>
         /// Builds the receiver.
         /// </summary>
         /// <returns>The receiver.</returns>
-        public (ReceiverOutput, CoinDto) BuildReceiver()
+        public CoinService BuildReceiver()
         {
-            ReceiverOutput receiver = null;
-            CoinDto coin = null;
-
             using (var secp256k1 = new Secp256k1())
             using (var pedersen = new Pedersen())
+            using (var rangeProof = new RangeProof())
             {
-                var blind = DeriveKey(Output());
-                var blindSum = pedersen.BlindSum(new List<byte[]> { blind, blind }, new List<byte[]> { });
-                var commitPos = Commit((ulong)Output(), blind);
-                var commitNeg = Commit(0, blind);
-
-                Stamp(GetNewStamp());
+                Stamp(NewStamp());
                 Version(-1);
 
-                coin = BuildCoin(blindSum, commitPos, commitNeg, true);
-                receiver = new ReceiverOutput(Output(), commitPos, blindSum);
+                MakeSingleCoin();
+
+                var naTInput = NaT(TransactionCoin().Input);
+                var blind = DeriveKey(naTInput, Stamp(), Coin().Version);
+
+                byte[] blindSum = new byte[32];
+
+                try
+                {
+                    blindSum = pedersen.BlindSum(new List<byte[]> { blind }, new List<byte[]> { });
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
+                    throw ex;
+                }
+
+                var commitPos = Commit(naTInput, blind);
+                var commitSum = pedersen.CommitSum(new List<byte[]> { commitPos }, new List<byte[]> { });
+
+                AttachEnvelope(secp256k1, pedersen, rangeProof, blindSum, commitSum, TransactionCoin().Input);
+
+                TransactionCoin().Blind = blindSum.ToHex();
             }
 
-            return (receiver, coin);
+            return this;
         }
 
         /// <summary>
         /// Builds the sender.
         /// </summary>
         /// <returns>The sender.</returns>
-        public CoinDto BuildSender()
+        public CoinService BuildSender()
         {
-            CoinDto coin = null;
-
             using (var secp256k1 = new Secp256k1())
             using (var pedersen = new Pedersen())
+            using (var rangeProof = new RangeProof())
             {
-                var blindPos = pedersen.BlindSwitch((ulong)Input(), DeriveKey(Input()));
-                var blindNeg = pedersen.BlindSwitch((ulong)Output(), DeriveKey(Output()));
-                var blindSum = pedersen.BlindSum(new List<byte[]> { blindPos }, new List<byte[]> { blindNeg });
-                var commitPos = Commit((ulong)Input(), blindPos);
-                var commitNeg = Commit((ulong)Output(), blindNeg);
+                Stamp(TransactionCoin().Stamp);
+                Version(TransactionCoin().Version);
 
-                coin = BuildCoin(blindSum, commitPos, commitNeg);
+                MakeSingleCoin();
+
+                var received = TransactionCoin().Chain.FirstOrDefault(tx => tx.TransactionType == TransactionType.Receive);
+
+                var blindNeg = DeriveKey(TransactionCoin().Input, received.Stamp, Coin().Version);
+                var commitNeg = pedersen.Commit(NaT(transactionCoin.Input), blindNeg);
+
+                var commitNegs = TransactionCoin().Chain
+                               .Where(tx => tx.TransactionType == TransactionType.Send)
+                               .Select(c => pedersen.Commit(NaT(c.Amount), DeriveKey(c.Amount, c.Stamp, c.Version))).ToList();
+
+                commitNegs.Add(commitNeg);
+
+                var blindNegSums = TransactionCoin().Chain
+                                .Where(tx => tx.TransactionType == TransactionType.Send)
+                                .Select(c => DeriveKey(c.Amount, c.Stamp, c.Version)).ToList();
+
+                blindNegSums.Add(blindNeg);
+
+                var blindSum = pedersen.BlindSum(new List<byte[]> { received.Blind.FromHex() }, blindNegSums);
+                var commitSum = pedersen.CommitSum(new List<byte[]> { received.Commitment.FromHex() }, commitNegs);
+
+                AttachEnvelope(secp256k1, pedersen, rangeProof, blindSum, commitSum, TransactionCoin().Output);
             }
 
-            return coin;
+            return this;
         }
 
         /// <summary>
-        /// Change this instance.
-        /// </summary>
-        /// <returns>The change.</returns>
-        public double Change() => change = Math.Abs(input) - Math.Abs(output);
-
-        /// <summary>
-        /// Clears the change, imputs, outputs and version cache.
+        /// Clears the change, imputs, minted coin, outputs, password, receiver output, stamp and version cache.
         /// </summary>
         public void ClearCache()
         {
-            change = 0;
-            Input(0);
-            Output(0);
-            Password(null);
-            Stamp(string.Empty);
-            Version(0);
+            mintedCoin = null;
+            password = null;
+            stamp = null;
+            version = 0;
+            transactionCoin = null;
         }
 
         /// <summary>
@@ -108,8 +146,8 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// <param name="password">Password.</param>
         public byte[] Commit(ulong amount, int version, string stamp, SecureString password)
         {
-            if (string.IsNullOrEmpty(stamp))
-                throw new ArgumentException("message", nameof(stamp));
+            Guard.Argument(stamp, nameof(stamp)).NotNull().NotEmpty();
+            Guard.Argument(password, nameof(password)).NotNull();
 
             using (var pedersen = new Pedersen())
             {
@@ -127,11 +165,8 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// <param name="amount">Amount.</param>
         public byte[] Commit(ulong amount)
         {
-            if (password == null)
-                throw new ArgumentNullException(nameof(password));
-
-            if (stamp == null)
-                throw new ArgumentNullException(nameof(stamp));
+            Guard.Argument(stamp, nameof(stamp)).NotNull().NotEmpty();
+            Guard.Argument(password, nameof(password)).NotNull();
 
             using (var pedersen = new Pedersen())
             {
@@ -150,15 +185,31 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// <param name="blind">Blind.</param>
         public byte[] Commit(ulong amount, byte[] blind)
         {
-            if ((blind == null) && (blind.Length > 32))
-                throw new ArgumentNullException(nameof(blind));
+            Guard.Argument(blind, nameof(blind)).NotNull().MaxCount(32);
+
+            byte[] commit = new byte[33];
 
             using (var pedersen = new Pedersen())
             {
-                var commit = pedersen.Commit(amount, blind);
+                try
+                {
+                    commit = pedersen.Commit(amount, blind);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
+                    throw ex;
+                }
+
                 return commit;
             }
         }
+
+        /// <summary>
+        /// Coin.
+        /// </summary>
+        /// <returns>The coin.</returns>
+        public CoinDto Coin() => mintedCoin;
 
         /// <summary>
         /// Derives the coin.
@@ -168,17 +219,14 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// <param name="coin">Coin.</param>
         public CoinDto DeriveCoin(SecureString password, CoinDto coin)
         {
-            if (password == null)
-                throw new ArgumentNullException(nameof(password));
-
-            if (coin == null)
-                throw new ArgumentNullException(nameof(coin));
+            Guard.Argument(password, nameof(password)).NotNull();
+            Guard.Argument(coin, nameof(coin)).NotNull();
 
             var v0 = +coin.Version;
             var v1 = +coin.Version + 1;
             var v2 = +coin.Version + 2;
 
-            var c = new CoinDto()
+            var coinDto = new CoinDto()
             {
                 Keeper = DeriveKey(v1, coin.Stamp, DeriveKey(v2, coin.Stamp, DeriveKey(v2, coin.Stamp, password).ToSecureString()).ToSecureString()),
                 Version = v0,
@@ -188,7 +236,7 @@ namespace TangramCypher.ApplicationLayer.Coin
                 Hint = DeriveKey(v1, coin.Stamp, DeriveKey(v1, coin.Stamp, password).ToSecureString())
             };
 
-            return c;
+            return coinDto;
         }
 
         /// <summary>
@@ -198,11 +246,8 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// <param name="coin">Coin.</param>
         public CoinDto DeriveCoin(CoinDto coin)
         {
-            if (password == null)
-                throw new ArgumentNullException(nameof(password));
-
-            if (coin == null)
-                throw new ArgumentNullException(nameof(coin));
+            Guard.Argument(password, nameof(password)).NotNull();
+            Guard.Argument(coin, nameof(coin)).NotNull();
 
             var v0 = +coin.Version;
             var v1 = +coin.Version + 1;
@@ -231,45 +276,23 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// <param name="bytes">Bytes.</param>
         public string DeriveKey(int version, string stamp, SecureString password, int bytes = 32)
         {
-            if (string.IsNullOrEmpty(stamp))
-                throw new ArgumentException("Stamp cannot be null or empty!", nameof(stamp));
+            Guard.Argument(stamp, nameof(stamp)).NotNull().NotEmpty();
+            Guard.Argument(password, nameof(password)).NotNull();
 
             using (var insecurePassword = password.Insecure())
             {
-                return Cryptography.GenericHashNoKey(string.Format("{0} {1} {2}", version, stamp, insecurePassword.Value), bytes).ToHex();
+                return Cryptography.GenericHashNoKey($"{version} {stamp} {insecurePassword.Value}", bytes).ToHex();
             }
         }
 
-        /// <summary>
-        /// Derives the key.
-        /// </summary>
-        /// <returns>The key.</returns>
-        /// <param name="bytes">Bytes.</param>
-        public byte[] DeriveKey(int bytes = 32)
+        public byte[] DeriveKey(double amount, string stamp, int version)
         {
-            if (string.IsNullOrEmpty(Stamp()))
-                throw new ArgumentException("Stamp cannot be null or empty!", nameof(stamp));
+            Guard.Argument(amount, nameof(amount)).NotNegative();
+            Guard.Argument(password, nameof(password)).NotNull();
 
             using (var insecurePassword = Password().Insecure())
             {
-                return Cryptography.GenericHashNoKey(string.Format("{0} {1} {2}", Version(), Stamp(), insecurePassword.Value), bytes);
-            }
-        }
-
-        /// <summary>
-        /// Derives the key.
-        /// </summary>
-        /// <returns>The key.</returns>
-        /// <param name="value">Value.</param>
-        /// <param name="bytes">Bytes.</param>
-        public byte[] DeriveKey(double value, int bytes = 32)
-        {
-            if (value < 0)
-                throw new Exception("Value can not be less than zero!");
-
-            using (var insecurePassword = Password().Insecure())
-            {
-                return Cryptography.GenericHashNoKey(string.Format("{0} {1} {2}", Version(), value, insecurePassword.Value), bytes);
+                return Cryptography.GenericHashNoKey($"{amount} {stamp} {version} {insecurePassword.Value}", 32);
             }
         }
 
@@ -277,7 +300,7 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// Gets the new stamp.
         /// </summary>
         /// <returns>The new stamp.</returns>
-        public string GetNewStamp()
+        public string NewStamp()
         {
             return Cryptography.GenericHashNoKey(Cryptography.RandomKey()).ToHex();
         }
@@ -289,8 +312,7 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// <param name="coin">Coin.</param>
         public byte[] Hash(CoinDto coin)
         {
-            if (coin == null)
-                throw new ArgumentNullException(nameof(coin));
+            Guard.Argument(coin, nameof(coin)).NotNull();
 
             return Cryptography.GenericHashNoKey(
                 string.Format("{0} {1} {2} {3} {4} {5} {6}",
@@ -304,7 +326,7 @@ namespace TangramCypher.ApplicationLayer.Coin
         }
 
         /// <summary>
-        ///  Releases two secret keys to continue hashchaing for sender/recipient. 
+        ///  Releases two secret keys to continue hashchaing for sender/recipient.
         /// </summary>
         /// <returns>The release.</returns>
         /// <param name="version">Version.</param>
@@ -312,11 +334,8 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// <param name="password">Password.</param>
         public (string, string) HotRelease(int version, string stamp, SecureString password)
         {
-            if (string.IsNullOrEmpty(stamp))
-                throw new ArgumentNullException(nameof(stamp));
-
-            if (password == null)
-                throw new ArgumentNullException(nameof(password));
+            Guard.Argument(stamp, nameof(stamp)).NotNull().NotEmpty();
+            Guard.Argument(password, nameof(password)).NotNull();
 
             var key1 = DeriveKey(version + 1, stamp, password);
             var key2 = DeriveKey(version + 2, stamp, password);
@@ -334,14 +353,8 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// <param name="password">Password.</param>
         public string PartialRelease(int version, string stamp, string memo, SecureString password)
         {
-            if (string.IsNullOrEmpty(stamp))
-                throw new ArgumentNullException(nameof(stamp));
-
-            if (memo == null)
-                throw new ArgumentNullException(nameof(memo));
-
-            if (password == null)
-                throw new ArgumentNullException(nameof(password));
+            Guard.Argument(stamp, nameof(stamp)).NotNull().NotEmpty();
+            Guard.Argument(password, nameof(password)).NotNull();
 
             var subKey1 = DeriveKey(version + 1, stamp, password);
             var subKey2 = DeriveKey(version + 2, stamp, password).ToSecureString();
@@ -360,14 +373,13 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// <param name="redemptionKey">Redemption key.</param>
         public (CoinDto, CoinDto) CoinSwap(SecureString password, CoinDto coin, RedemptionKeyDto redemptionKey)
         {
-            if (password == null)
-                throw new ArgumentNullException(nameof(password));
+            Guard.Argument(password, nameof(password)).NotNull();
+            Guard.Argument(coin, nameof(coin)).NotNull();
+            Guard.Argument(redemptionKey, nameof(redemptionKey)).NotNull();
 
-            if (coin == null)
-                throw new ArgumentNullException(nameof(coin));
-
-            if (redemptionKey == null)
-                throw new ArgumentNullException(nameof(redemptionKey));
+            try
+            { coin = coin.FormatCoinFromBase64(); }
+            catch (FormatException) { }
 
             if (!redemptionKey.Stamp.Equals(coin.Stamp))
                 throw new Exception("Redemption stamp is not equal to the coins stamp!");
@@ -413,14 +425,9 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// <param name="redemptionKey">Redemption key.</param>
         public CoinDto SwapPartialOne(SecureString password, CoinDto coin, RedemptionKeyDto redemptionKey)
         {
-            if (password == null)
-                throw new ArgumentNullException(nameof(password));
-
-            if (coin == null)
-                throw new ArgumentNullException(nameof(coin));
-
-            if (redemptionKey == null)
-                throw new ArgumentNullException(nameof(redemptionKey));
+            Guard.Argument(password, nameof(password)).NotNull();
+            Guard.Argument(coin, nameof(coin)).NotNull();
+            Guard.Argument(redemptionKey, nameof(redemptionKey)).NotNull();
 
             var v1 = coin.Version + 1;
             var v2 = coin.Version + 2;
@@ -447,14 +454,9 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// <param name="msg">Message.</param>
         public byte[] Sign(ulong amount, int version, string stamp, SecureString password, byte[] msg)
         {
-            if (string.IsNullOrEmpty(stamp))
-                throw new ArgumentNullException(nameof(stamp));
-
-            if (password == null)
-                throw new ArgumentNullException(nameof(password));
-
-            if ((msg == null) && (msg.Length > 32))
-                throw new ArgumentNullException(nameof(msg));
+            Guard.Argument(stamp, nameof(stamp)).NotNull().NotEmpty();
+            Guard.Argument(password, nameof(password)).NotNull();
+            Guard.Argument(msg, nameof(msg)).NotNull().MaxCount(32);
 
             using (var secp256k1 = new Secp256k1())
             {
@@ -473,8 +475,7 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// <param name="msg">Message.</param>
         public byte[] Sign(ulong amount, byte[] msg)
         {
-            if ((msg == null) && (msg.Length > 32))
-                throw new ArgumentNullException(nameof(msg));
+            Guard.Argument(msg, nameof(msg)).NotNull().MaxCount(32);
 
             using (var secp256k1 = new Secp256k1())
             {
@@ -494,11 +495,8 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// <param name="blinding">Blinding.</param>
         public byte[] SignWithBlinding(byte[] msg, byte[] blinding)
         {
-            if ((msg == null) && (msg.Length > 32))
-                throw new ArgumentNullException(nameof(msg));
-
-            if ((blinding == null) && (blinding.Length > 32))
-                throw new ArgumentNullException(nameof(blinding));
+            Guard.Argument(msg, nameof(msg)).NotNull().MaxCount(32);
+            Guard.Argument(blinding, nameof(blinding)).NotNull().MaxCount(32);
 
             using (var secp256k1 = new Secp256k1())
             {
@@ -507,25 +505,34 @@ namespace TangramCypher.ApplicationLayer.Coin
             }
         }
 
+        //TODO.. possibly remove?
         /// <summary>
-        /// Split the specified blinding factor. We use one of these (k1) to sign the tx_kernel (k1G)
-        /// and the other gets aggregated in the block as the "offset".
+        /// Split coin.
         /// </summary>
         /// <returns>The split.</returns>
         /// <param name="blinding">Blinding.</param>
         public (byte[], byte[]) Split(byte[] blinding)
         {
-            if ((blinding == null) && (blinding.Length > 32))
-                throw new ArgumentNullException(nameof(blinding));
+            Guard.Argument(blinding, nameof(blinding)).NotNull().MaxCount(32);
 
             using (var pedersen = new Pedersen())
             {
-                var skey1 = DeriveKey(Change());
-                var skey2 = pedersen.BlindSum(new List<byte[]> { blinding }, new List<byte[]> { skey1 });
+                var skey1 = DeriveKey(transactionCoin.Input, stamp, version);
+
+                byte[] skey2 = new byte[32];
+
+                try
+                {
+                    skey2 = pedersen.BlindSum(new List<byte[]> { blinding }, new List<byte[]> { skey1 });
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
+                    throw ex;
+                }
 
                 return (skey1, skey2);
             }
-
         }
 
         /// <summary>
@@ -536,17 +543,14 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// <param name="password">Password.</param>
         public CoinDto MakeSingleCoin(TransactionDto transaction, SecureString password)
         {
-            if (transaction == null)
-                throw new ArgumentNullException(nameof(transaction));
-
-            if (password == null)
-                throw new ArgumentNullException(nameof(password));
+            Guard.Argument(transaction, nameof(transaction)).NotNull();
+            Guard.Argument(password, nameof(password)).NotNull();
 
             return DeriveCoin(password,
                 new CoinDto
                 {
-                    Version = transaction.Version,
-                    Stamp = transaction.Stamp,
+                    Version = version,
+                    Stamp = stamp,
                     Envelope = new EnvelopeDto()
                 });
         }
@@ -555,15 +559,14 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// Makes the single coin.
         /// </summary>
         /// <returns>The single coin.</returns>
-        public CoinDto MakeSingleCoin()
+        public void MakeSingleCoin()
         {
-            if (password == null)
-                throw new ArgumentNullException(nameof(password));
+            Guard.Argument(password, nameof(password)).NotNull();
 
-            return DeriveCoin(new CoinDto
+            mintedCoin = DeriveCoin(new CoinDto
             {
-                Version = Version() + 1,
-                Stamp = Stamp(),
+                Version = version + 1,
+                Stamp = stamp,
                 Envelope = new EnvelopeDto()
             });
         }
@@ -576,11 +579,8 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// <param name="password">Password.</param>
         public IEnumerable<CoinDto> MakeMultipleCoins(IEnumerable<TransactionDto> transactions, SecureString password)
         {
-            if (transactions == null)
-                throw new ArgumentNullException(nameof(transactions));
-
-            if (password == null)
-                throw new ArgumentNullException(nameof(password));
+            Guard.Argument(transactions, nameof(transactions)).NotNull();
+            Guard.Argument(password, nameof(password)).NotNull();
 
             return transactions.Select(tx =>
                 DeriveCoin(password, new CoinDto
@@ -592,46 +592,10 @@ namespace TangramCypher.ApplicationLayer.Coin
         }
 
         /// <summary>
-        /// Inputs this instance.
+        /// Range proof struct.
         /// </summary>
-        /// <returns>The inputs.</returns>
-        public double Input() => input;
-
-        /// <summary>
-        /// Input the specified value.
-        /// </summary>
-        /// <returns>The input.</returns>
-        /// <param name="value">Value.</param>
-        public CoinService Input(double value)
-        {
-            if (value < 0)
-                throw new Exception("Value can not be less than zero!");
-
-            input = value;
-
-            return this;
-        }
-
-        /// <summary>
-        /// Outputs this instance.
-        /// </summary>
-        /// <returns>The outputs.</returns>
-        public double Output() => output;
-
-        /// <summary>
-        /// Output the specified value.
-        /// </summary>
-        /// <returns>The output.</returns>
-        /// <param name="value">Value.</param>
-        public CoinService Output(double value)
-        {
-            if (value < 0)
-                throw new Exception("Value can not be less than zero!");
-
-            output = value;
-
-            return this;
-        }
+        /// <returns>The struct.</returns>
+        public ProofStruct ProofStruct() => proofStruct;
 
         /// <summary>
         /// Verifies the coin on ownership.
@@ -641,11 +605,8 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// <param name="current">Current.</param>
         public int VerifyCoin(CoinDto terminal, CoinDto current)
         {
-            if (terminal == null)
-                throw new ArgumentNullException(nameof(terminal));
-
-            if (current == null)
-                throw new ArgumentNullException(nameof(current));
+            Guard.Argument(terminal, nameof(terminal)).NotNull();
+            Guard.Argument(current, nameof(current)).NotNull();
 
             return terminal.Keeper.Equals(current.Keeper) && terminal.Hint.Equals(current.Hint)
                ? 1
@@ -690,6 +651,14 @@ namespace TangramCypher.ApplicationLayer.Coin
             return this;
         }
 
+        public TransactionCoin TransactionCoin() => transactionCoin;
+
+        public CoinService TransactionCoin(TransactionCoin transactionCoin)
+        {
+            this.transactionCoin = transactionCoin;
+            return this;
+        }
+
         /// <summary>
         /// Password this instance.
         /// </summary>
@@ -708,51 +677,39 @@ namespace TangramCypher.ApplicationLayer.Coin
         }
 
         /// <summary>
-        /// Builds the coin.
+        /// naT decimal format.
         /// </summary>
-        /// <returns>The coin.</returns>
-        /// <param name="blindSum">Blind sum.</param>
-        /// <param name="commitPos">Commit position.</param>
-        /// <param name="commitNeg">Commit neg.</param>
-        private CoinDto BuildCoin(byte[] blindSum, byte[] commitPos, byte[] commitNeg, bool receiver = false)
+        /// <returns>The t.</returns>
+        /// <param name="value">Value.</param>
+        private ulong NaT(double value)
         {
-            if ((blindSum == null) && (blindSum.Length > 32))
-                throw new ArgumentNullException(nameof(blindSum));
+            return (ulong)(value * NanoTan);
+        }
 
-            if ((commitPos == null) && (commitPos.Length > 33))
-                throw new ArgumentNullException(nameof(commitPos));
+        /// <summary>
+        /// Attaches the envelope.
+        /// </summary>
+        /// <param name="secp256k1">Secp256k1.</param>
+        /// <param name="pedersen">Pedersen.</param>
+        /// <param name="rangeProof">Range proof.</param>
+        /// <param name="blindSum">Blind sum.</param>
+        /// <param name="commitSum">Commit sum.</param>
+        private void AttachEnvelope(Secp256k1 secp256k1, Pedersen pedersen, RangeProof rangeProof, byte[] blindSum, byte[] commitSum, double blance)
+        {
+            var (k1, k2) = Split(blindSum);
 
-            if ((commitNeg == null) && (commitNeg.Length > 33))
-                throw new ArgumentNullException(nameof(commitNeg));
+            Coin().Envelope.Commitment = commitSum.ToHex();
+            Coin().Envelope.Proof = k2.ToHex();
+            Coin().Envelope.PublicKey = pedersen.ToPublicKey(Commit(0, k1)).ToHex();
+            Coin().Hash = Hash(Coin()).ToHex();
+            Coin().Envelope.Signature = secp256k1.Sign(Coin().Hash.FromHex(), k1).ToHex();
 
-            CoinDto coin;
-            bool isVerified;
+            proofStruct = rangeProof.Proof(0, NaT(blance), blindSum, commitSum, Coin().Hash.FromHex());
 
-            using (var secp256k1 = new Secp256k1())
-            using (var pedersen = new Pedersen())
-            {
-                var commitSum = pedersen.CommitSum(new List<byte[]> { commitPos }, new List<byte[]> { commitNeg });
+            var isVerified = rangeProof.Verify(commitSum, proofStruct);
 
-                isVerified = receiver
-                    ? pedersen.VerifyCommitSum(new List<byte[]> { commitPos, commitNeg }, new List<byte[]> { Commit((ulong)Output(), blindSum) })
-                    : pedersen.VerifyCommitSum(new List<byte[]> { commitPos }, new List<byte[]> { commitNeg, commitSum });
-
-                if (!isVerified)
-                    throw new Exception(nameof(isVerified));
-
-                var (k1, k2) = Split(blindSum);
-
-                coin = MakeSingleCoin();
-
-                coin.Envelope.Commitment = commitSum.ToHex();
-                coin.Envelope.Proof = k2.ToHex();
-                coin.Envelope.PublicKey = pedersen.ToPublicKey(Commit(0, k1)).ToHex();
-                coin.Envelope.Signature = secp256k1.Sign(Hash(coin), k1).ToHex();
-
-                coin.Hash = Hash(coin).ToHex();
-            }
-
-            return coin;
+            if (!isVerified)
+                throw new ArgumentOutOfRangeException(nameof(isVerified), "Range proof failed.");
         }
     }
 }

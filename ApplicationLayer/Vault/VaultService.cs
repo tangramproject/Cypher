@@ -48,6 +48,7 @@ namespace TangramCypher.ApplicationLayer.Vault
 
         private IConsole console;
         private ILogger logger;
+        private IVaultServiceClient vaultServiceClient;
 
         private readonly int secretShares;
         private readonly int secretThreshold;
@@ -59,8 +60,9 @@ namespace TangramCypher.ApplicationLayer.Vault
         private VaultTokenCreateResponseAuth serviceToken;
         private VaultClientSettings vaultClientSettings;
 
-        public VaultService(IConfiguration configuration, IConsole cnsl, ILogger lgr)
+        public VaultService(IVaultServiceClient vsc, IConfiguration configuration, IConsole cnsl, ILogger lgr)
         {
+            vaultServiceClient = vsc;
             console = cnsl;
             logger = lgr;
 
@@ -380,7 +382,7 @@ namespace TangramCypher.ApplicationLayer.Vault
                     throw new ArgumentNullException(nameof(shard));
                 }
 
-                var response = await PutAsJsonAsync<SealStatus>(new VaultUnsealRequest { key = s.Value, reset = false }, "/v1/sys/unseal");
+                var response = await vaultServiceClient.PutAsJsonAsync<SealStatus>(new VaultUnsealRequest { key = s.Value, reset = false }, "/v1/sys/unseal");
 
                 if (!response.Sealed && !skipPrint)
                 {
@@ -408,7 +410,7 @@ namespace TangramCypher.ApplicationLayer.Vault
 
             using (var t = token.Insecure())
             {
-                var response = await PutAsJsonAsync<string>(new VaultLeaseRevokeRequest { lease_id = t.Value }, "/v1/sys/leases/revoke", token);
+                var response = await vaultServiceClient.PutAsJsonAsync<string>(new VaultLeaseRevokeRequest { lease_id = t.Value }, "/v1/sys/leases/revoke", token);
             }
         }
 
@@ -564,101 +566,6 @@ namespace TangramCypher.ApplicationLayer.Vault
             return await CreateToken(authToken, new List<string> { "servicepolicy" });
         }
 
-        private async Task<T> PostAsJsonAsync<T>(object obj, string requestUri, SecureString authToken = null)
-        {
-            var baseUri = new Uri(endpoint);
-            var uri = new Uri(baseUri, requestUri);
-
-            using (var client = new HttpClient())
-            using (var rt = authToken != null ? authToken.Insecure() : null)
-            {
-                logger.LogInformation($"PostAsJsonAsync {requestUri}");
-
-                if (authToken != null && !string.IsNullOrEmpty(rt.Value))
-                    client.DefaultRequestHeaders.Add("X-Vault-Token", rt.Value);
-
-                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-
-                string json = JsonConvert.SerializeObject(obj, Formatting.None);
-
-                logger.LogInformation($"POST {json} to {requestUri}");
-
-                var httpContent = new StringContent(json, Encoding.UTF8, "application/json");
-
-                var response = await client.PostAsync(uri, httpContent);
-
-                if (response.IsSuccessStatusCode)
-                {
-                    var content = await response.Content.ReadAsStringAsync();
-
-                    return JsonConvert.DeserializeObject<T>(content);
-                }
-
-                throw new Exception($"Error: server returned status code {response.StatusCode}");
-            }
-        }
-
-        private async Task<T> PutAsJsonAsync<T>(object obj, string requestUri, SecureString authToken = null)
-        {
-            var baseUri = new Uri(endpoint);
-            var uri = new Uri(baseUri, requestUri);
-
-            using (var client = new HttpClient())
-            using (var rt = authToken != null ? authToken.Insecure() : null)
-            {
-                logger.LogInformation($"PutAsJsonAsync {requestUri}");
-
-                if (authToken != null && !string.IsNullOrEmpty(rt.Value))
-                    client.DefaultRequestHeaders.Add("X-Vault-Token", rt.Value);
-
-                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-
-                string json = JsonConvert.SerializeObject(obj, Formatting.None);
-
-                logger.LogInformation($"PUT {json} to {requestUri}");
-
-                var httpContent = new StringContent(json, Encoding.UTF8, "application/json");
-
-                var response = await client.PutAsync(uri, httpContent);
-
-                if (response.IsSuccessStatusCode)
-                {
-                    var content = await response.Content.ReadAsStringAsync();
-
-                    return JsonConvert.DeserializeObject<T>(content);
-                }
-
-                throw new Exception($"Error: server returned status code {response.StatusCode}");
-            }
-        }
-
-
-        private async Task<T> GetAsJsonAsync<T>(string requestUri, SecureString authToken = null)
-        {
-            var baseUri = new Uri(endpoint);
-            var uri = new Uri(baseUri, requestUri);
-
-            using (var client = new HttpClient())
-            using (var rt = authToken != null ? authToken.Insecure() : null)
-            {
-                if (authToken != null && !string.IsNullOrEmpty(rt.Value))
-                    client.DefaultRequestHeaders.Add("X-Vault-Token", rt.Value);
-
-                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-
-                var response = await client.GetAsync(uri);
-
-                if (response.IsSuccessStatusCode)
-                {
-                    var content = await response.Content.ReadAsStringAsync();
-
-                    return JsonConvert.DeserializeObject<T>(content);
-                }
-
-                throw new Exception($"Error: server returned status code {response.StatusCode}");
-            }
-        }
-
         private async Task<VaultTokenCreateResponseAuth> CreateToken(SecureString authToken, List<string> policies, bool orphaned = true)
         {
             if (authToken == null)
@@ -674,7 +581,7 @@ namespace TangramCypher.ApplicationLayer.Vault
 
             console.WriteLine("Created dynamic token");
 
-            var response = await PostAsJsonAsync<VaultTokenCreateResponse>(request, "/v1/auth/token/create", authToken);
+            var response = await vaultServiceClient.PostAsJsonAsync<VaultTokenCreateResponse>(request, "/v1/auth/token/create", authToken);
 
             return response.auth;
         }
@@ -714,7 +621,7 @@ namespace TangramCypher.ApplicationLayer.Vault
 
             logger.LogInformation("Created Policy object");
 
-            var response = await PutAsJsonAsync<string>(data, "/v1/sys/policy/servicepolicy", rootToken);
+            var response = await vaultServiceClient.PutAsJsonAsync<string>(data, "/v1/sys/policy/servicepolicy", rootToken);
         }
 
         private async Task CreateTemplatedWalletPolicyAsync(SecureString rootToken)
@@ -739,120 +646,13 @@ namespace TangramCypher.ApplicationLayer.Vault
 
             var data = new VaultPolicyCreateRequest { policy = policy.ToString() };
 
-            var response = await PutAsJsonAsync<string>(data, "/v1/sys/policy/walletpolicy", rootToken);
-        }
-
-        public async Task CreateUserAsync(SecureString username, SecureString password)
-        {
-            using (var u = username.Insecure())
-            using (var p = password.Insecure())
-            {
-                if (string.IsNullOrEmpty(u.Value))
-                {
-                    throw new ArgumentNullException(nameof(username));
-                }
-
-                if (string.IsNullOrEmpty(p.Value))
-                {
-                    throw new ArgumentNullException(nameof(password));
-                }
-
-                using (var ct = serviceToken.client_token.ToSecureString())
-                {
-                    await PostAsJsonAsync<object>(new VaultUserCreateRequest { password = p.Value }, $"v1/auth/userpass/users/{u.Value}", ct);
-
-                    var identityCreateResponse = await PostAsJsonAsync<VaultIdentityEntityCreateResponse>
-                    (
-                        new VaultIdentityEntityCreateRequest
-                        {
-                            name = u.Value,
-                            policies = new string[] { "walletpolicy" }
-                        },
-                        $"v1/identity/entity",
-                        ct
-                    );
-
-                    var authResponse = await GetAsJsonAsync<JObject>($"v1/sys/auth", ct);
-
-                    var accesor = authResponse["userpass/"]["accessor"].Value<string>();
-
-                    var entityId = identityCreateResponse.data.id;
-
-                    var identityAliasCreateResponse = await PostAsJsonAsync<object>
-                    (
-                        new VaultCreateEntityAliasRequest
-                        {
-                            name = u.Value,
-                            canonical_id = entityId,
-                            mount_accessor = accesor
-                        },
-                        $"v1/identity/entity-alias",
-                        ct
-                    );
-                }
-            }
-        }
-
-        public async Task SaveDataAsync(SecureString username, SecureString password, string path, IDictionary<string, object> data)
-        {
-            using (var u = username.Insecure())
-            using (var p = password.Insecure())
-            {
-                if (string.IsNullOrEmpty(u.Value))
-                {
-                    throw new ArgumentNullException(nameof(username));
-                }
-
-                if (string.IsNullOrEmpty(p.Value))
-                {
-                    throw new ArgumentNullException(nameof(password));
-                }
-                var vaultClientSettings = new VaultClientSettings(endpoint, new UserPassAuthMethodInfo(u.Value,
-                                                                                                       p.Value));
-                var vaultWalletClient = new VaultClient(vaultClientSettings);
-
-                await vaultWalletClient.V1.Secrets.KeyValue.V1.WriteSecretAsync(path, data);
-            }
-        }
-
-        public async Task<Secret<Dictionary<string, object>>> GetDataAsync(SecureString username, SecureString password, string path)
-        {
-            using (var u = username.Insecure())
-            using (var p = password.Insecure())
-            {
-                if (string.IsNullOrEmpty(u.Value))
-                {
-                    throw new ArgumentNullException(nameof(username));
-                }
-
-                if (string.IsNullOrEmpty(p.Value))
-                {
-                    throw new ArgumentNullException(nameof(password));
-                }
-
-                var vaultClientSettings = new VaultClientSettings(endpoint, new UserPassAuthMethodInfo(u.Value,
-                                                                                                       p.Value));
-                var vc = new VaultClient(vaultClientSettings);
-
-                var secret = await vc.V1.Secrets.KeyValue.V1.ReadSecretAsync(path);
-
-                return secret;
-            }
-        }
-
-        public async Task<Secret<ListInfo>> GetListAsync(string path)
-        {
-            var t = serviceToken.client_token;
-        
-            var vaultClientSettings = new VaultClientSettings(endpoint, new TokenAuthMethodInfo(t));
-
-            var vc = new VaultClient(vaultClientSettings);
-
-            return await vc.V1.Secrets.KeyValue.V1.ReadSecretPathsAsync(path);
+            var response = await vaultServiceClient.PutAsJsonAsync<string>(data, "/v1/sys/policy/walletpolicy", rootToken);
         }
 
         protected override async Task ExecuteAsync(CancellationToken cancellationToken)
         {
+            Debug.WriteLine("VAULT EXECUTEASYNC");
+
             try
             {
                 await Task.Run(async () => await StartVaultService());

@@ -7,16 +7,16 @@
 // work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
 
 using System;
-using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc;
 
-namespace TangramCypher.ApplicationLayer.Commands.Vault
+namespace TangramCypher.ApplicationLayer.Controllers
 {
-    [CommandDescriptor(new string[] { "setnodeendpoint" }, "Set contact endpoint")]
-    public class SetNodeEndpointCommand : Command
+    public class HomeController : Controller
     {
-        public override async Task Execute()
+        public IActionResult Index()
         {
-            throw new NotImplementedException();
+            return new RedirectResult("~/swagger");
         }
     }
+
 }
