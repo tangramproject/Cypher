@@ -116,18 +116,20 @@ namespace TangramCypher.ApplicationLayer
         readonly IConfigurationSection restAPISection;
 
         public int EnableRestAPI { get; }
+        public string Endpoint { get; }
 
         public HttpXy(IConfiguration configuration)
         {
             restAPISection = configuration.GetSection("network");
             EnableRestAPI = restAPISection.GetValue<int>("enabled_restAPI");
+            Endpoint = restAPISection.GetValue<string>("restApi_endpoint");
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
         {
             if (EnableRestAPI == 1)
             {
-                return BuildWebHost(null).RunAsync(stoppingToken);
+                return BuildWebHost(new string[] { Endpoint } ).RunAsync(stoppingToken);
             }
 
             return Task.CompletedTask;
@@ -136,7 +138,7 @@ namespace TangramCypher.ApplicationLayer
         public static IWebHost BuildWebHost(string[] args) =>
                   WebHost.CreateDefaultBuilder(args)
                          .UseContentRoot(Directory.GetCurrentDirectory())
-                         .UseUrls("http://localhost:5001")
+                         .UseUrls(args[0])
                          .UseStartup<Startup>()
                          .ConfigureLogging((hostingContext, builder) =>
                          {
