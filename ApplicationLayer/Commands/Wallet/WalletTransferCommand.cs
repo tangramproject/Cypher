@@ -93,6 +93,8 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                                 case false:
                                     var localMessage = await actorService.SendPaymentMessage(false);
 
+                                    spinner.Stop();
+
                                     SaveRedemptionKeyLocal(localMessage);
 
                                     break;
