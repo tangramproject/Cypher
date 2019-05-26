@@ -63,7 +63,7 @@ namespace TangramCypher.ApplicationLayer.Controllers
         public async Task<IActionResult> WalletProfile([FromBody] CredentialsDto credentials)
         {
             var profile = await walletService.Profile(credentials.Identifier.ToSecureString(), credentials.Password.ToSecureString());
-            return new OkObjectResult(profile);
+            return new OkObjectResult(JsonConvert.DeserializeObject(profile));
         }
 
         [HttpGet("list", Name = "WalletList")]
@@ -91,10 +91,10 @@ namespace TangramCypher.ApplicationLayer.Controllers
             catch (Exception ex)
             {
                 balance = await actorService.CheckBalance();
-                return new ObjectResult(new { error = ex.Message, statusCode = 500, balance });
+                return new ObjectResult(new { error = ex.Message, statusCode = 500, balance = balance });
             }
 
-            return new OkObjectResult(new { balance });
+            return new OkObjectResult(new { balance = balance });
         }
 
         [HttpPost("send", Name = "WalletTransfer")]
@@ -129,10 +129,10 @@ namespace TangramCypher.ApplicationLayer.Controllers
             catch (Exception ex)
             {
                 balance = await actorService.CheckBalance();
-                return new ObjectResult(new { error = ex.Message, statusCode = 500, balance });
+                return new ObjectResult(new { error = ex.Message, statusCode = 500, balance = balance });
             }
 
-            return new OkObjectResult(new { balance });
+            return new OkObjectResult(new { balance = balance });
         }
 
         [HttpPost("transactions", Name = "WalletTransactions")]
@@ -145,8 +145,8 @@ namespace TangramCypher.ApplicationLayer.Controllers
         [HttpPost("vaultunseal", Name = "VaultUnseal")]
         public async Task<IActionResult> VaultUnseal([FromBody] ShardDto key)
         {
-            await vaultServiceClient.Unseal(key.Shard.ToSecureString());
-            return new OkObjectResult(true);
+            var success = await vaultServiceClient.Unseal(key.Shard.ToSecureString());
+            return new OkObjectResult(new { success = success });
         }
     }
 }
