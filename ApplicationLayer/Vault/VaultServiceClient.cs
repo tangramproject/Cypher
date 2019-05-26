@@ -60,7 +60,7 @@ namespace TangramCypher.ApplicationLayer.Vault
             vaultClientSettings = new VaultClientSettings(endpoint, null);
         }
 
-        public async Task Unseal(SecureString shard, bool skipPrint = false)
+        public async Task<bool> Unseal(SecureString shard, bool skipPrint = false)
         {
             using (var s = shard.Insecure())
             {
@@ -77,6 +77,8 @@ namespace TangramCypher.ApplicationLayer.Vault
                     console.ForegroundColor = ConsoleColor.DarkGreen;
                     console.WriteLine("Vault Unsealed!");
                 }
+
+                return !response.Sealed;
             }
         }
 
