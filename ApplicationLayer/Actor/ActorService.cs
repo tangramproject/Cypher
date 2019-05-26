@@ -151,6 +151,11 @@ namespace TangramCypher.ApplicationLayer.Actor
         public ActorService Amount(double value)
         {
             amount = Guard.Argument(value, nameof(value)).NotZero().NotNegative();
+
+            double.TryParse(amount.ToString("F9"), out double result);
+
+            amount = result;
+
             return this;
         }
 
@@ -331,7 +336,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             notifications = messageTrack == null
                 ? await GetRangeAsync<NotificationDto>(notificationAddress, 0, countValue, RestApiMethod.MessageRange)
-                : await GetRangeAsync<NotificationDto>(notificationAddress, messageTrack.Skip, messageTrack.Take + 1, RestApiMethod.MessageRange);
+                : await GetRangeAsync<NotificationDto>(notificationAddress, messageTrack.Skip, countValue, RestApiMethod.MessageRange);
 
             if (sharedKey)
                 pk = Util.FormatNetworkAddress(receiverPk);
