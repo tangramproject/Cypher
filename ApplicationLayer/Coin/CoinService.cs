@@ -518,6 +518,7 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// <param name="rangeProof">Range proof.</param>
         /// <param name="blindSum">Blind sum.</param>
         /// <param name="commitSum">Commit sum.</param>
+        /// <param name="secret">Secret.</param>
         private void AttachEnvelope(Secp256k1 secp256k1, Pedersen pedersen, RangeProof rangeProof, byte[] blindSum, byte[] commitSum, double balance, SecureString secret)
         {
             var (k1, k2) = Split(blindSum, secret);

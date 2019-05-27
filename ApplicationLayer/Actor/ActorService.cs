@@ -193,7 +193,6 @@ namespace TangramCypher.ApplicationLayer.Actor
             {
                 amount = result;
             }
-
             return this;
         }
 
@@ -290,7 +289,6 @@ namespace TangramCypher.ApplicationLayer.Actor
                 this.memo = string.Empty;
 
             this.memo = Guard.Argument(memo, nameof(memo)).MaxLength(64);
-
             return this;
         }
 
@@ -499,7 +497,6 @@ namespace TangramCypher.ApplicationLayer.Actor
                     var decode = DecodeAddress(address).ToArray();
 
                     await ReceivePayment(notificationAddress, true, decode);
-
                     break;
                 }
 
@@ -708,7 +705,6 @@ namespace TangramCypher.ApplicationLayer.Actor
                     success = false,
                     message = "Failed to read the recipient public key!"
                 });
-
                 return false;
             }
 
@@ -880,7 +876,6 @@ namespace TangramCypher.ApplicationLayer.Actor
                     success = false,
                     message = "Not enough coin on a sigle chain for the request!"
                 });
-
                 return null;
             }
 
@@ -896,7 +891,6 @@ namespace TangramCypher.ApplicationLayer.Actor
                     success = false,
                     message = "Failed to build sender coin!"
                 });
-
                 return null;
             }
 
@@ -911,7 +905,6 @@ namespace TangramCypher.ApplicationLayer.Actor
                     success = false,
                     message = "Failed to send the request!"
                 });
-
                 return null;
             }
 
