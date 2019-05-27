@@ -9,5 +9,6 @@ namespace TangramCypher.ApplicationLayer.Actor
         public CredentialsDto Credentials { get; set; }
         [Required]
         public string FromAddress { get; set; }
+        public NotificationDto RedemptionMessage { get; set; }
     }
 }
