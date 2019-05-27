@@ -694,7 +694,7 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// <param name="rangeProof">Range proof.</param>
         /// <param name="blindSum">Blind sum.</param>
         /// <param name="commitSum">Commit sum.</param>
-        private void AttachEnvelope(Secp256k1 secp256k1, Pedersen pedersen, RangeProof rangeProof, byte[] blindSum, byte[] commitSum, double blance)
+        private void AttachEnvelope(Secp256k1 secp256k1, Pedersen pedersen, RangeProof rangeProof, byte[] blindSum, byte[] commitSum, double balance)
         {
             var (k1, k2) = Split(blindSum);
 
@@ -704,7 +704,7 @@ namespace TangramCypher.ApplicationLayer.Coin
             Coin().Hash = Hash(Coin()).ToHex();
             Coin().Envelope.Signature = secp256k1.Sign(Coin().Hash.FromHex(), k1).ToHex();
 
-            proofStruct = rangeProof.Proof(0, NaT(blance), blindSum, commitSum, Coin().Hash.FromHex());
+            proofStruct = rangeProof.Proof(0, NaT(balance), blindSum, commitSum, Coin().Hash.FromHex());
 
             var isVerified = rangeProof.Verify(commitSum, proofStruct);
 
