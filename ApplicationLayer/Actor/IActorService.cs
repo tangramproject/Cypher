@@ -25,7 +25,6 @@ namespace TangramCypher.ApplicationLayer.Actor
         ActorService Amount(double value);
         Task<T> GetAsync<T>(string address, RestApiMethod apiMethod);
         Task<double> CheckBalance();
-        double GetChange();
         JObject GetLastError();
         Task<IEnumerable<T>> GetRangeAsync<T>(string address, int skip, int take, RestApiMethod apiMethod);
         Span<byte> DecodeAddress(string key);
