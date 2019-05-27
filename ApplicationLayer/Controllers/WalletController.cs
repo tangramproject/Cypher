@@ -6,11 +6,10 @@
 // You should have received a copy of the license along with this
 // work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
 
-using System;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
+using System;
+using System.Threading.Tasks;
 using TangramCypher.ApplicationLayer.Actor;
 using TangramCypher.ApplicationLayer.Vault;
 using TangramCypher.ApplicationLayer.Wallet;
@@ -80,11 +79,22 @@ namespace TangramCypher.ApplicationLayer.Controllers
 
             try
             {
-                await actorService
+                if (receivePaymentDto.RedemptionMessage != null)
+                {
+                    await actorService
                       .MasterKey(receivePaymentDto.Credentials.Password.ToSecureString())
                       .Identifier(receivePaymentDto.Credentials.Identifier.ToSecureString())
                       .FromAddress(receivePaymentDto.FromAddress)
-                      .ReceivePayment();
+                      .ReceivePaymentRedemptionKey(JsonConvert.SerializeObject(receivePaymentDto.RedemptionMessage));
+                }
+                else
+                {
+                    await actorService
+                          .MasterKey(receivePaymentDto.Credentials.Password.ToSecureString())
+                          .Identifier(receivePaymentDto.Credentials.Identifier.ToSecureString())
+                          .FromAddress(receivePaymentDto.FromAddress)
+                          .ReceivePayment();
+                }
 
                 balance = await actorService.CheckBalance();
             }
@@ -118,13 +128,23 @@ namespace TangramCypher.ApplicationLayer.Controllers
                     return new ObjectResult(new { error = failedMessage, statusCode = 500 });
                 }
 
-                var networkMessage = await actorService.SendPaymentMessage(true);
-                var success = networkMessage.GetValue("success").ToObject<bool>();
+                if (sendPaymentDto.CreateRedemptionKey)
+                {
+                    var message = await actorService.SendPaymentMessage(false);
+                    var notification = message.GetValue("message").ToObject<NotificationDto>();
 
-                if (success.Equals(false))
-                    return new ObjectResult(new { error = JsonConvert.SerializeObject(networkMessage.GetValue("message")), statusCode = 500 });
+                    return new OkObjectResult(new { message = notification });
+                }
+                else
+                {
+                    var networkMessage = await actorService.SendPaymentMessage(true);
+                    var success = networkMessage.GetValue("success").ToObject<bool>();
 
-                balance = await actorService.CheckBalance();
+                    if (success.Equals(false))
+                        return new ObjectResult(new { error = JsonConvert.SerializeObject(networkMessage.GetValue("message")), statusCode = 500 });
+
+                    balance = await actorService.CheckBalance();
+                }
             }
             catch (Exception ex)
             {
