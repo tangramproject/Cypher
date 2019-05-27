@@ -211,5 +211,49 @@ namespace TangramCypher.Helper
 
             return networkAddress;
         }
+
+        public static T TriesUntilCompleted<T>(Func<T> action, int tries, int delay, T expected)
+        {
+            var result = default(T);
+
+            for (int i = 0; i < tries; i++)
+            {
+                try
+                {
+                    result = action();
+                    if (result.Equals(expected) || i.Equals(tries))
+                        break;
+                }
+                finally
+                {
+                    Task.Delay(delay);
+                }
+            }
+
+            return result;
+        }
+
+        public static T TriesUntilCompleted<T>(Func<T> action, int tries, int delay, Func<T> expected)
+        {
+            var result = default(T);
+            var expectedResult = default(T);
+
+            for (int i = 0; i < tries; i++)
+            {
+                try
+                {
+                    result = action();
+                    expectedResult = expected();
+                    if (EqualityComparer<T>.Default.Equals(result, expectedResult) || i.Equals(tries))
+                        break;
+                }
+                finally
+                {
+                    Task.Delay(delay);
+                }
+            }
+
+            return result;
+        }
     }
 }
