@@ -194,7 +194,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                 var parts = value.ToString().Split(new char[] { '.', ',' });
                 var part1 = (ulong)Math.Truncate(value);
 
-                if (parts.Length.Equals(0))
+                if (parts.Length.Equals(1))
                     amount = part1;
                 else
                 {
@@ -963,7 +963,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             coin.Network = walletService.NetworkAddress(coin).ToHex();
 
             //TODO: Could possibility fail.. need recovery..
-            var added = await AddWalletTransaction(coin, transactionCoin.Input, Memo(), null, TransactionType.Send);
+            var added = await AddWalletTransaction(coin, coinService.TransactionCoin().Input, Memo(), null, TransactionType.Send);
 
             return coin;
         }

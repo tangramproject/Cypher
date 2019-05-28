@@ -734,7 +734,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
                 $" {coin.Principle}" +
                 $" {coin.Stamp}" +
                 $" {coin.Version}",
-                Encoding.UTF8.GetBytes(coin.Principle));
+                coin.Principle.FromHex());
 
             Array.Copy(hash, 0, address, 1, 32);
 
