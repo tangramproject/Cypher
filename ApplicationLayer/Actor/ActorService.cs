@@ -201,6 +201,8 @@ namespace TangramCypher.ApplicationLayer.Actor
                     var part2 = (ulong)((value - part1) * UInt64.Parse("1".PadRight(parts[1].Length + 1, '0')) + 0.5);
                     amount = UInt64.Parse(part1.ToString() + part2.ToString());
                 }
+
+                amount = walletService.MulWithNaT(amount);
             }
             catch (Exception ex)
             {

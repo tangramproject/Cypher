@@ -24,11 +24,6 @@ namespace TangramCypher.ApplicationLayer.Coin
 {
     public class CoinService : ICoinService
     {
-        public const int Tan = 1;
-        public const int MicroTan = 100;
-        public const int NanoTan = 1000_000_000;
-        public const ulong AttoTan = 1000_000_000_000_000_000;
-
         private readonly ILogger logger;
         private string stamp;
         private int version;
@@ -56,8 +51,7 @@ namespace TangramCypher.ApplicationLayer.Coin
 
                 MakeSingleCoin(secret);
 
-                var naTInput = NaT(TransactionCoin().Input);
-                var blind = DeriveKey(naTInput, Stamp(), Coin().Version, secret);
+                var blind = DeriveKey(TransactionCoin().Input, Stamp(), Coin().Version, secret);
 
                 byte[] blindSum = new byte[32];
 
@@ -71,7 +65,7 @@ namespace TangramCypher.ApplicationLayer.Coin
                     throw ex;
                 }
 
-                var commitPos = pedersen.Commit(naTInput, blind);
+                var commitPos = pedersen.Commit(TransactionCoin().Input, blind);
                 var commitSum = pedersen.CommitSum(new List<byte[]> { commitPos }, new List<byte[]> { });
 
                 AttachEnvelope(secp256k1, pedersen, rangeProof, blindSum, commitSum, TransactionCoin().Input, secret);
@@ -100,11 +94,11 @@ namespace TangramCypher.ApplicationLayer.Coin
                 var received = TransactionCoin().Chain.FirstOrDefault(tx => tx.TransactionType == TransactionType.Receive);
 
                 var blindNeg = DeriveKey(TransactionCoin().Input, received.Stamp, Coin().Version, secret);
-                var commitNeg = pedersen.Commit(NaT(TransactionCoin().Input), blindNeg);
+                var commitNeg = pedersen.Commit(TransactionCoin().Input, blindNeg);
 
                 var commitNegs = TransactionCoin().Chain
                                .Where(tx => tx.TransactionType == TransactionType.Send)
-                               .Select(c => pedersen.Commit(NaT(c.Amount), DeriveKey(c.Amount, c.Stamp, c.Version, secret))).ToList();
+                               .Select(c => pedersen.Commit(c.Amount, DeriveKey(c.Amount, c.Stamp, c.Version, secret))).ToList();
 
                 commitNegs.Add(commitNeg);
 
@@ -501,16 +495,6 @@ namespace TangramCypher.ApplicationLayer.Coin
         }
 
         /// <summary>
-        /// naT decimal format.
-        /// </summary>
-        /// <returns>The t.</returns>
-        /// <param name="value">Value.</param>
-        private ulong NaT(ulong value)
-        {
-            return (ulong)(value * NanoTan);
-        }
-
-        /// <summary>
         /// Attaches the envelope.
         /// </summary>
         /// <param name="secp256k1">Secp256k1.</param>
@@ -529,7 +513,7 @@ namespace TangramCypher.ApplicationLayer.Coin
             Coin().Hash = Hash(Coin()).ToHex();
             Coin().Envelope.Signature = secp256k1.Sign(Coin().Hash.FromHex(), k1).ToHex();
 
-            proofStruct = rangeProof.Proof(0, NaT(balance), blindSum, commitSum, Coin().Hash.FromHex());
+            proofStruct = rangeProof.Proof(0, balance, blindSum, commitSum, Coin().Hash.FromHex());
 
             var isVerified = rangeProof.Verify(commitSum, proofStruct);
 

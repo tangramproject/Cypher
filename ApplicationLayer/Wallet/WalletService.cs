@@ -811,6 +811,26 @@ namespace TangramCypher.ApplicationLayer.Wallet
             return cleared;
         }
 
+        /// <summary>
+        /// naT UInt64 format.
+        /// </summary>
+        /// <returns>The t.</returns>
+        /// <param name="value">Value.</param>
+        public ulong MulWithNaT(ulong value)
+        {
+            return (ulong)(value * Constant.NanoTan);
+        }
+        
+        /// <summary>
+        /// naT UInt64 format.
+        /// </summary>
+        /// <param name="value"></param>
+        /// <returns></returns>
+        public ulong DivWithNaT(ulong value)
+        {
+            return (ulong)(value / Constant.NanoTan);
+        }
+
         private static ulong Sum(IEnumerable<ulong> source)
         {
             var sum = 0UL;
