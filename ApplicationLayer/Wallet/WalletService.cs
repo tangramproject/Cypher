@@ -51,7 +51,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <returns>The balance.</returns>
         /// <param name="identifier">Identifier.</param>
         /// <param name="password">Password.</param>
-        public async Task<double> AvailableBalance(SecureString identifier, SecureString password)
+        public async Task<ulong> AvailableBalance(SecureString identifier, SecureString password)
         {
             Guard.Argument(identifier, nameof(identifier)).NotNull();
             Guard.Argument(password, nameof(password)).NotNull();
@@ -349,23 +349,22 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <param name="identifier">Identifier.</param>
         /// <param name="password">Password.</param>
         /// <param name="stamp">Stamp.</param>
-        public async Task<double> TransactionAmount(SecureString identifier, SecureString password, string stamp)
+        public async Task<ulong> TransactionAmount(SecureString identifier, SecureString password, string stamp)
         {
             Guard.Argument(identifier, nameof(identifier)).NotNull();
             Guard.Argument(password, nameof(password)).NotNull();
             Guard.Argument(stamp, nameof(stamp)).NotNull().NotEmpty();
 
-            var total = 0.0D;
+            var total = 0UL;
             var transactions = await Transactions(identifier, password);
 
             if (transactions == null)
-                return -1;
+                return 0;
 
             var transaction = transactions.Select(tx =>
             {
                 if (tx.Stamp.Equals(stamp))
-                    if (double.TryParse(tx.Amount.ToString(), out double t))
-                        total = t;
+                    total = tx.Amount;
 
                 return total;
             });
@@ -379,7 +378,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <returns>The transaction amount.</returns>
         /// <param name="identifier">Identifier.</param>
         /// <param name="password">Password.</param>
-        public async Task<double> LastTransactionAmount(SecureString identifier, SecureString password, TransactionType transactionType)
+        public async Task<ulong> LastTransactionAmount(SecureString identifier, SecureString password, TransactionType transactionType)
         {
             Guard.Argument(identifier, nameof(identifier)).NotNull();
             Guard.Argument(password, nameof(password)).NotNull();
@@ -550,11 +549,10 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <param name="identifier">Identifier.</param>
         /// <param name="password">Password.</param>
         /// <param name="amount">Amount.</param>
-        public async Task<TransactionCoin> SortChange(SecureString identifier, SecureString password, double amount)
+        public async Task<TransactionCoin> SortChange(SecureString identifier, SecureString password, ulong amount)
         {
             Guard.Argument(identifier, nameof(identifier)).NotNull();
             Guard.Argument(password, nameof(password)).NotNull();
-            Guard.Argument(amount, nameof(amount)).NotNaN().NotNegative();
 
             var transactions = await Transactions(identifier, password);
 
@@ -642,19 +640,19 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <param name="identifier">Identifier.</param>
         /// <param name="password">Password.</param>
         /// <param name="transactions">Transactions.</param>
-        private double Balance(SecureString identifier, SecureString password, List<TransactionDto> transactions)
+        private ulong Balance(SecureString identifier, SecureString password, List<TransactionDto> transactions)
         {
-            var total = 0.0d;
+            var total = 0UL;
 
             if (transactions != null)
             {
-                double? pocket = null;
-                double? burnt = null;
+                ulong? pocket = null;
+                ulong? burnt = null;
 
                 try
                 {
-                    pocket = transactions.Where(tx => tx.TransactionType == TransactionType.Receive).Sum(p => p.Amount);
-                    burnt = transactions.Where(tx => tx.TransactionType == TransactionType.Send).Sum(p => p.Amount);
+                    pocket = Sum(transactions.Where(tx => tx.TransactionType == TransactionType.Receive).Select(p => p.Amount));
+                    burnt = Sum(transactions.Where(tx => tx.TransactionType == TransactionType.Send).Select(p => p.Amount));
                 }
                 catch (Exception ex)
                 {
@@ -685,9 +683,8 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <returns>The change.</returns>
         /// <param name="amount">Amount.</param>
         /// <param name="transactions">Transactions.</param>
-        private (TransactionDto, double) CalculateChange(double amount, TransactionDto[] transactions)
+        private (TransactionDto, ulong) CalculateChange(ulong amount, TransactionDto[] transactions)
         {
-            Guard.Argument(amount, nameof(amount)).NotNaN().NotNegative();
             Guard.Argument(transactions, nameof(transactions)).NotNull();
 
             int count;
@@ -695,16 +692,16 @@ namespace TangramCypher.ApplicationLayer.Wallet
 
             for (var i = 0; i < transactions.Length; i++)
             {
-                count = (int)(amount / Math.Abs(transactions[i].Amount));
+                count = (int)(amount / transactions[i].Amount);
                 if (count != 0)
                     for (int k = 0; k < count; k++) tempTxs.Add(transactions[i]);
 
                 amount %= transactions[i].Amount;
             }
 
-            var sum = tempTxs.Sum(s => Math.Abs(s.Amount));
-            var remainder = Math.Abs(amount - sum);
-            var closest = transactions.Select(x => Math.Abs(x.Amount)).Aggregate((x, y) => Math.Abs(x - remainder) < Math.Abs(y - remainder) ? x : y);
+            var sum = Sum(tempTxs.Select(s => s.Amount));
+            var remainder = amount - sum;
+            var closest = transactions.Select(x => x.Amount).Aggregate((x, y) => x - remainder < y - remainder ? x : y);
             var tx = transactions.FirstOrDefault(a => a.Amount.Equals(closest));
 
             return (tx, remainder);
@@ -812,6 +809,16 @@ namespace TangramCypher.ApplicationLayer.Wallet
             }
 
             return cleared;
+        }
+
+        private static ulong Sum(IEnumerable<ulong> source)
+        {
+            var sum = 0UL;
+            foreach (var number in source)
+            {
+                sum += number;
+            }
+            return sum;
         }
     }
 }

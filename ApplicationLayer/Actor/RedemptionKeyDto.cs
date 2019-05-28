@@ -10,7 +10,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 {
     public class RedemptionKeyDto
     {
-        public double Amount;
+        public ulong Amount;
         public string Blind;
         public string Hash;
         public string Key1;

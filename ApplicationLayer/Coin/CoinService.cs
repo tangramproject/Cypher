@@ -27,7 +27,7 @@ namespace TangramCypher.ApplicationLayer.Coin
         public const int Tan = 1;
         public const int MicroTan = 100;
         public const int NanoTan = 1000_000_000;
-        public const long AttoTan = 1000_000_000_000_000_000;
+        public const ulong AttoTan = 1000_000_000_000_000_000;
 
         private readonly ILogger logger;
         private string stamp;
@@ -186,7 +186,7 @@ namespace TangramCypher.ApplicationLayer.Coin
             }
         }
 
-        public byte[] DeriveKey(double amount, string stamp, int version, SecureString secret)
+        public byte[] DeriveKey(ulong amount, string stamp, int version, SecureString secret)
         {
             Guard.Argument(amount, nameof(amount)).NotNegative();
             Guard.Argument(secret, nameof(secret)).NotNull();
@@ -505,7 +505,7 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// </summary>
         /// <returns>The t.</returns>
         /// <param name="value">Value.</param>
-        private ulong NaT(double value)
+        private ulong NaT(ulong value)
         {
             return (ulong)(value * NanoTan);
         }
@@ -519,7 +519,7 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// <param name="blindSum">Blind sum.</param>
         /// <param name="commitSum">Commit sum.</param>
         /// <param name="secret">Secret.</param>
-        private void AttachEnvelope(Secp256k1 secp256k1, Pedersen pedersen, RangeProof rangeProof, byte[] blindSum, byte[] commitSum, double balance, SecureString secret)
+        private void AttachEnvelope(Secp256k1 secp256k1, Pedersen pedersen, RangeProof rangeProof, byte[] blindSum, byte[] commitSum, ulong balance, SecureString secret)
         {
             var (k1, k2) = Split(blindSum, secret);
 

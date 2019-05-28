@@ -34,7 +34,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         protected SecureString masterKey;
         protected string toAdress;
         protected string fromAddress;
-        protected double amount;
+        protected ulong amount;
         protected string memo;
         protected SecureString secretKey;
         protected SecureString publicKey;
@@ -178,7 +178,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// Gets the Amount instance.
         /// </summary>
         /// <returns>The amount.</returns>
-        public double Amount() => amount;
+        public ulong Amount() => amount;
 
         /// <summary>
         /// Sets the specified Amount value.
@@ -187,12 +187,26 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <param name="value">Value.</param>
         public ActorService Amount(double value)
         {
-            amount = Guard.Argument(value, nameof(value)).NotZero().NotNegative();
+            Guard.Argument(value, nameof(value)).NotZero().NotNegative();
 
-            if (double.TryParse(amount.ToString("F9"), out double result))
+            try
             {
-                amount = result;
+                var parts = value.ToString().Split(new char[] { '.', ',' });
+                var part1 = (ulong)Math.Truncate(value);
+
+                if (parts.Length.Equals(0))
+                    amount = part1;
+                else
+                {
+                    var part2 = (ulong)((value - part1) * UInt64.Parse("1".PadRight(parts[1].Length + 1, '0')) + 0.5);
+                    amount = UInt64.Parse(part1.ToString() + part2.ToString());
+                }
             }
+            catch (Exception)
+            {
+                throw;
+            }
+
             return this;
         }
 
@@ -200,7 +214,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// Checks the balance.
         /// </summary>
         /// <returns>The balance.</returns>
-        public async Task<double> CheckBalance() => await walletService.AvailableBalance(Identifier(), MasterKey());
+        public async Task<ulong> CheckBalance() => await walletService.AvailableBalance(Identifier(), MasterKey());
 
         /// <summary>
         /// Decodes the address.
@@ -923,7 +937,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <returns>The Wallet transaction.</returns>
         /// <param name="coin">Coin.</param>
         /// <param name="transactionType">Transaction type.</param>
-        private async Task<bool> AddWalletTransaction(CoinDto coin, double total, string memoText, byte[] blind, TransactionType transactionType)
+        private async Task<bool> AddWalletTransaction(CoinDto coin, ulong total, string memoText, byte[] blind, TransactionType transactionType)
         {
             Guard.Argument(coin, nameof(coin)).NotNull();
             Guard.Argument(total, nameof(total)).NotNegative();

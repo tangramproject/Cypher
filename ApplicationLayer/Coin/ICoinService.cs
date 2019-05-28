@@ -22,7 +22,7 @@ namespace TangramCypher.ApplicationLayer.Coin
         (CoinDto, CoinDto) CoinSwap(SecureString secret, CoinDto coin, RedemptionKeyDto redemptionKey);
         CoinDto Coin();
         CoinDto DeriveCoin(CoinDto coin, SecureString secret);
-        byte[] DeriveKey(double amount, string stamp, int version, SecureString secret);
+        byte[] DeriveKey(ulong amount, string stamp, int version, SecureString secret);
         string DeriveKey(int version, string stamp, SecureString secret, int bytes = 32);
         string NewStamp();
         byte[] Hash(CoinDto coin);

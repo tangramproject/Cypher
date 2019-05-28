@@ -21,10 +21,10 @@ namespace TangramCypher.ApplicationLayer.Actor
         event MessagePumpEventHandler MessagePump;
 
         Task<T> AddAsync<T>(T payload, RestApiMethod apiMethod);
-        double Amount();
+        ulong Amount();
         ActorService Amount(double value);
         Task<T> GetAsync<T>(string address, RestApiMethod apiMethod);
-        Task<double> CheckBalance();
+        Task<ulong> CheckBalance();
         JObject GetLastError();
         Task<IEnumerable<T>> GetRangeAsync<T>(string address, int skip, int take, RestApiMethod apiMethod);
         Span<byte> DecodeAddress(string key);

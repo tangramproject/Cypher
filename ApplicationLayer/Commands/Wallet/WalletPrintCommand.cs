@@ -76,7 +76,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                             await actorService.SetPublicKey();
 
                             var coin = coinService
-                                .TransactionCoin(new TransactionCoin { Input = amount })
+                                .TransactionCoin(new TransactionCoin { Input = (ulong)amount })
                                 .BuildReceiver(password)
                                 .Coin();
 

@@ -16,7 +16,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
 {
     public interface IWalletService
     {
-        Task<double> AvailableBalance(SecureString identifier, SecureString password);
+        Task<ulong> AvailableBalance(SecureString identifier, SecureString password);
         Task<bool> AddKey(SecureString identifier, SecureString password, PkSkDto pkSk);
         PkSkDto CreatePkSk();
         Task<CredentialsDto> CreateWallet();
@@ -26,11 +26,11 @@ namespace TangramCypher.ApplicationLayer.Wallet
         Task<bool> AddTransaction(SecureString identifier, SecureString password, TransactionDto transaction);
         Task<TransactionDto> Transaction(SecureString identifier, SecureString password, string hash);
         Task<List<TransactionDto>> Transactions(SecureString identifier, SecureString password);
-        Task<double> TransactionAmount(SecureString identifier, SecureString password, string stamp);
-        Task<double> LastTransactionAmount(SecureString identifier, SecureString password, TransactionType transactionType);
+        Task<ulong> TransactionAmount(SecureString identifier, SecureString password, string stamp);
+        Task<ulong> LastTransactionAmount(SecureString identifier, SecureString password, TransactionType transactionType);
         Task<SecureString> StoreKey(SecureString identifier, SecureString password, string storeKey);
         Task<SecureString> StoreKey(SecureString identifier, SecureString password, StoreKeyApiMethod storeKeyApi, string address);
-        Task<TransactionCoin> SortChange(SecureString identifier, SecureString password, double amount);
+        Task<TransactionCoin> SortChange(SecureString identifier, SecureString password, ulong amount);
         Task<bool> AddMessageTracking(SecureString identifier, SecureString password, MessageTrackDto messageTrack);
         Task<MessageTrackDto> MessageTrack(SecureString identifier, SecureString password, string pk);
         byte[] NetworkAddress(CoinDto coin, NetworkApiMethod networkApi = null);
