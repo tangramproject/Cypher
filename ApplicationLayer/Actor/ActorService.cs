@@ -60,7 +60,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                 }
                 catch (Exception ex)
                 {
-                    logger.LogError(ex.Message);
+                    logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
                 }
             }
         }
@@ -202,9 +202,10 @@ namespace TangramCypher.ApplicationLayer.Actor
                     amount = UInt64.Parse(part1.ToString() + part2.ToString());
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                throw;
+                logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
+                throw ex;
             }
 
             return this;
@@ -580,7 +581,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             }
             catch (Exception ex)
             {
-                logger.LogError(ex.Message);
+                logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
             }
 
             return false;
@@ -630,7 +631,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             }
             catch (Exception ex)
             {
-                logger.LogError(ex.Message);
+                logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
                 throw ex;
             }
         }
@@ -658,24 +659,38 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <returns>The pub key message.</returns>
         public Task<MessageDto> EstablishPubKeyMessage()
         {
-            var pk = Util.FormatNetworkAddress(DecodeAddress(ToAddress()).ToArray());
-            var notificationAddress = Cryptography.GenericHashWithKey(pk.ToHex(), pk);
-            var senderPk = PublicKey().ToUnSecureString();
-            var innerMessage = JObject.FromObject(new
-            {
-                payment = false,
-                store = EncodeAddress(senderPk)
-            });
-            var paddedBuf = Cryptography.Pad(innerMessage.ToString());
-            var cypher = Cypher(Encoding.UTF8.GetString(paddedBuf), pk);
-            var payload = new MessageDto
-            {
-                Address = notificationAddress.ToBase64(),
-                Body = cypher.ToBase64()
-            };
+            MessageDto msg = null;
 
-            var msg = Util.TriesUntilCompleted<MessageDto>(
-                () => { return AddAsync(payload, RestApiMethod.PostMessage).GetAwaiter().GetResult(); }, 10, 100, payload);
+            try
+            {
+                var pk = Util.FormatNetworkAddress(DecodeAddress(ToAddress()).ToArray());
+                var notificationAddress = Cryptography.GenericHashWithKey(pk.ToHex(), pk);
+                var senderPk = PublicKey().ToUnSecureString();
+                var innerMessage = JObject.FromObject(new
+                {
+                    payment = false,
+                    store = EncodeAddress(senderPk)
+                });
+                var paddedBuf = Cryptography.Pad(innerMessage.ToString());
+                var cypher = Cypher(Encoding.UTF8.GetString(paddedBuf), pk);
+                var payload = new MessageDto
+                {
+                    Address = notificationAddress.ToBase64(),
+                    Body = cypher.ToBase64()
+                };
+
+                msg = Util.TriesUntilCompleted<MessageDto>(
+                    () => { return AddAsync(payload, RestApiMethod.PostMessage).GetAwaiter().GetResult(); }, 10, 100, payload);
+            }
+            catch (Exception ex)
+            {
+                lastError = JObject.FromObject(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+                logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
+            }
 
             return Task.FromResult(msg);
         }
@@ -697,7 +712,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             }
             catch (Exception ex)
             {
-                logger.LogError(ex.Message);
+                logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
                 throw ex;
             }
 
@@ -805,6 +820,13 @@ namespace TangramCypher.ApplicationLayer.Actor
         {
             var message = BuildRedemptionKeyMessage();
 
+            if (message == null)
+                return JObject.FromObject(new
+                {
+                    success = false,
+                    message = lastError
+                });
+
             if (send)
             {
                 UpdateMessagePump("Sending redemption key ...");
@@ -842,34 +864,49 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <returns>The redemption key message.</returns>
         private MessageDto BuildRedemptionKeyMessage()
         {
-            var (key1, key2) = coinService.HotRelease(coinService.Coin().Version, coinService.Coin().Stamp, MasterKey());
-            var redemption = new RedemptionKeyDto
-            {
-                Amount = coinService.TransactionCoin().Input,
-                Blind = coinService.TransactionCoin().Blind,
-                Hash = coinService.Coin().Hash,
-                Key1 = key1,
-                Key2 = key2,
-                Memo = Memo(),
-                Stamp = coinService.Coin().Stamp
-            };
-            var innerMessage = JObject.FromObject(new
-            {
-                payment = true,
-                store = JsonConvert.SerializeObject(redemption)
-            });
-            var paddedBuf = Cryptography.Pad(innerMessage.ToString());
-            var pk = Util.FormatNetworkAddress(DecodeAddress(ToAddress()).ToArray());
-            var cypher = Cypher(Encoding.UTF8.GetString(paddedBuf), pk);
-            var sharedKey = ToSharedKey(pk.ToArray());
-            var notificationAddress = Cryptography.GenericHashWithKey(sharedKey.ToHex(), pk);
-            var message = new MessageDto
-            {
-                Address = notificationAddress.ToBase64(),
-                Body = cypher.ToBase64()
-            };
+            MessageDto message = null;
 
-            coinService.ClearCache();
+            try
+            {
+                var (key1, key2) = coinService.HotRelease(coinService.Coin().Version, coinService.Coin().Stamp, MasterKey());
+                var redemption = new RedemptionKeyDto
+                {
+                    Amount = coinService.TransactionCoin().Input,
+                    Blind = coinService.TransactionCoin().Blind,
+                    Hash = coinService.Coin().Hash,
+                    Key1 = key1,
+                    Key2 = key2,
+                    Memo = Memo(),
+                    Stamp = coinService.Coin().Stamp
+                };
+                var innerMessage = JObject.FromObject(new
+                {
+                    payment = true,
+                    store = JsonConvert.SerializeObject(redemption)
+                });
+                var paddedBuf = Cryptography.Pad(innerMessage.ToString());
+                var pk = Util.FormatNetworkAddress(DecodeAddress(ToAddress()).ToArray());
+                var cypher = Cypher(Encoding.UTF8.GetString(paddedBuf), pk);
+                var sharedKey = ToSharedKey(pk.ToArray());
+                var notificationAddress = Cryptography.GenericHashWithKey(sharedKey.ToHex(), pk);
+
+                message = new MessageDto
+                {
+                    Address = notificationAddress.ToBase64(),
+                    Body = cypher.ToBase64()
+                };
+
+                coinService.ClearCache();
+            }
+            catch (Exception ex)
+            {
+                lastError = JObject.FromObject(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+                logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
+            }
 
             return message;
         }
@@ -982,7 +1019,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                 return JObject.FromObject(new
                 {
                     success = false,
-                    message = "Public key agreement message failed to send!"
+                    message = lastError
                 });
 
             await Task.Delay(500);
@@ -1028,7 +1065,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                 }
                 catch (Exception ex)
                 {
-                    logger.LogError(ex.Message);
+                    logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
                     throw ex;
                 }
             }
