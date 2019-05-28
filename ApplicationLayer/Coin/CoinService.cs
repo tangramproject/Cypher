@@ -58,19 +58,19 @@ namespace TangramCypher.ApplicationLayer.Coin
                 try
                 {
                     blindSum = pedersen.BlindSum(new List<byte[]> { blind }, new List<byte[]> { });
+
+                    var commitPos = pedersen.Commit(TransactionCoin().Input, blind);
+                    var commitSum = pedersen.CommitSum(new List<byte[]> { commitPos }, new List<byte[]> { });
+
+                    AttachEnvelope(secp256k1, pedersen, rangeProof, blindSum, commitSum, TransactionCoin().Input, secret);
+
+                    transactionCoin.Blind = blindSum.ToHex();
                 }
                 catch (Exception ex)
                 {
                     logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
                     throw ex;
                 }
-
-                var commitPos = pedersen.Commit(TransactionCoin().Input, blind);
-                var commitSum = pedersen.CommitSum(new List<byte[]> { commitPos }, new List<byte[]> { });
-
-                AttachEnvelope(secp256k1, pedersen, rangeProof, blindSum, commitSum, TransactionCoin().Input, secret);
-
-                transactionCoin.Blind = blindSum.ToHex();
             }
 
             return this;
@@ -91,27 +91,35 @@ namespace TangramCypher.ApplicationLayer.Coin
 
                 MakeSingleCoin(secret);
 
-                var received = TransactionCoin().Chain.FirstOrDefault(tx => tx.TransactionType == TransactionType.Receive);
+                try
+                {
+                    var received = TransactionCoin().Chain.FirstOrDefault(tx => tx.TransactionType == TransactionType.Receive);
 
-                var blindNeg = DeriveKey(TransactionCoin().Input, received.Stamp, Coin().Version, secret);
-                var commitNeg = pedersen.Commit(TransactionCoin().Input, blindNeg);
+                    var blindNeg = DeriveKey(TransactionCoin().Input, received.Stamp, Coin().Version, secret);
+                    var commitNeg = pedersen.Commit(TransactionCoin().Input, blindNeg);
 
-                var commitNegs = TransactionCoin().Chain
-                               .Where(tx => tx.TransactionType == TransactionType.Send)
-                               .Select(c => pedersen.Commit(c.Amount, DeriveKey(c.Amount, c.Stamp, c.Version, secret))).ToList();
+                    var commitNegs = TransactionCoin().Chain
+                                   .Where(tx => tx.TransactionType == TransactionType.Send)
+                                   .Select(c => pedersen.Commit(c.Amount, DeriveKey(c.Amount, c.Stamp, c.Version, secret))).ToList();
 
-                commitNegs.Add(commitNeg);
+                    commitNegs.Add(commitNeg);
 
-                var blindNegSums = TransactionCoin().Chain
-                                .Where(tx => tx.TransactionType == TransactionType.Send)
-                                .Select(c => DeriveKey(c.Amount, c.Stamp, c.Version, secret)).ToList();
+                    var blindNegSums = TransactionCoin().Chain
+                                    .Where(tx => tx.TransactionType == TransactionType.Send)
+                                    .Select(c => DeriveKey(c.Amount, c.Stamp, c.Version, secret)).ToList();
 
-                blindNegSums.Add(blindNeg);
+                    blindNegSums.Add(blindNeg);
 
-                var blindSum = pedersen.BlindSum(new List<byte[]> { received.Blind.FromHex() }, blindNegSums);
-                var commitSum = pedersen.CommitSum(new List<byte[]> { received.Commitment.FromHex() }, commitNegs);
+                    var blindSum = pedersen.BlindSum(new List<byte[]> { received.Blind.FromHex() }, blindNegSums);
+                    var commitSum = pedersen.CommitSum(new List<byte[]> { received.Commitment.FromHex() }, commitNegs);
 
-                AttachEnvelope(secp256k1, pedersen, rangeProof, blindSum, commitSum, TransactionCoin().Output, secret);
+                    AttachEnvelope(secp256k1, pedersen, rangeProof, blindSum, commitSum, TransactionCoin().Output, secret);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
+                    throw ex;
+                }
             }
 
             return this;
