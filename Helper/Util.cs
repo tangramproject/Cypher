@@ -221,7 +221,7 @@ namespace TangramCypher.Helper
                 try
                 {
                     result = await action();
-                    if (result.Equals(expected) || i.Equals(tries))
+                    if (result.Equals(expected))
                         break;
                 }
                 finally
