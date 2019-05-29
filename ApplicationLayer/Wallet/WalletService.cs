@@ -717,6 +717,11 @@ namespace TangramCypher.ApplicationLayer.Wallet
         {
             Guard.Argument(coin, nameof(coin)).NotNull();
 
+            //TODO: Will remove the need to format to and from base64..
+            try
+            { coin = coin.FormatCoinFromBase64(); }
+            catch (FormatException) { }
+
             string env = string.Empty;
             byte[] address = new byte[33];
 
