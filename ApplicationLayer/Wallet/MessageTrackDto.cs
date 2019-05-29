@@ -7,6 +7,7 @@
 // work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
 
 using System;
+
 namespace TangramCypher.ApplicationLayer.Wallet
 {
     public class MessageTrackDto

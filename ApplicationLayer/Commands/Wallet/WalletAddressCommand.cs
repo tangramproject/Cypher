@@ -36,7 +36,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                 using (var password = Prompt.GetPasswordAsSecureString("Password:", ConsoleColor.Yellow))
                 {
                     var pksk = walletService.CreatePkSk();
-                    var added = await walletService.AddKey(identifier, password, pksk);
+                    var added = await walletService.Put(identifier, password, pksk.Address, pksk, "storeKeys", "Address");
 
                     if(added)
                     {
