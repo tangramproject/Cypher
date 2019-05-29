@@ -212,7 +212,7 @@ namespace TangramCypher.Helper
             return networkAddress;
         }
 
-        public static T TriesUntilCompleted<T>(Func<T> action, int tries, int delay, T expected)
+        public async static Task<T> TriesUntilCompleted<T>(Func<Task<T>> action, int tries, int delay, T expected)
         {
             var result = default(T);
 
@@ -220,36 +220,34 @@ namespace TangramCypher.Helper
             {
                 try
                 {
-                    result = action();
+                    result = await action();
                     if (result.Equals(expected) || i.Equals(tries))
                         break;
                 }
                 finally
                 {
-                    Task.Delay(delay);
+                    await Task.Delay(delay);
                 }
             }
 
             return result;
         }
 
-        public static T TriesUntilCompleted<T>(Func<T> action, int tries, int delay, Func<T> expected)
+        public async static Task<T> TriesUntilCompleted<T>(Func<Task<T>> action, int tries, int delay)
         {
             var result = default(T);
-            var expectedResult = default(T);
 
             for (int i = 0; i < tries; i++)
             {
                 try
                 {
-                    result = action();
-                    expectedResult = expected();
-                    if (EqualityComparer<T>.Default.Equals(result, expectedResult) || i.Equals(tries))
+                    result = await action();
+                    if (result != null)
                         break;
                 }
                 finally
                 {
-                    Task.Delay(delay);
+                    await Task.Delay(delay);
                 }
             }
 
