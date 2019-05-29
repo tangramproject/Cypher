@@ -195,11 +195,11 @@ namespace TangramCypher.ApplicationLayer.Actor
                 var part1 = (ulong)Math.Truncate(value);
 
                 if (parts.Length.Equals(1))
-                    amount = part1;
+                    amount = walletService.MulWithNaT(part1);
                 else
                 {
                     var part2 = (ulong)((value - part1) * UInt64.Parse("1".PadRight(parts[1].Length + 1, '0')) + 0.5);
-                    amount = UInt64.Parse(part1.ToString() + part2.ToString());
+                    amount = walletService.MulWithNaT(part1) + UInt64.Parse(part2.ToString());
                 }
             }
             catch (Exception ex)
@@ -351,7 +351,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             await SetSecretKey();
             await SetPublicKey();
 
-            Util.TriesUntilCompleted<bool>(() => { return ReceivePayment(fromAddress).GetAwaiter().GetResult(); }, 10, 100, true);
+            await Util.TriesUntilCompleted<bool>(async () => { return await ReceivePayment(fromAddress); }, 10, 100, true);
         }
 
         /// <summary>
@@ -680,7 +680,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                 };
 
                 msg = Util.TriesUntilCompleted<MessageDto>(
-                    () => { return AddAsync(payload, RestApiMethod.PostMessage).GetAwaiter().GetResult(); }, 10, 100, payload);
+                     async () => { return await AddAsync(payload, RestApiMethod.PostMessage); }, 10, 100, payload).GetAwaiter().GetResult();
             }
             catch (Exception ex)
             {
@@ -745,16 +745,11 @@ namespace TangramCypher.ApplicationLayer.Actor
             await SetSecretKey();
             await SetPublicKey();
 
-            var spend = Util.TriesUntilCompleted<CoinDto>
-            (
-                () => { return Spend().GetAwaiter().GetResult(); }, 10, 100,
-                () => { return coinService.Coin().FormatCoinToBase64(); }
-            );
+            var spend = await Util.TriesUntilCompleted<CoinDto>(async () => { return await Spend(); }, 10, 100);
             if (spend == null)
                 return false;
 
-
-            var receiver = Util.TriesUntilCompleted<bool>(() => { return SendReceiverCoin().GetAwaiter().GetResult(); }, 10, 100, true);
+            var receiver = await Util.TriesUntilCompleted<bool>(async () => { return await SendReceiverCoin(); }, 10, 100, true);
             if (receiver.Equals(false))
                 return false;
 
@@ -1024,8 +1019,8 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             await Task.Delay(500);
 
-            msg = Util.TriesUntilCompleted<MessageDto>(
-                () => { return AddAsync(message, RestApiMethod.PostMessage).GetAwaiter().GetResult(); }, 10, 100, message);
+            msg = await Util.TriesUntilCompleted<MessageDto>(
+                async () => { return await AddAsync(message, RestApiMethod.PostMessage); }, 10, 100, message);
 
             if (msg == null)
                 return JObject.FromObject(new

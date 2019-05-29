@@ -36,5 +36,9 @@ namespace TangramCypher.ApplicationLayer.Actor
         public const string PublicKey = "PublicKey";
         public const string SecretKey = "SecretKey";
         public const string AddressKey = "Address";
+        public const int Tan = 1;
+        public const int MicroTan = 100;
+        public const int NanoTan = 1000_000_000;
+        public const ulong AttoTan = 1000_000_000_000_000_000;
     }
 }

@@ -40,5 +40,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
         Task<string> RandomAddress(SecureString identifier, SecureString password);
         Task<string> Profile(SecureString identifier, SecureString password);
         Task<IEnumerable<string>> WalletList();
+         ulong MulWithNaT(ulong value);
+         ulong DivWithNaT(ulong value);
     }
 }
