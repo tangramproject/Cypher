@@ -955,7 +955,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             }
 
             //TODO: Need to update node side..
-            coin.Network = walletService.NetworkAddress(coin).ToHex();
+            coin.Network = walletService.NetworkAddress(coin).ToBase64();
 
             //TODO: Could possibility fail.. need recovery..
             var added = await AddWalletTransaction(coin, coinService.TransactionCoin().Input, Memo(), null, TransactionType.Send);
