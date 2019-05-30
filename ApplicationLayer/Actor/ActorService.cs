@@ -681,7 +681,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                 };
 
                 msg = Util.TriesUntilCompleted<MessageDto>(
-                     async () => { return await AddAsync(payload, RestApiMethod.PostMessage); }, 10, 100, payload).GetAwaiter().GetResult();
+                     async () => { return await AddAsync(payload, RestApiMethod.PostMessage); }, 10, 100).GetAwaiter().GetResult();
             }
             catch (Exception ex)
             {
@@ -1032,7 +1032,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             await Task.Delay(500);
 
             msg = await Util.TriesUntilCompleted<MessageDto>(
-                async () => { return await AddAsync(message, RestApiMethod.PostMessage); }, 10, 100, message);
+                async () => { return await AddAsync(message, RestApiMethod.PostMessage); }, 10, 100);
 
             if (msg == null)
                 return JObject.FromObject(new
