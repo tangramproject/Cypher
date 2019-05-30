@@ -817,7 +817,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             var msgStore = RedemptionKeyMessage();
 
             //TODO: Could possibility fail.. need recovery..
-            var added = await walletService.Put(Identifier(), MasterKey(), msgStore.Hash, msgStore, "messages", "Hash");
+            var added = await walletService.Put(Identifier(), MasterKey(), msgStore.Hash, msgStore, "redemption", "Hash");
 
             if (msgStore == null)
                 return JObject.FromObject(new
