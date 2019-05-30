@@ -171,7 +171,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
                     var found = false;
                     var data = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
 
-                    if (data.Data.TryGetValue("messages", out object msgs))
+                    if (data.Data.TryGetValue("track", out object msgs))
                     {
                         foreach (JObject item in ((JArray)msgs).Children().ToList())
                         {
@@ -185,7 +185,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
                             ((JArray)msgs).Replace(JObject.FromObject(messageTrack));
                     }
                     else
-                        data.Data.Add("messages", new List<MessageTrackDto> { messageTrack });
+                        data.Data.Add("track", new List<MessageTrackDto> { messageTrack });
 
                     await vaultServiceClient.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", data.Data);
 
