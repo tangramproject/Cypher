@@ -17,13 +17,11 @@ namespace TangramCypher.ApplicationLayer.Wallet
     public interface IWalletService
     {
         Task<ulong> AvailableBalance(SecureString identifier, SecureString password);
-        Task<bool> AddKey(SecureString identifier, SecureString password, PkSkDto pkSk);
         PkSkDto CreatePkSk();
         Task<CredentialsDto> CreateWallet();
         SecureString NewID(int bytes = 32);
         SecureString Passphrase();
         byte[] HashPassword(SecureString passphrase);
-        Task<bool> AddTransaction(SecureString identifier, SecureString password, TransactionDto transaction);
         Task<TransactionDto> Transaction(SecureString identifier, SecureString password, string hash);
         Task<List<TransactionDto>> Transactions(SecureString identifier, SecureString password);
         Task<ulong> TransactionAmount(SecureString identifier, SecureString password, string stamp);
@@ -40,7 +38,8 @@ namespace TangramCypher.ApplicationLayer.Wallet
         Task<string> RandomAddress(SecureString identifier, SecureString password);
         Task<string> Profile(SecureString identifier, SecureString password);
         Task<IEnumerable<string>> WalletList();
-         ulong MulWithNaT(ulong value);
-         ulong DivWithNaT(ulong value);
+        ulong MulWithNaT(ulong value);
+        ulong DivWithNaT(ulong value);
+        Task<bool> Put<T>(SecureString identifier, SecureString password, string key, T value, string storeName, string keyName);
     }
 }

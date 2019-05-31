@@ -62,45 +62,6 @@ namespace TangramCypher.ApplicationLayer.Wallet
         }
 
         /// <summary>
-        /// Adds the keys.
-        /// </summary>
-        /// <returns>The keys.</returns>
-        /// <param name="identifier">Identifier.</param>
-        /// <param name="password">Password.</param>
-        /// <param name="pkSk">Pk sk.</param>
-        public async Task<bool> AddKey(SecureString identifier, SecureString password, PkSkDto pkSk)
-        {
-            Guard.Argument(identifier, nameof(identifier)).NotNull();
-            Guard.Argument(password, nameof(password)).NotNull();
-            Guard.Argument(pkSk, nameof(pkSk)).NotNull();
-
-            bool added = false;
-
-            using (var insecureIdentifier = identifier.Insecure())
-            {
-                try
-                {
-                    var data = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
-
-                    if (data.Data.TryGetValue("storeKeys", out object keys))
-                    {
-                        ((JArray)keys).Add(JObject.FromObject(pkSk));
-
-                        await vaultServiceClient.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", data.Data);
-
-                        added = true;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex.Message);
-                }
-            }
-
-            return added;
-        }
-
-        /// <summary>
         /// Creates new secret/public address key.
         /// </summary>
         /// <returns>The pk sk.</returns>
@@ -188,55 +149,6 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <param name="passphrase">Passphrase.</param>
         public byte[] HashPassword(SecureString passphrase) => Cryptography.ArgonHashPassword(passphrase);
 
-
-        /// <summary>
-        /// Adds the transaction.
-        /// </summary>
-        /// <returns>The transaction.</returns>
-        /// <param name="identifier">Identifier.</param>
-        /// <param name="password">Password.</param>
-        /// <param name="transaction">Transaction.</param>
-        public async Task<bool> AddTransaction(SecureString identifier, SecureString password, TransactionDto transaction)
-        {
-            Guard.Argument(identifier, nameof(identifier)).NotNull();
-            Guard.Argument(password, nameof(password)).NotNull();
-            Guard.Argument(transaction, nameof(transaction)).NotNull();
-
-            bool added = false;
-
-            using (var insecureIdentifier = identifier.Insecure())
-            {
-                try
-                {
-                    var found = false;
-                    var data = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
-
-                    if (data.Data.TryGetValue("transactions", out object txs))
-                    {
-                        foreach (JObject item in ((JArray)txs).Children().ToList())
-                        {
-                            var hash = item.GetValue("Hash");
-                            found = hash.Value<string>().Equals(transaction.Hash);
-                        }
-                        if (!found)
-                            ((JArray)txs).Add(JObject.FromObject(transaction));
-                    }
-                    else
-                        data.Data.Add("transactions", new List<TransactionDto> { transaction });
-
-                    await vaultServiceClient.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", data.Data);
-
-                    added = true;
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex.Message);
-                }
-            }
-
-            return added;
-        }
-
         /// <summary>
         /// Adds message tracking.
         /// </summary>
@@ -259,7 +171,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
                     var found = false;
                     var data = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
 
-                    if (data.Data.TryGetValue("messages", out object msgs))
+                    if (data.Data.TryGetValue("track", out object msgs))
                     {
                         foreach (JObject item in ((JArray)msgs).Children().ToList())
                         {
@@ -273,7 +185,47 @@ namespace TangramCypher.ApplicationLayer.Wallet
                             ((JArray)msgs).Replace(JObject.FromObject(messageTrack));
                     }
                     else
-                        data.Data.Add("messages", new List<MessageTrackDto> { messageTrack });
+                        data.Data.Add("track", new List<MessageTrackDto> { messageTrack });
+
+                    await vaultServiceClient.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", data.Data);
+
+                    added = true;
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex.Message);
+                }
+            }
+
+            return added;
+        }
+
+        public async Task<bool> Put<T>(SecureString identifier, SecureString password, string key, T value, string storeName, string keyName)
+        {
+            Guard.Argument(identifier, nameof(identifier)).NotNull();
+            Guard.Argument(password, nameof(password)).NotNull();
+
+            bool added = false;
+
+            using (var insecureIdentifier = identifier.Insecure())
+            {
+                try
+                {
+                    var found = false;
+                    var data = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
+
+                    if (data.Data.TryGetValue(storeName, out object txs))
+                    {
+                        foreach (JObject item in ((JArray)txs).Children().ToList())
+                        {
+                            var hash = item.GetValue(keyName);
+                            found = hash.Value<string>().Equals(key);
+                        }
+                        if (!found)
+                            ((JArray)txs).Add(JObject.FromObject(value));
+                    }
+                    else
+                        data.Data.Add(storeName, new List<T> { value });
 
                     await vaultServiceClient.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", data.Data);
 
