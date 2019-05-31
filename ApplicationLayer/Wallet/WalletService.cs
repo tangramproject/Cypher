@@ -25,6 +25,7 @@ using Microsoft.Extensions.Configuration;
 using Dawn;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using TangramCypher.Model;
 
 namespace TangramCypher.ApplicationLayer.Wallet
 {
@@ -34,8 +35,9 @@ namespace TangramCypher.ApplicationLayer.Wallet
         private readonly IConfigurationSection apiNetworkSection;
         private readonly ILogger logger;
         private readonly string environment;
+        private readonly IUnitOfWork unitOfWork;
 
-        public WalletService(IVaultServiceClient vaultServiceClient, IConfiguration configuration, ILogger logger)
+        public WalletService(IVaultServiceClient vaultServiceClient, IConfiguration configuration, ILogger logger, IUnitOfWork unitOfWork)
         {
             this.vaultServiceClient = vaultServiceClient;
 
@@ -43,6 +45,8 @@ namespace TangramCypher.ApplicationLayer.Wallet
             environment = apiNetworkSection.GetValue<string>(Constant.Environment);
 
             this.logger = logger;
+
+            this.unitOfWork = unitOfWork;
         }
 
         /// <summary>
@@ -57,6 +61,9 @@ namespace TangramCypher.ApplicationLayer.Wallet
             Guard.Argument(password, nameof(password)).NotNull();
 
             var transactions = await Transactions(identifier, password);
+
+            //Test...
+            var txns = await unitOfWork.GetTransactionRepository().All(identifier, password, "transactions");
 
             return Balance(identifier, password, transactions);
         }

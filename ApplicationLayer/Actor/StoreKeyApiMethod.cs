@@ -9,6 +9,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         public static readonly StoreKeyApiMethod AddressKey = new StoreKeyApiMethod(1, Constant.AddressKey);
         public static readonly StoreKeyApiMethod PublicKey = new StoreKeyApiMethod(2, Constant.PublicKey);
         public static readonly StoreKeyApiMethod SecretKey = new StoreKeyApiMethod(3, Constant.SecretKey);
+        public static readonly StoreKeyApiMethod HashKey = new StoreKeyApiMethod(4, Constant.Hash);
 
         private StoreKeyApiMethod(int value, string name)
         {

@@ -21,6 +21,7 @@ using Microsoft.Extensions.Hosting;
 using TangramCypher.ApplicationLayer.Coin;
 using System;
 using TangramCypher.ApplicationLayer.Onion;
+using TangramCypher.Model;
 
 namespace TangramCypher
 {
@@ -52,6 +53,7 @@ namespace TangramCypher
                         .AddSingleton<ICoinService, CoinService>()
                         .AddSingleton<IHostedService, OnionService>()
                         .AddSingleton<IHostedService, VaultService>()
+                        .AddSingleton<IUnitOfWork, UnitOfWork>()
                         .AddSingleton<IHostedService, CommandService>(sp =>
                         {
                             return sp.GetService<ICommandService>() as CommandService;
