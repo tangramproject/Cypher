@@ -24,8 +24,8 @@ namespace TangramCypher.ApplicationLayer.Wallet
         byte[] HashPassword(SecureString passphrase);
         Task<TransactionDto> Transaction(SecureString identifier, SecureString password, string hash);
         Task<List<TransactionDto>> Transactions(SecureString identifier, SecureString password);
-        Task<ulong> TransactionAmount(SecureString identifier, SecureString password, string stamp);
-        Task<ulong> LastTransactionAmount(SecureString identifier, SecureString password, TransactionType transactionType);
+        Task<ulong> TotalTransactionAmount(SecureString identifier, SecureString password, string stamp);
+        Task<TransactionDto> LastTransaction(SecureString identifier, SecureString password, TransactionType transactionType);
         Task<SecureString> StoreKey(SecureString identifier, SecureString password, string storeKey);
         Task<SecureString> StoreKey(SecureString identifier, SecureString password, StoreKeyApiMethod storeKeyApi, string address);
         Task<TransactionCoin> SortChange(SecureString identifier, SecureString password, ulong amount);

@@ -295,33 +295,26 @@ namespace TangramCypher.ApplicationLayer.Wallet
         }
 
         /// <summary>
-        /// Gets the transaction amount.
+        /// Gets the total transaction amount.
         /// </summary>
         /// <returns>The transaction amount.</returns>
         /// <param name="identifier">Identifier.</param>
         /// <param name="password">Password.</param>
         /// <param name="stamp">Stamp.</param>
-        public async Task<ulong> TransactionAmount(SecureString identifier, SecureString password, string stamp)
+        public async Task<ulong> TotalTransactionAmount(SecureString identifier, SecureString password, string stamp)
         {
             Guard.Argument(identifier, nameof(identifier)).NotNull();
             Guard.Argument(password, nameof(password)).NotNull();
             Guard.Argument(stamp, nameof(stamp)).NotNull().NotEmpty();
 
-            var total = 0UL;
             var transactions = await Transactions(identifier, password);
 
             if (transactions == null)
                 return 0;
 
-            var transaction = transactions.Select(tx =>
-            {
-                if (tx.Stamp.Equals(stamp))
-                    total = tx.Amount;
+            var total = Sum(transactions.Where(tx => tx.Stamp.Equals(stamp)).Select(p => p.Amount));
 
-                return total;
-            });
-
-            return transaction.FirstOrDefault();
+            return total;
         }
 
         /// <summary>
@@ -330,7 +323,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <returns>The transaction amount.</returns>
         /// <param name="identifier">Identifier.</param>
         /// <param name="password">Password.</param>
-        public async Task<ulong> LastTransactionAmount(SecureString identifier, SecureString password, TransactionType transactionType)
+        public async Task<TransactionDto> LastTransaction(SecureString identifier, SecureString password, TransactionType transactionType)
         {
             Guard.Argument(identifier, nameof(identifier)).NotNull();
             Guard.Argument(password, nameof(password)).NotNull();
@@ -338,9 +331,10 @@ namespace TangramCypher.ApplicationLayer.Wallet
             var transactions = await Transactions(identifier, password);
 
             if (transactions == null)
-                return 0;
+                return null;
 
-            return transactions.Last(tx => tx.TransactionType.Equals(transactionType)).Amount;
+            var transaction = transactions.Last(tx => tx.TransactionType.Equals(transactionType));
+            return transaction;
         }
 
         /// <summary>

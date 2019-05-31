@@ -431,14 +431,14 @@ namespace TangramCypher.ApplicationLayer.Actor
             if (payment)
             {
                 var availableBal = await CheckBalance();
-                var lastAmount = await walletService.LastTransactionAmount(Identifier(), MasterKey(), TransactionType.Receive);
+                var transaction = await walletService.LastTransaction(Identifier(), MasterKey(), TransactionType.Receive);
                 return JObject.FromObject(new
                 {
                     success = true,
                     message = new
                     {
                         previous = previousBal,
-                        received = lastAmount,
+                        received = transaction.Amount,
                         available = availableBal
                     }
                 });
@@ -994,6 +994,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             var transaction = new TransactionDto
             {
+                TransactionId = Guid.NewGuid().ToString(),
                 Amount = total,
                 Blind = blind == null ? string.Empty : blind.ToHex(),
                 Commitment = formattedCoin.Envelope.Commitment,

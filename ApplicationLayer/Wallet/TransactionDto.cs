@@ -17,6 +17,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
 
     public class TransactionDto
     {
+        public string TransactionId { get; set; }
         public ulong Amount { get; set; }
         public string Blind { get; set; }
         public string Commitment { get; set; }
