@@ -19,6 +19,7 @@ using TangramCypher.ApplicationLayer.Coin;
 using Kurukuru;
 using System.Security;
 using Microsoft.Extensions.Logging;
+using TangramCypher.Model;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
 {
@@ -76,7 +77,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                             await actorService.SetPublicKey();
 
                             var coin = coinService
-                                .TransactionCoin(new TransactionCoin { Input = (ulong)amount })
+                                .TransactionCoin(new TransactionCoinDto { Input = (ulong)amount })
                                 .BuildReceiver(password)
                                 .Coin();
 
