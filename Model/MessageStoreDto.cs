@@ -7,9 +7,8 @@
 // work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
 
 using System;
-using TangramCypher.ApplicationLayer.Actor;
 
-namespace TangramCypher.ApplicationLayer.Wallet
+namespace TangramCypher.Model
 {
     public class MessageStoreDto
     {

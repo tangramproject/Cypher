@@ -1,6 +1,7 @@
 ﻿using System;
 using System.ComponentModel.DataAnnotations;
 using TangramCypher.ApplicationLayer.Wallet;
+using TangramCypher.Model;
 
 namespace TangramCypher.ApplicationLayer.Actor
 {

@@ -15,10 +15,12 @@ namespace TangramCypher.Model
     public class UnitOfWork : IUnitOfWork
     {
         private ITransactionRepository transactionRepository;
+        private IRedemptionRepository redemptionRepository;
 
         public UnitOfWork(IVaultServiceClient vaultServiceClient, ILogger logger)
         {
             SetTransactionRepository(new TransactionRepository(vaultServiceClient, logger));
+            SetRedemptionRepository(new RedemptionRepository(vaultServiceClient, logger));
         }
 
         public ITransactionRepository GetTransactionRepository()
@@ -29,6 +31,16 @@ namespace TangramCypher.Model
         private void SetTransactionRepository(ITransactionRepository value)
         {
             transactionRepository = value;
+        }
+
+        public IRedemptionRepository GetRedemptionRepository()
+        {
+            return redemptionRepository;
+        }
+
+        private void SetRedemptionRepository(IRedemptionRepository value)
+        {
+            redemptionRepository = value;
         }
 
         public void Dispose()

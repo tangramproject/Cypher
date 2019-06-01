@@ -20,6 +20,7 @@ using Newtonsoft.Json.Linq;
 using TangramCypher.ApplicationLayer.Wallet;
 using System.Security;
 using Microsoft.Extensions.Logging;
+using TangramCypher.Model;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
 {

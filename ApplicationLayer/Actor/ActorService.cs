@@ -817,9 +817,9 @@ namespace TangramCypher.ApplicationLayer.Actor
         public async Task<JObject> SendPaymentMessage(bool send)
         {
             var msgStore = RedemptionKeyMessage();
-
+            
             //TODO: Could possibility fail.. need recovery..
-            var added = await walletService.Put(Identifier(), MasterKey(), msgStore.Hash, msgStore, "redemption", "Hash");
+            var added = await unitOfWork.GetRedemptionRepository().Put(Identifier(), MasterKey(), StoreKey.HashKey, msgStore.Hash, msgStore);
 
             if (msgStore == null)
                 return JObject.FromObject(new
