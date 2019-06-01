@@ -63,7 +63,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
             var transactions = await Transactions(identifier, password);
 
             //Test...
-            var txns = await unitOfWork.GetTransactionRepository().All(identifier, password, "transactions");
+            var txns = await unitOfWork.GetTransactionRepository().All(identifier, password);
 
             return Balance(identifier, password, transactions);
         }

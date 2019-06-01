@@ -19,13 +19,15 @@ using TangramCypher.Helper;
 
 namespace TangramCypher.Model
 {
-    public class Repository<TEntity> : IRepository<TEntity> where TEntity : class
+    public abstract class Repository<TEntity> : IRepository<TEntity> where TEntity : class
     {
         private readonly IVaultServiceClient vaultServiceClient;
         private readonly ILogger logger;
+        private readonly StoreName store;
 
-        public Repository(IVaultServiceClient vaultServiceClient, ILogger logger)
+        public Repository(StoreName store, IVaultServiceClient vaultServiceClient, ILogger logger)
         {
+            this.store = store;
             this.vaultServiceClient = vaultServiceClient;
             this.logger = logger;
         }
@@ -37,18 +39,18 @@ namespace TangramCypher.Model
         /// <param name="password"></param>
         /// <param name="store"></param>
         /// <returns></returns>
-        public async Task<IEnumerable<TEntity>> All(SecureString identifier, SecureString password, string store)
+        public async Task<IEnumerable<TEntity>> All(SecureString identifier, SecureString password)
         {
-            List<TEntity> List = null;
+            IEnumerable<TEntity> List = null;
 
             using (var insecureIdentifier = identifier.Insecure())
             {
                 try
                 {
                     var vault = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
-                    if (vault.Data.TryGetValue(store, out object txs))
+                    if (vault.Data.TryGetValue(store.ToString(), out object txs))
                     {
-                        List = ((JArray)txs).ToObject<List<TEntity>>();
+                        List = ((JArray)txs).ToObject<IEnumerable<TEntity>>();
                     }
                 }
                 catch (Exception ex)
@@ -69,7 +71,7 @@ namespace TangramCypher.Model
         /// <param name="name"></param>
         /// <param name="key"></param>
         /// <returns></returns>
-        public async Task<TEntity> Get(SecureString identifier, SecureString password, string store, StoreKeyApiMethod name, string key)
+        public async Task<TEntity> Get(SecureString identifier, SecureString password, StoreKey name, string key)
         {
             TEntity tEntity = default(TEntity);
 
@@ -79,7 +81,7 @@ namespace TangramCypher.Model
                 {
                     var vault = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
 
-                    if (vault.Data.TryGetValue(store, out object stores))
+                    if (vault.Data.TryGetValue(store.ToString(), out object stores))
                     {
                         foreach (JObject item in ((JArray)stores).Children().ToList())
                         {
@@ -110,7 +112,7 @@ namespace TangramCypher.Model
         /// <param name="key"></param>
         /// <param name="value"></param>
         /// <returns></returns>
-        public async Task<bool> Put(SecureString identifier, SecureString password, string store, StoreKeyApiMethod name, string key, TEntity value)
+        public async Task<bool> Put(SecureString identifier, SecureString password, StoreKey name, string key, TEntity value)
         {
             bool added = false;
 
@@ -121,7 +123,7 @@ namespace TangramCypher.Model
                     var found = false;
                     var vault = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
 
-                    if (vault.Data.TryGetValue(store, out object txs))
+                    if (vault.Data.TryGetValue(store.ToString(), out object txs))
                     {
                         foreach (JObject item in ((JArray)txs).Children().ToList())
                         {
@@ -132,7 +134,7 @@ namespace TangramCypher.Model
                             ((JArray)txs).Add(JObject.FromObject(value));
                     }
                     else
-                        vault.Data.Add(store, new List<TEntity> { value });
+                        vault.Data.Add(store.ToString(), new List<TEntity> { value });
 
                     await vaultServiceClient.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", vault.Data);
 
@@ -154,7 +156,7 @@ namespace TangramCypher.Model
         /// <param name="password"></param>
         /// <param name="store"></param>
         /// <returns></returns>
-        public async Task<bool> Truncate(SecureString identifier, SecureString password, string store)
+        public async Task<bool> Truncate(SecureString identifier, SecureString password)
         {
             bool cleared = false;
 
@@ -164,7 +166,7 @@ namespace TangramCypher.Model
                 {
                     var vault = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
 
-                    if (vault.Data.TryGetValue(store, out object txs))
+                    if (vault.Data.TryGetValue(store.ToString(), out object txs))
                         vault.Data.Clear();
 
                     await vaultServiceClient.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", vault.Data);

@@ -15,7 +15,7 @@ namespace TangramCypher.Model
     public class TransactionRepository : Repository<TransactionDto>, ITransactionRepository
     {
         public TransactionRepository(IVaultServiceClient vaultServiceClient, ILogger logger)
-            : base(vaultServiceClient, logger)
+            : base(StoreName.Transactions, vaultServiceClient, logger)
         {
         }
     }
