@@ -10,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security;
+using System.Threading;
 using System.Threading.Tasks;
 using Dawn;
 using Microsoft.Extensions.Logging;
@@ -22,6 +23,10 @@ namespace TangramCypher.Model
 {
     public abstract class Repository<TEntity> : IRepository<TEntity> where TEntity : class
     {
+        private static readonly AsyncLock addOrReplaceMutex = new AsyncLock();
+        private static readonly AsyncLock putMutex = new AsyncLock();
+        private static readonly AsyncLock truncateMutex = new AsyncLock();
+
         private readonly IVaultServiceClient vaultServiceClient;
         private readonly ILogger logger;
         private readonly StoreName store;
@@ -54,34 +59,37 @@ namespace TangramCypher.Model
 
             using (var insecureIdentifier = identifier.Insecure())
             {
-                try
+                using (await addOrReplaceMutex.LockAsync())
                 {
-                    var found = false;
-                    var vault = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
-
-                    if (vault.Data.TryGetValue(store.ToString(), out object msgs))
+                    try
                     {
-                        foreach (JObject item in ((JArray)msgs).Children().ToList())
+                        var found = false;
+                        var vault = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
+
+                        if (vault.Data.TryGetValue(store.ToString(), out object msgs))
                         {
-                            var pk = item.GetValue(name.ToString());
-                            found = pk.Value<string>().Equals(key);
+                            foreach (JObject item in ((JArray)msgs).Children().ToList())
+                            {
+                                var pk = item.GetValue(name.ToString());
+                                found = pk.Value<string>().Equals(key);
+                            }
+
+                            if (!found)
+                                ((JArray)msgs).Add(JObject.FromObject(value));
+                            else
+                                ((JArray)msgs).Replace(JObject.FromObject(value));
                         }
-
-                        if (!found)
-                            ((JArray)msgs).Add(JObject.FromObject(value));
                         else
-                            ((JArray)msgs).Replace(JObject.FromObject(value));
+                            vault.Data.Add(store.ToString(), new List<TEntity> { value });
+
+                        await vaultServiceClient.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", vault.Data);
+
+                        added = true;
                     }
-                    else
-                        vault.Data.Add(store.ToString(), new List<TEntity> { value });
-
-                    await vaultServiceClient.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", vault.Data);
-
-                    added = true;
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex.Message);
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex.Message);
+                    }
                 }
             }
 
@@ -188,32 +196,36 @@ namespace TangramCypher.Model
 
             using (var insecureIdentifier = identifier.Insecure())
             {
-                try
+                using (await putMutex.LockAsync())
                 {
-                    var found = false;
-                    var vault = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
-
-                    if (vault.Data.TryGetValue(store.ToString(), out object txs))
+                    try
                     {
-                        foreach (JObject item in ((JArray)txs).Children().ToList())
+                        var found = false;
+                        var vault = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
+
+                        if (vault.Data.TryGetValue(store.ToString(), out object txs))
                         {
-                            var hash = item.GetValue(name.ToString());
-                            found = hash.Value<string>().Equals(key);
+                            foreach (JObject item in ((JArray)txs).Children().ToList())
+                            {
+                                var hash = item.GetValue(name.ToString());
+                                found = hash.Value<string>().Equals(key);
+                            }
+                            if (!found)
+                                ((JArray)txs).Add(JObject.FromObject(value));
                         }
-                        if (!found)
-                            ((JArray)txs).Add(JObject.FromObject(value));
+                        else
+                            vault.Data.Add(store.ToString(), new List<TEntity> { value });
+
+                        await vaultServiceClient.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", vault.Data);
+
+                        added = true;
                     }
-                    else
-                        vault.Data.Add(store.ToString(), new List<TEntity> { value });
-
-                    await vaultServiceClient.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", vault.Data);
-
-                    added = true;
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex.Message);
+                    }
                 }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex.Message);
-                }
+
             }
 
             return added;
@@ -235,20 +247,23 @@ namespace TangramCypher.Model
 
             using (var insecureIdentifier = identifier.Insecure())
             {
-                try
+                using (await truncateMutex.LockAsync())
                 {
-                    var vault = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
+                    try
+                    {
+                        var vault = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
 
-                    if (vault.Data.TryGetValue(store.ToString(), out object txs))
-                        vault.Data.Clear();
+                        if (vault.Data.TryGetValue(store.ToString(), out object txs))
+                            vault.Data.Clear();
 
-                    await vaultServiceClient.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", vault.Data);
+                        await vaultServiceClient.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", vault.Data);
 
-                    cleared = true;
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex.Message);
+                        cleared = true;
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex.Message);
+                    }
                 }
             }
 
