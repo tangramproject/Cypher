@@ -36,8 +36,8 @@ namespace TangramCypher.ApplicationLayer.Coin
         (byte[], byte[]) Split(byte[] blinding, SecureString secret);
         string Stamp();
         CoinService Stamp(string stamp);
-        TransactionCoin TransactionCoin();
-        CoinService TransactionCoin(TransactionCoin transactionCoin);
+        TransactionCoinDto TransactionCoin();
+        CoinService TransactionCoin(TransactionCoinDto transactionCoin);
         CoinDto SwapPartialOne(SecureString secret, CoinDto coin, RedemptionKeyDto redemptionKey);
         int VerifyCoin(CoinDto terminal, CoinDto current);
         int Version();

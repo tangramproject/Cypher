@@ -204,7 +204,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <param name="identifier">Identifier.</param>
         /// <param name="password">Password.</param>
         /// <param name="amount">Amount.</param>
-        public async Task<TransactionCoin> SortChange(SecureString identifier, SecureString password, ulong amount)
+        public async Task<TransactionCoinDto> SortChange(SecureString identifier, SecureString password, ulong amount)
         {
             Guard.Argument(identifier, nameof(identifier)).NotNull();
             Guard.Argument(password, nameof(password)).NotNull();
@@ -214,7 +214,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
             if (txns == null)
                 return null;
 
-            TransactionCoin transactionCoin = null;
+            TransactionCoinDto transactionCoin = null;
             TransactionDto[] txsIn = txns.Where(tx => tx.TransactionType == TransactionType.Receive).OrderBy(tx => tx.Version).ToArray();
             TransactionDto[] target = new TransactionDto[txsIn.Length];
 
@@ -226,7 +226,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
 
                 if (balance >= amountFor)
                 {
-                    transactionCoin = new TransactionCoin
+                    transactionCoin = new TransactionCoinDto
                     {
                         Balance = balance,
                         Input = amount,

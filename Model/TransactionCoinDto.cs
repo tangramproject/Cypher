@@ -9,9 +9,9 @@
 using System.Collections.Generic;
 using TangramCypher.Model;
 
-namespace TangramCypher.ApplicationLayer.Wallet
+namespace TangramCypher.Model
 {
-    public class TransactionCoin
+    public class TransactionCoinDto
     {
         public ulong Balance { get; set; }
         public string Blind { get; set; }

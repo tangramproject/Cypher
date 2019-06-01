@@ -30,7 +30,7 @@ namespace TangramCypher.ApplicationLayer.Coin
         private int version;
         private CoinDto mintedCoin;
         private ProofStruct proofStruct;
-        private TransactionCoin transactionCoin;
+        private TransactionCoinDto transactionCoin;
 
         public CoinService(ILogger logger)
         {
@@ -495,9 +495,9 @@ namespace TangramCypher.ApplicationLayer.Coin
             return this;
         }
 
-        public TransactionCoin TransactionCoin() => transactionCoin;
+        public TransactionCoinDto TransactionCoin() => transactionCoin;
 
-        public CoinService TransactionCoin(TransactionCoin transactionCoin)
+        public CoinService TransactionCoin(TransactionCoinDto transactionCoin)
         {
             this.transactionCoin = transactionCoin;
             return this;

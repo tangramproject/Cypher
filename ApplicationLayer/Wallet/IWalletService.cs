@@ -25,7 +25,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
         byte[] HashPassword(SecureString passphrase);
         Task<ulong> TotalTransactionAmount(SecureString identifier, SecureString password, string stamp);
         Task<TransactionDto> LastTransaction(SecureString identifier, SecureString password, TransactionType transactionType);
-        Task<TransactionCoin> SortChange(SecureString identifier, SecureString password, ulong amount);
+        Task<TransactionCoinDto> SortChange(SecureString identifier, SecureString password, ulong amount);
         byte[] NetworkAddress(CoinDto coin, NetworkApiMethod networkApi = null);
         byte[] NetworkAddress(byte[] pk, NetworkApiMethod networkApi = null);
         string ProverPassword(SecureString password, int version);
