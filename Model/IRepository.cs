@@ -13,11 +13,12 @@ using System.Threading.Tasks;
 
 namespace TangramCypher.Model
 {
-     public interface IRepository<TEntity> where TEntity : class
+    public interface IRepository<TEntity> where TEntity : class
     {
         Task<bool> Put(SecureString identifier, SecureString password, StoreKey name, string key, TEntity value);
         Task<TEntity> Get(SecureString identifier, SecureString password, StoreKey name, string key);
         Task<IEnumerable<TEntity>> All(SecureString identifier, SecureString password);
         Task<bool> Truncate(SecureString identifier, SecureString password);
+        Task<bool> AddOrReplace(SecureString identifier, SecureString password, StoreKey name, string key, TEntity value);
     }
 }

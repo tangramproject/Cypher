@@ -34,6 +34,61 @@ namespace TangramCypher.Model
         }
 
         /// <summary>
+        /// Adds or replaces entity.
+        /// </summary>
+        /// <param name="identifier"></param>
+        /// <param name="password"></param>
+        /// <param name="name"></param>
+        /// <param name="key"></param>
+        /// <param name="value"></param>
+        /// <returns></returns>
+        public async Task<bool> AddOrReplace(SecureString identifier, SecureString password, StoreKey name, string key, TEntity value)
+        {
+            Guard.Argument(identifier, nameof(identifier)).NotNull();
+            Guard.Argument(password, nameof(password)).NotNull();
+            Guard.Argument(name, nameof(name)).In(new StoreKey[] { StoreKey.AddressKey, StoreKey.HashKey, StoreKey.PublicKey, StoreKey.SecretKey });
+            Guard.Argument(key, nameof(key)).NotNull().NotEmpty();
+            Guard.Argument(value, nameof(value)).NotNull();
+
+            bool added = false;
+
+            using (var insecureIdentifier = identifier.Insecure())
+            {
+                try
+                {
+                    var found = false;
+                    var vault = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
+
+                    if (vault.Data.TryGetValue(store.ToString(), out object msgs))
+                    {
+                        foreach (JObject item in ((JArray)msgs).Children().ToList())
+                        {
+                            var pk = item.GetValue(name.ToString());
+                            found = pk.Value<string>().Equals(key);
+                        }
+
+                        if (!found)
+                            ((JArray)msgs).Add(JObject.FromObject(value));
+                        else
+                            ((JArray)msgs).Replace(JObject.FromObject(value));
+                    }
+                    else
+                        vault.Data.Add(store.ToString(), new List<TEntity> { value });
+
+                    await vaultServiceClient.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", vault.Data);
+
+                    added = true;
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex.Message);
+                }
+            }
+
+            return added;
+        }
+
+        /// <summary>
         /// Returns a list of all entities.
         /// </summary>
         /// <param name="identifier"></param>

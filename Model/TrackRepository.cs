@@ -7,14 +7,16 @@
 // work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
 
 using System;
+using Microsoft.Extensions.Logging;
+using TangramCypher.ApplicationLayer.Vault;
 
 namespace TangramCypher.Model
 {
-    public interface IUnitOfWork : IDisposable
+    public class TrackRepository : Repository<TrackDto>, ITrackRepository
     {
-        ITransactionRepository GetTransactionRepository();
-        IRedemptionRepository GetRedemptionRepository();
-        IKeySetRepository GetKeySetRepository();
-        ITrackRepository GetTrackRepository();
+        public TrackRepository(IVaultServiceClient vaultServiceClient, ILogger logger)
+            : base(StoreName.Track, vaultServiceClient, logger)
+        {
+        }
     }
 }

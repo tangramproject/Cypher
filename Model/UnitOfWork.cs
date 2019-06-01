@@ -17,12 +17,14 @@ namespace TangramCypher.Model
         private ITransactionRepository transactionRepository;
         private IRedemptionRepository redemptionRepository;
         private IKeySetRepository keySetRepository;
+        private ITrackRepository trackRepository;
 
         public UnitOfWork(IVaultServiceClient vaultServiceClient, ILogger logger)
         {
             SetTransactionRepository(new TransactionRepository(vaultServiceClient, logger));
             SetRedemptionRepository(new RedemptionRepository(vaultServiceClient, logger));
             SetKeySetRepository(new KeySetRepository(vaultServiceClient, logger));
+            SetTrackRepository(new TrackRepository(vaultServiceClient, logger));
         }
 
         public ITransactionRepository GetTransactionRepository()
@@ -54,7 +56,16 @@ namespace TangramCypher.Model
         {
             keySetRepository = value;
         }
-        
+
+        public ITrackRepository GetTrackRepository()
+        {
+            return trackRepository;
+        }
+
+        private void SetTrackRepository(ITrackRepository value) {
+            trackRepository = value;
+        }
+
         public void Dispose()
         {
             // throw new NotImplementedException();

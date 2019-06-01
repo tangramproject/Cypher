@@ -26,8 +26,6 @@ namespace TangramCypher.ApplicationLayer.Wallet
         Task<ulong> TotalTransactionAmount(SecureString identifier, SecureString password, string stamp);
         Task<TransactionDto> LastTransaction(SecureString identifier, SecureString password, TransactionType transactionType);
         Task<TransactionCoin> SortChange(SecureString identifier, SecureString password, ulong amount);
-        Task<bool> AddMessageTracking(SecureString identifier, SecureString password, MessageTrackDto messageTrack);
-        Task<MessageTrackDto> MessageTrack(SecureString identifier, SecureString password, string pk);
         byte[] NetworkAddress(CoinDto coin, NetworkApiMethod networkApi = null);
         byte[] NetworkAddress(byte[] pk, NetworkApiMethod networkApi = null);
         string ProverPassword(SecureString password, int version);

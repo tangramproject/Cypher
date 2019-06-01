@@ -10,11 +10,8 @@ using System;
 
 namespace TangramCypher.Model
 {
-    public interface IUnitOfWork : IDisposable
+    public interface ITrackRepository : IRepository<TrackDto>
     {
-        ITransactionRepository GetTransactionRepository();
-        IRedemptionRepository GetRedemptionRepository();
-        IKeySetRepository GetKeySetRepository();
-        ITrackRepository GetTrackRepository();
+
     }
 }

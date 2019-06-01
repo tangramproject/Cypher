@@ -372,20 +372,20 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             msgAddress = sharedKey ? pk.ToHex() : Cryptography.GenericHashWithKey(pk.ToHex(), pk).ToHex();
 
-            var msgTrack = await walletService.MessageTrack(Identifier(), MasterKey(), pk.ToHex());
+            var track = await unitOfWork.GetTrackRepository().Get(Identifier(), MasterKey(), StoreKey.PublicKey, pk.ToHex());
 
             UpdateMessagePump("Downloading messages ...");
 
             JObject count = null;
             int countValue = 0;
-            if (msgTrack == null)
+            if (track == null)
                 count = await GetAsync<JObject>(msgAddress, RestApiMethod.MessageCount);
 
             countValue = count == null ? 1 : count.Value<int>("count");
 
-            messages = msgTrack == null
+            messages = track == null
                 ? await GetRangeAsync<MessageDto>(msgAddress, 0, countValue, RestApiMethod.MessageRange)
-                : await GetRangeAsync<MessageDto>(msgAddress, msgTrack.Skip, countValue, RestApiMethod.MessageRange);
+                : await GetRangeAsync<MessageDto>(msgAddress, track.Skip, countValue, RestApiMethod.MessageRange);
 
             if (sharedKey)
                 pk = Util.FormatNetworkAddress(receiverPk);
@@ -524,7 +524,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
                 if (payment)
                 {
-                    var track = new MessageTrackDto
+                    var track = new TrackDto
                     {
                         PublicKey = pk.ToHex(),
                         Skip = skip,
@@ -532,7 +532,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                     };
 
                     //TODO: Could possibility fail.. need recovery..
-                    var added = await walletService.AddMessageTracking(Identifier(), MasterKey(), track);
+                    var added = await unitOfWork.GetTrackRepository().AddOrReplace(Identifier(), MasterKey(), StoreKey.PublicKey, track.PublicKey, track);
                 }
 
                 skip++;
