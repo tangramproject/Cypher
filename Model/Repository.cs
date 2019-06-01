@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Security;
 using System.Threading.Tasks;
+using Dawn;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 using TangramCypher.ApplicationLayer.Actor;
@@ -41,6 +42,9 @@ namespace TangramCypher.Model
         /// <returns></returns>
         public async Task<IEnumerable<TEntity>> All(SecureString identifier, SecureString password)
         {
+            Guard.Argument(identifier, nameof(identifier)).NotNull();
+            Guard.Argument(password, nameof(password)).NotNull();
+
             IEnumerable<TEntity> List = null;
 
             using (var insecureIdentifier = identifier.Insecure())
@@ -73,6 +77,11 @@ namespace TangramCypher.Model
         /// <returns></returns>
         public async Task<TEntity> Get(SecureString identifier, SecureString password, StoreKey name, string key)
         {
+            Guard.Argument(identifier, nameof(identifier)).NotNull();
+            Guard.Argument(password, nameof(password)).NotNull();
+            Guard.Argument(name, nameof(name)).In(new StoreKey[] { StoreKey.AddressKey, StoreKey.HashKey, StoreKey.PublicKey, StoreKey.SecretKey });
+            Guard.Argument(key, nameof(key)).NotNull().NotEmpty();
+
             TEntity tEntity = default(TEntity);
 
             using (var insecureIdentifier = identifier.Insecure())
@@ -114,6 +123,12 @@ namespace TangramCypher.Model
         /// <returns></returns>
         public async Task<bool> Put(SecureString identifier, SecureString password, StoreKey name, string key, TEntity value)
         {
+            Guard.Argument(identifier, nameof(identifier)).NotNull();
+            Guard.Argument(password, nameof(password)).NotNull();
+            Guard.Argument(name, nameof(name)).In(new StoreKey[] { StoreKey.AddressKey, StoreKey.HashKey, StoreKey.PublicKey, StoreKey.SecretKey });
+            Guard.Argument(key, nameof(key)).NotNull().NotEmpty();
+            Guard.Argument(value, nameof(value)).NotNull();
+
             bool added = false;
 
             using (var insecureIdentifier = identifier.Insecure())
@@ -158,6 +173,9 @@ namespace TangramCypher.Model
         /// <returns></returns>
         public async Task<bool> Truncate(SecureString identifier, SecureString password)
         {
+            Guard.Argument(identifier, nameof(identifier)).NotNull();
+            Guard.Argument(password, nameof(password)).NotNull();
+
             bool cleared = false;
 
             using (var insecureIdentifier = identifier.Insecure())
