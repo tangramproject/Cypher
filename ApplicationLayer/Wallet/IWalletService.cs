@@ -31,7 +31,6 @@ namespace TangramCypher.ApplicationLayer.Wallet
         byte[] NetworkAddress(CoinDto coin, NetworkApiMethod networkApi = null);
         byte[] NetworkAddress(byte[] pk, NetworkApiMethod networkApi = null);
         string ProverPassword(SecureString password, int version);
-        Task<string> RandomAddress(SecureString identifier, SecureString password);
         Task<string> Profile(SecureString identifier, SecureString password);
         Task<IEnumerable<string>> WalletList();
         ulong MulWithNaT(ulong value);

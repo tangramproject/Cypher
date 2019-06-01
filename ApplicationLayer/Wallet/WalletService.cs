@@ -282,43 +282,6 @@ namespace TangramCypher.ApplicationLayer.Wallet
         }
 
         /// <summary>
-        /// Select random address.
-        /// </summary>
-        /// <returns>The address.</returns>
-        /// <param name="identifier">Identifier.</param>
-        /// <param name="password">Password.</param>
-        public async Task<string> RandomAddress(SecureString identifier, SecureString password)
-        {
-            Guard.Argument(identifier, nameof(identifier)).NotNull();
-            Guard.Argument(password, nameof(password)).NotNull();
-
-            string address = null;
-
-            using (var insecureIdentifier = identifier.Insecure())
-            {
-                try
-                {
-                    var data = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
-
-                    if (data.Data.TryGetValue("storeKeys", out object keys))
-                    {
-                        var rnd = new Random();
-                        var pkSks = ((JArray)keys).ToObject<List<KeySetDto>>();
-
-                        address = pkSks[rnd.Next(pkSks.Count())].Address;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex.Message);
-                    throw ex;
-                }
-            }
-
-            return address;
-        }
-
-        /// <summary>
         /// Sorts the change.
         /// </summary>
         /// <returns>The change.</returns>

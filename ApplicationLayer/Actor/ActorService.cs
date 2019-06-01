@@ -765,7 +765,8 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <returns>The random address.</returns>
         public async Task SetRandomAddress()
         {
-            FromAddress(await walletService.RandomAddress(Identifier(), MasterKey()));
+            var rnd = await unitOfWork.GetKeySetRepository().RandomAddress(Identifier(), MasterKey());
+            FromAddress(rnd);
         }
 
         /// <summary>
