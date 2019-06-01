@@ -6,14 +6,14 @@
 // You should have received a copy of the license along with this
 // work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
 
-using System;
+using System.Security;
 
 namespace TangramCypher.Model
 {
-    public interface IUnitOfWork : IDisposable
+    public class KeySetDto
     {
-        ITransactionRepository GetTransactionRepository();
-        IRedemptionRepository GetRedemptionRepository();
-        IKeySetRepository GetKeySetRepository();
+        public string PublicKey;
+        public string SecretKey;
+        public string Address;
     }
 }

@@ -316,13 +316,13 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <returns>The box seal.</returns>
         /// <param name="cypher">Cypher.</param>
         /// <param name="pkSkDto">Pk sk dto.</param>
-        public string OpenBoxSeal(string cypher, PkSkDto pkSkDto)
+        public string OpenBoxSeal(string cypher, KeySetDto keySet)
         {
             Guard.Argument(cypher, nameof(cypher)).NotNull().NotEmpty();
-            Guard.Argument(pkSkDto, nameof(pkSkDto)).NotNull();
+            Guard.Argument(keySet, nameof(keySet)).NotNull();
 
-            var pk = Encoding.UTF8.GetBytes(pkSkDto.PublicKey);
-            var sk = Encoding.UTF8.GetBytes(pkSkDto.SecretKey);
+            var pk = Encoding.UTF8.GetBytes(keySet.PublicKey);
+            var sk = Encoding.UTF8.GetBytes(keySet.SecretKey);
             var message = Cryptography.OpenBoxSeal(Encoding.UTF8.GetBytes(cypher), new KeyPair(pk, sk));
 
             return message;
@@ -817,7 +817,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         public async Task<JObject> SendPaymentMessage(bool send)
         {
             var msgStore = RedemptionKeyMessage();
-            
+
             //TODO: Could possibility fail.. need recovery..
             var added = await unitOfWork.GetRedemptionRepository().Put(Identifier(), MasterKey(), StoreKey.HashKey, msgStore.Hash, msgStore);
 
@@ -841,13 +841,15 @@ namespace TangramCypher.ApplicationLayer.Actor
             });
         }
 
+        //TODO: Need a better way of handling secret key.. 
         /// <summary>
         /// Sets the secret key.
         /// </summary>
         /// <returns>The secret key.</returns>
         public async Task SetSecretKey()
         {
-            SecretKey(await walletService.StoreKey(Identifier(), MasterKey(), StoreKeyApiMethod.SecretKey, FromAddress()));
+            var keySet = await unitOfWork.GetKeySetRepository().Get(Identifier(), MasterKey(), StoreKey.AddressKey, FromAddress());
+            SecretKey(keySet.SecretKey.ToSecureString());
         }
 
         /// <summary>
@@ -856,7 +858,8 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <returns>The public key.</returns>
         public async Task SetPublicKey()
         {
-            PublicKey(await walletService.StoreKey(Identifier(), MasterKey(), StoreKeyApiMethod.PublicKey, FromAddress()));
+            var keySet = await unitOfWork.GetKeySetRepository().Get(Identifier(), MasterKey(), StoreKey.AddressKey, FromAddress());
+            PublicKey(keySet.PublicKey.ToSecureString());
         }
 
         /// <summary>

@@ -38,9 +38,9 @@ namespace TangramCypher.ApplicationLayer.Controllers
         [HttpPost("address", Name = "CreateWalletAddress")]
         public async Task<IActionResult> CreateWalletAddress([FromBody] CredentialsDto credentials)
         {
-            var pksk = walletService.CreatePkSk();
-            var added = await walletService.Put(credentials.Identifier.ToSecureString(), credentials.Password.ToSecureString(), pksk.Address, pksk, "storeKeys", "Address");
-
+            var keySet = walletService.CreateKeySet();
+            var added = await unitOfWork.GetKeySetRepository().Put(credentials.Identifier.ToSecureString(), credentials.Password.ToSecureString(), StoreKey.AddressKey, keySet.Address, keySet);
+            
             if (added)
                 return new CreatedResult("httpWallet", new { success = added });
 

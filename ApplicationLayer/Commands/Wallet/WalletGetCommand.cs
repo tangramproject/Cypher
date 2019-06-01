@@ -15,6 +15,7 @@ using TangramCypher.ApplicationLayer.Wallet;
 using Newtonsoft.Json.Linq;
 using System.Collections.Generic;
 using ConsoleTables;
+using TangramCypher.Model;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
 {
@@ -46,7 +47,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                     var storeKeys = JObject
                                     .FromObject(data["data"])
                                     .GetValue("storeKeys")
-                                    .ToObject<List<PkSkDto>>();
+                                    .ToObject<List<KeySetDto>>();
 
                     var table = new ConsoleTable("Address");
 

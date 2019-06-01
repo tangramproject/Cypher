@@ -13,6 +13,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using TangramCypher.ApplicationLayer.Wallet;
 using TangramCypher.Helper;
+using TangramCypher.Model;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
 {
@@ -21,11 +22,13 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
     {
         readonly IConsole console;
         readonly IWalletService walletService;
+        readonly IUnitOfWork unitOfWork;
 
         public WalletAddressCommand(IServiceProvider serviceProvider)
         {
             console = serviceProvider.GetService<IConsole>();
             walletService = serviceProvider.GetService<IWalletService>();
+            unitOfWork = serviceProvider.GetService<IUnitOfWork>();
         }
 
         public async override Task Execute()
@@ -35,10 +38,10 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                 using (var identifier = Prompt.GetPasswordAsSecureString("Identifier:", ConsoleColor.Yellow))
                 using (var password = Prompt.GetPasswordAsSecureString("Password:", ConsoleColor.Yellow))
                 {
-                    var pksk = walletService.CreatePkSk();
-                    var added = await walletService.Put(identifier, password, pksk.Address, pksk, "storeKeys", "Address");
+                    var keySet = walletService.CreateKeySet();
+                    var added = await unitOfWork.GetKeySetRepository().Put(identifier, password, StoreKey.AddressKey, keySet.Address, keySet);
 
-                    if(added)
+                    if (added)
                     {
                         console.ForegroundColor = ConsoleColor.Magenta;
                         console.WriteLine("\nWallet Key set added!\n");

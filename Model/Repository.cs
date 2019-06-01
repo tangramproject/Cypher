@@ -97,7 +97,7 @@ namespace TangramCypher.Model
                             var obj = item.GetValue(name.ToString());
                             if (obj.Value<string>().Equals(key))
                             {
-                                tEntity = obj.ToObject<TEntity>();
+                                tEntity = item.ToObject<TEntity>();
                             }
                         }
                     }

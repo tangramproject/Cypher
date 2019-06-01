@@ -68,11 +68,11 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// Creates new secret/public address key.
         /// </summary>
         /// <returns>The pk sk.</returns>
-        public PkSkDto CreatePkSk()
+        public KeySetDto CreateKeySet()
         {
             var kp = Cryptography.KeyPair();
 
-            return new PkSkDto()
+            return new KeySetDto()
             {
                 PublicKey = kp.PublicKey.ToHex(),
                 SecretKey = kp.SecretKey.ToHex(),
@@ -88,7 +88,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
         {
             var walletId = NewID(16);
             var passphrase = Passphrase();
-            var pkSk = CreatePkSk();
+            var pkSk = CreateKeySet();
 
             walletId.MakeReadOnly();
             passphrase.MakeReadOnly();
@@ -99,7 +99,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
 
                 var dic = new Dictionary<string, object>
                 {
-                    { "storeKeys", new List<PkSkDto> { pkSk } }
+                    { "storeKeys", new List<KeySetDto> { pkSk } }
                 };
 
                 await vaultServiceClient.SaveDataAsync(
@@ -203,46 +203,6 @@ namespace TangramCypher.ApplicationLayer.Wallet
             return added;
         }
 
-        public async Task<bool> Put<T>(SecureString identifier, SecureString password, string key, T value, string storeName, string keyName)
-        {
-            Guard.Argument(identifier, nameof(identifier)).NotNull();
-            Guard.Argument(password, nameof(password)).NotNull();
-
-            bool added = false;
-
-            using (var insecureIdentifier = identifier.Insecure())
-            {
-                try
-                {
-                    var found = false;
-                    var data = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
-
-                    if (data.Data.TryGetValue(storeName, out object txs))
-                    {
-                        foreach (JObject item in ((JArray)txs).Children().ToList())
-                        {
-                            var hash = item.GetValue(keyName);
-                            found = hash.Value<string>().Equals(key);
-                        }
-                        if (!found)
-                            ((JArray)txs).Add(JObject.FromObject(value));
-                    }
-                    else
-                        data.Data.Add(storeName, new List<T> { value });
-
-                    await vaultServiceClient.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", data.Data);
-
-                    added = true;
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex.Message);
-                }
-            }
-
-            return added;
-        }
-
         /// <summary>
         /// Gets the stored message track.
         /// </summary>
@@ -322,88 +282,6 @@ namespace TangramCypher.ApplicationLayer.Wallet
         }
 
         /// <summary>
-        /// Gets the store key.
-        /// </summary>
-        /// <returns>The store key.</returns>
-        /// <param name="identifier">Identifier.</param>
-        /// <param name="password">Password.</param>
-        /// <param name="storeKey">Store key.</param>
-        public async Task<SecureString> StoreKey(SecureString identifier, SecureString password, string storeKey)
-        {
-            Guard.Argument(identifier, nameof(identifier)).NotNull();
-            Guard.Argument(password, nameof(password)).NotNull();
-            Guard.Argument(storeKey, nameof(storeKey)).NotNull().NotEmpty();
-
-            var secureString = new SecureString();
-
-            using (var insecureIdentifier = identifier.Insecure())
-            {
-                try
-                {
-                    var data = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
-                    var storeKeys = JObject.FromObject(data.Data["storeKeys"]);
-                    var key = storeKeys.GetValue(storeKey).Value<string>();
-
-                    foreach (var c in key) secureString.AppendChar(Convert.ToChar(c));
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex.Message);
-                    throw ex;
-                }
-            }
-
-            return secureString;
-        }
-
-        /// <summary>
-        ///  Gets the store key from the address.
-        /// </summary>
-        /// <returns>The key.</returns>
-        /// <param name="identifier">Identifier.</param>
-        /// <param name="password">Password.</param>
-        /// <param name="storeKeyApi">Store key API.</param>
-        /// <param name="address">Address.</param>
-        public async Task<SecureString> StoreKey(SecureString identifier, SecureString password, StoreKeyApiMethod storeKeyApi, string address)
-        {
-            Guard.Argument(identifier, nameof(identifier)).NotNull();
-            Guard.Argument(password, nameof(password)).NotNull();
-            Guard.Argument(address, nameof(address)).NotNull().NotEmpty();
-
-            SecureString secureString = null;
-
-            using (var insecureIdentifier = identifier.Insecure())
-            {
-                try
-                {
-                    var data = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
-
-                    if (data.Data.TryGetValue("storeKeys", out object keys))
-                    {
-                        foreach (JObject item in ((JArray)keys).Children().ToList())
-                        {
-                            var addressKey = item.GetValue("Address");
-                            if (addressKey.Value<string>().Equals(address))
-                            {
-                                var key = item.GetValue(storeKeyApi.ToString()).Value<string>();
-
-                                secureString = new SecureString();
-
-                                foreach (var c in key) secureString.AppendChar(Convert.ToChar(c));
-                            }
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex.Message);
-                }
-            }
-
-            return secureString;
-        }
-
-        /// <summary>
         /// Select random address.
         /// </summary>
         /// <returns>The address.</returns>
@@ -425,7 +303,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
                     if (data.Data.TryGetValue("storeKeys", out object keys))
                     {
                         var rnd = new Random();
-                        var pkSks = ((JArray)keys).ToObject<List<PkSkDto>>();
+                        var pkSks = ((JArray)keys).ToObject<List<KeySetDto>>();
 
                         address = pkSks[rnd.Next(pkSks.Count())].Address;
                     }

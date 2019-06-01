@@ -37,7 +37,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         ActorService Identifier(SecureString walletId);
         string Memo();
         ActorService Memo(string text);
-        string OpenBoxSeal(string cypher, PkSkDto pkSkDto);
+        string OpenBoxSeal(string cypher, KeySetDto keySet);
         SecureString PublicKey();
         ActorService PublicKey(SecureString pk);
         Task ReceivePayment();

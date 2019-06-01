@@ -18,15 +18,13 @@ namespace TangramCypher.ApplicationLayer.Wallet
     public interface IWalletService
     {
         Task<ulong> AvailableBalance(SecureString identifier, SecureString password);
-        PkSkDto CreatePkSk();
+        KeySetDto CreateKeySet();
         Task<CredentialsDto> CreateWallet();
         SecureString NewID(int bytes = 32);
         SecureString Passphrase();
         byte[] HashPassword(SecureString passphrase);
         Task<ulong> TotalTransactionAmount(SecureString identifier, SecureString password, string stamp);
         Task<TransactionDto> LastTransaction(SecureString identifier, SecureString password, TransactionType transactionType);
-        Task<SecureString> StoreKey(SecureString identifier, SecureString password, string storeKey);
-        Task<SecureString> StoreKey(SecureString identifier, SecureString password, StoreKeyApiMethod storeKeyApi, string address);
         Task<TransactionCoin> SortChange(SecureString identifier, SecureString password, ulong amount);
         Task<bool> AddMessageTracking(SecureString identifier, SecureString password, MessageTrackDto messageTrack);
         Task<MessageTrackDto> MessageTrack(SecureString identifier, SecureString password, string pk);
@@ -38,6 +36,5 @@ namespace TangramCypher.ApplicationLayer.Wallet
         Task<IEnumerable<string>> WalletList();
         ulong MulWithNaT(ulong value);
         ulong DivWithNaT(ulong value);
-        Task<bool> Put<T>(SecureString identifier, SecureString password, string key, T value, string storeName, string keyName);
     }
 }
