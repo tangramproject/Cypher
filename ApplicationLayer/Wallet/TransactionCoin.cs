@@ -12,11 +12,11 @@ namespace TangramCypher.ApplicationLayer.Wallet
 {
     public class TransactionCoin
     {
-        public double Balance { get; set; }
+        public ulong Balance { get; set; }
         public string Blind { get; set; }
         public IList<TransactionDto> Chain { get; set; }
-        public double Input { get; set; }
-        public double Output { get; set; }
+        public ulong Input { get; set; }
+        public ulong Output { get; set; }
         public bool Spent { get; set; }
         public string Stamp { get; set; }
         public int Version { get; set; }

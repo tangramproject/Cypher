@@ -51,7 +51,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <returns>The balance.</returns>
         /// <param name="identifier">Identifier.</param>
         /// <param name="password">Password.</param>
-        public async Task<double> AvailableBalance(SecureString identifier, SecureString password)
+        public async Task<ulong> AvailableBalance(SecureString identifier, SecureString password)
         {
             Guard.Argument(identifier, nameof(identifier)).NotNull();
             Guard.Argument(password, nameof(password)).NotNull();
@@ -59,45 +59,6 @@ namespace TangramCypher.ApplicationLayer.Wallet
             var transactions = await Transactions(identifier, password);
 
             return Balance(identifier, password, transactions);
-        }
-
-        /// <summary>
-        /// Adds the keys.
-        /// </summary>
-        /// <returns>The keys.</returns>
-        /// <param name="identifier">Identifier.</param>
-        /// <param name="password">Password.</param>
-        /// <param name="pkSk">Pk sk.</param>
-        public async Task<bool> AddKey(SecureString identifier, SecureString password, PkSkDto pkSk)
-        {
-            Guard.Argument(identifier, nameof(identifier)).NotNull();
-            Guard.Argument(password, nameof(password)).NotNull();
-            Guard.Argument(pkSk, nameof(pkSk)).NotNull();
-
-            bool added = false;
-
-            using (var insecureIdentifier = identifier.Insecure())
-            {
-                try
-                {
-                    var data = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
-
-                    if (data.Data.TryGetValue("storeKeys", out object keys))
-                    {
-                        ((JArray)keys).Add(JObject.FromObject(pkSk));
-
-                        await vaultServiceClient.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", data.Data);
-
-                        added = true;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex.Message);
-                }
-            }
-
-            return added;
         }
 
         /// <summary>
@@ -188,55 +149,6 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <param name="passphrase">Passphrase.</param>
         public byte[] HashPassword(SecureString passphrase) => Cryptography.ArgonHashPassword(passphrase);
 
-
-        /// <summary>
-        /// Adds the transaction.
-        /// </summary>
-        /// <returns>The transaction.</returns>
-        /// <param name="identifier">Identifier.</param>
-        /// <param name="password">Password.</param>
-        /// <param name="transaction">Transaction.</param>
-        public async Task<bool> AddTransaction(SecureString identifier, SecureString password, TransactionDto transaction)
-        {
-            Guard.Argument(identifier, nameof(identifier)).NotNull();
-            Guard.Argument(password, nameof(password)).NotNull();
-            Guard.Argument(transaction, nameof(transaction)).NotNull();
-
-            bool added = false;
-
-            using (var insecureIdentifier = identifier.Insecure())
-            {
-                try
-                {
-                    var found = false;
-                    var data = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
-
-                    if (data.Data.TryGetValue("transactions", out object txs))
-                    {
-                        foreach (JObject item in ((JArray)txs).Children().ToList())
-                        {
-                            var hash = item.GetValue("Hash");
-                            found = hash.Value<string>().Equals(transaction.Hash);
-                        }
-                        if (!found)
-                            ((JArray)txs).Add(JObject.FromObject(transaction));
-                    }
-                    else
-                        data.Data.Add("transactions", new List<TransactionDto> { transaction });
-
-                    await vaultServiceClient.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", data.Data);
-
-                    added = true;
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex.Message);
-                }
-            }
-
-            return added;
-        }
-
         /// <summary>
         /// Adds message tracking.
         /// </summary>
@@ -259,7 +171,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
                     var found = false;
                     var data = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
 
-                    if (data.Data.TryGetValue("messages", out object msgs))
+                    if (data.Data.TryGetValue("track", out object msgs))
                     {
                         foreach (JObject item in ((JArray)msgs).Children().ToList())
                         {
@@ -273,7 +185,47 @@ namespace TangramCypher.ApplicationLayer.Wallet
                             ((JArray)msgs).Replace(JObject.FromObject(messageTrack));
                     }
                     else
-                        data.Data.Add("messages", new List<MessageTrackDto> { messageTrack });
+                        data.Data.Add("track", new List<MessageTrackDto> { messageTrack });
+
+                    await vaultServiceClient.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", data.Data);
+
+                    added = true;
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex.Message);
+                }
+            }
+
+            return added;
+        }
+
+        public async Task<bool> Put<T>(SecureString identifier, SecureString password, string key, T value, string storeName, string keyName)
+        {
+            Guard.Argument(identifier, nameof(identifier)).NotNull();
+            Guard.Argument(password, nameof(password)).NotNull();
+
+            bool added = false;
+
+            using (var insecureIdentifier = identifier.Insecure())
+            {
+                try
+                {
+                    var found = false;
+                    var data = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
+
+                    if (data.Data.TryGetValue(storeName, out object txs))
+                    {
+                        foreach (JObject item in ((JArray)txs).Children().ToList())
+                        {
+                            var hash = item.GetValue(keyName);
+                            found = hash.Value<string>().Equals(key);
+                        }
+                        if (!found)
+                            ((JArray)txs).Add(JObject.FromObject(value));
+                    }
+                    else
+                        data.Data.Add(storeName, new List<T> { value });
 
                     await vaultServiceClient.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", data.Data);
 
@@ -349,23 +301,22 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <param name="identifier">Identifier.</param>
         /// <param name="password">Password.</param>
         /// <param name="stamp">Stamp.</param>
-        public async Task<double> TransactionAmount(SecureString identifier, SecureString password, string stamp)
+        public async Task<ulong> TransactionAmount(SecureString identifier, SecureString password, string stamp)
         {
             Guard.Argument(identifier, nameof(identifier)).NotNull();
             Guard.Argument(password, nameof(password)).NotNull();
             Guard.Argument(stamp, nameof(stamp)).NotNull().NotEmpty();
 
-            var total = 0.0D;
+            var total = 0UL;
             var transactions = await Transactions(identifier, password);
 
             if (transactions == null)
-                return -1;
+                return 0;
 
             var transaction = transactions.Select(tx =>
             {
                 if (tx.Stamp.Equals(stamp))
-                    if (double.TryParse(tx.Amount.ToString(), out double t))
-                        total = t;
+                    total = tx.Amount;
 
                 return total;
             });
@@ -379,7 +330,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <returns>The transaction amount.</returns>
         /// <param name="identifier">Identifier.</param>
         /// <param name="password">Password.</param>
-        public async Task<double> LastTransactionAmount(SecureString identifier, SecureString password, TransactionType transactionType)
+        public async Task<ulong> LastTransactionAmount(SecureString identifier, SecureString password, TransactionType transactionType)
         {
             Guard.Argument(identifier, nameof(identifier)).NotNull();
             Guard.Argument(password, nameof(password)).NotNull();
@@ -550,11 +501,10 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <param name="identifier">Identifier.</param>
         /// <param name="password">Password.</param>
         /// <param name="amount">Amount.</param>
-        public async Task<TransactionCoin> SortChange(SecureString identifier, SecureString password, double amount)
+        public async Task<TransactionCoin> SortChange(SecureString identifier, SecureString password, ulong amount)
         {
             Guard.Argument(identifier, nameof(identifier)).NotNull();
             Guard.Argument(password, nameof(password)).NotNull();
-            Guard.Argument(amount, nameof(amount)).NotNaN().NotNegative();
 
             var transactions = await Transactions(identifier, password);
 
@@ -642,19 +592,19 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <param name="identifier">Identifier.</param>
         /// <param name="password">Password.</param>
         /// <param name="transactions">Transactions.</param>
-        private double Balance(SecureString identifier, SecureString password, List<TransactionDto> transactions)
+        private ulong Balance(SecureString identifier, SecureString password, List<TransactionDto> transactions)
         {
-            var total = 0.0d;
+            var total = 0UL;
 
             if (transactions != null)
             {
-                double? pocket = null;
-                double? burnt = null;
+                ulong? pocket = null;
+                ulong? burnt = null;
 
                 try
                 {
-                    pocket = transactions.Where(tx => tx.TransactionType == TransactionType.Receive).Sum(p => p.Amount);
-                    burnt = transactions.Where(tx => tx.TransactionType == TransactionType.Send).Sum(p => p.Amount);
+                    pocket = Sum(transactions.Where(tx => tx.TransactionType == TransactionType.Receive).Select(p => p.Amount));
+                    burnt = Sum(transactions.Where(tx => tx.TransactionType == TransactionType.Send).Select(p => p.Amount));
                 }
                 catch (Exception ex)
                 {
@@ -685,9 +635,8 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <returns>The change.</returns>
         /// <param name="amount">Amount.</param>
         /// <param name="transactions">Transactions.</param>
-        private (TransactionDto, double) CalculateChange(double amount, TransactionDto[] transactions)
+        private (TransactionDto, ulong) CalculateChange(ulong amount, TransactionDto[] transactions)
         {
-            Guard.Argument(amount, nameof(amount)).NotNaN().NotNegative();
             Guard.Argument(transactions, nameof(transactions)).NotNull();
 
             int count;
@@ -695,16 +644,16 @@ namespace TangramCypher.ApplicationLayer.Wallet
 
             for (var i = 0; i < transactions.Length; i++)
             {
-                count = (int)(amount / Math.Abs(transactions[i].Amount));
+                count = (int)(amount / transactions[i].Amount);
                 if (count != 0)
                     for (int k = 0; k < count; k++) tempTxs.Add(transactions[i]);
 
                 amount %= transactions[i].Amount;
             }
 
-            var sum = tempTxs.Sum(s => Math.Abs(s.Amount));
-            var remainder = Math.Abs(amount - sum);
-            var closest = transactions.Select(x => Math.Abs(x.Amount)).Aggregate((x, y) => Math.Abs(x - remainder) < Math.Abs(y - remainder) ? x : y);
+            var sum = Sum(tempTxs.Select(s => s.Amount));
+            var remainder = amount - sum;
+            var closest = transactions.Select(x => x.Amount).Aggregate((x, y) => x - remainder < y - remainder ? x : y);
             var tx = transactions.FirstOrDefault(a => a.Amount.Equals(closest));
 
             return (tx, remainder);
@@ -719,6 +668,11 @@ namespace TangramCypher.ApplicationLayer.Wallet
         public byte[] NetworkAddress(CoinDto coin, NetworkApiMethod networkApi = null)
         {
             Guard.Argument(coin, nameof(coin)).NotNull();
+
+            //TODO: Will remove the need to format to and from base64..
+            try
+            { coin = coin.FormatCoinFromBase64(); }
+            catch (FormatException) { }
 
             string env = string.Empty;
             byte[] address = new byte[33];
@@ -737,7 +691,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
                 $" {coin.Principle}" +
                 $" {coin.Stamp}" +
                 $" {coin.Version}",
-                Encoding.UTF8.GetBytes(coin.Principle));
+                coin.Principle.FromHex());
 
             Array.Copy(hash, 0, address, 1, 32);
 
@@ -812,6 +766,30 @@ namespace TangramCypher.ApplicationLayer.Wallet
             }
 
             return cleared;
+        }
+
+        /// <summary>
+        /// naT UInt64 format.
+        /// </summary>
+        /// <returns>The t.</returns>
+        /// <param name="value">Value.</param>
+        public ulong MulWithNaT(ulong value) => (ulong)(value * Constant.NanoTan);
+
+        /// <summary>
+        /// naT UInt64 format.
+        /// </summary>
+        /// <param name="value"></param>
+        /// <returns></returns>
+        public ulong DivWithNaT(ulong value) => (ulong)(value / Constant.NanoTan);
+
+        private static ulong Sum(IEnumerable<ulong> source)
+        {
+            var sum = 0UL;
+            foreach (var number in source)
+            {
+                sum += number;
+            }
+            return sum;
         }
     }
 }

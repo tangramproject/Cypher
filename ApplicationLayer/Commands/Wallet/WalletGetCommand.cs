@@ -12,6 +12,9 @@ using Microsoft.Extensions.DependencyInjection;
 using McMaster.Extensions.CommandLineUtils;
 using TangramCypher.Helper;
 using TangramCypher.ApplicationLayer.Wallet;
+using Newtonsoft.Json.Linq;
+using System.Collections.Generic;
+using ConsoleTables;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
 {
@@ -35,7 +38,23 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                 using (var id = identifier.Insecure())
                 {
                     var profile = await walletService.Profile(identifier, password);
-                    console.WriteLine(profile);
+
+                    var data = JObject
+                                .Parse(profile)
+                                .ToObject<Dictionary<string, object>>();
+
+                    var storeKeys = JObject
+                                    .FromObject(data["data"])
+                                    .GetValue("storeKeys")
+                                    .ToObject<List<PkSkDto>>();
+
+                    var table = new ConsoleTable("Address");
+
+                    foreach (var key in storeKeys)
+                        table.AddRow(key.Address);
+
+                    console.WriteLine(table);
+
                 }
             }
         }

@@ -36,7 +36,7 @@ namespace TangramCypher.ApplicationLayer.Controllers
         public async Task<IActionResult> CreateWalletAddress([FromBody] CredentialsDto credentials)
         {
             var pksk = walletService.CreatePkSk();
-            var added = await walletService.AddKey(credentials.Identifier.ToSecureString(), credentials.Password.ToSecureString(), pksk);
+            var added = await walletService.Put(credentials.Identifier.ToSecureString(), credentials.Password.ToSecureString(), pksk.Address, pksk, "storeKeys", "Address");
 
             if (added)
                 return new CreatedResult("httpWallet", new { success = added });
@@ -131,7 +131,7 @@ namespace TangramCypher.ApplicationLayer.Controllers
                 if (sendPaymentDto.CreateRedemptionKey)
                 {
                     var message = await actorService.SendPaymentMessage(false);
-                    var notification = message.GetValue("message").ToObject<NotificationDto>();
+                    var notification = message.GetValue("message").ToObject<MessageDto>();
 
                     return new OkObjectResult(new { message = notification });
                 }

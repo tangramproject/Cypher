@@ -93,6 +93,8 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                                 case false:
                                     var localMessage = await actorService.SendPaymentMessage(false);
 
+                                    spinner.Stop();
+
                                     SaveRedemptionKeyLocal(localMessage);
 
                                     break;
@@ -114,7 +116,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
 
         private void SaveRedemptionKeyLocal(JObject message)
         {
-            var notification = message.GetValue("message").ToObject<NotificationDto>();
+            var msg = message.GetValue("message").ToObject<MessageDto>();
 
             console.ForegroundColor = ConsoleColor.Magenta;
             console.WriteLine("\nOptions:");
@@ -128,7 +130,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
             var content =
                 "--------------Begin Redemption Key--------------" +
                 Environment.NewLine +
-                JsonConvert.SerializeObject(notification) +
+                JsonConvert.SerializeObject(msg) +
                 Environment.NewLine +
                 "--------------End Redemption Key----------------";
 
