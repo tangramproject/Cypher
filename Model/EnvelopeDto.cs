@@ -6,16 +6,14 @@
 // You should have received a copy of the license along with this
 // work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
 
-using System;
-using System.ComponentModel.DataAnnotations;
-
-namespace TangramCypher.ApplicationLayer.Wallet
+namespace TangramCypher.Model
 {
-    public class CredentialsDto
+    public class EnvelopeDto
     {
-        [Required]
-        public string Identifier { get; set; }
-        [Required]
-        public string Password { get; set; }
+        public string Commitment { get; set; }
+        public string Proof { get; set; }
+        public string PublicKey { get; set; }
+        public string Signature { get; set; }
+        public string Sum { get; set; }
     }
 }

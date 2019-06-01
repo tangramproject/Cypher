@@ -11,6 +11,7 @@ using System.Security;
 using Secp256k1_ZKP.Net;
 using TangramCypher.ApplicationLayer.Actor;
 using TangramCypher.ApplicationLayer.Wallet;
+using TangramCypher.Model;
 
 namespace TangramCypher.ApplicationLayer.Coin
 {

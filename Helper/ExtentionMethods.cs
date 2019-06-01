@@ -17,6 +17,7 @@ using System.Text;
 using Newtonsoft.Json;
 using Sodium;
 using TangramCypher.ApplicationLayer.Coin;
+using TangramCypher.Model;
 
 namespace TangramCypher.Helper
 {

@@ -23,6 +23,7 @@ using System.Dynamic;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Logging;
 using Sodium;
+using TangramCypher.Model;
 
 namespace TangramCypher.Helper
 {
