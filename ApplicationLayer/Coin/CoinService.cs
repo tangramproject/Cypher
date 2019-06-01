@@ -19,6 +19,7 @@ using System.Text;
 using TangramCypher.ApplicationLayer.Wallet;
 using Dawn;
 using Microsoft.Extensions.Logging;
+using TangramCypher.Model;
 
 namespace TangramCypher.ApplicationLayer.Coin
 {

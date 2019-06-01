@@ -13,19 +13,20 @@ using TangramCypher.ApplicationLayer.Wallet;
 using Microsoft.Extensions.DependencyInjection;
 using ConsoleTables;
 using System.Linq;
+using TangramCypher.Model;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
 {
     [CommandDescriptor(new string[] { "wallet", "transactions" }, "List wallet transactions")]
     public class WalletTxHistoryCommand: Command
     {
-        readonly IConsole console;
-        readonly IWalletService walletService;
+        private readonly IConsole console;
+        private readonly IUnitOfWork unitOfWork;
 
         public WalletTxHistoryCommand(IServiceProvider serviceProvider)
         {
             console = serviceProvider.GetService<IConsole>();
-            walletService = serviceProvider.GetService<IWalletService>();
+            unitOfWork = serviceProvider.GetService<IUnitOfWork>();
         }
 
         public async override Task Execute()
@@ -35,9 +36,9 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
             {
                 try
                 {
-                    var transactions = await walletService.Transactions(identifier, password);
-                    var txs = transactions.Select(tx => new { tx.Amount, tx.Memo, tx.TransactionType, tx.DateTime, tx.Hash }).ToList();
-                    var table = ConsoleTable.From(txs).ToString();
+                    var txns = await unitOfWork.GetTransactionRepository().All(identifier, password);
+                    var final = txns.Select(tx => new { tx.Amount, tx.Memo, tx.TransactionType, tx.DateTime, tx.Hash }).ToList();
+                    var table = ConsoleTable.From(final).ToString();
 
                     console.WriteLine(table);
                 }

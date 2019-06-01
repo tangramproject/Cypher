@@ -17,6 +17,7 @@ using TangramCypher.ApplicationLayer.Wallet;
 using Kurukuru;
 using System.Security;
 using Microsoft.Extensions.Logging;
+using TangramCypher.Model;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
 {

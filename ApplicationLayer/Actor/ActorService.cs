@@ -26,6 +26,7 @@ using TangramCypher.Helper.LibSodium;
 using TangramCypher.ApplicationLayer.Coin;
 using Dawn;
 using TangramCypher.ApplicationLayer.Onion;
+using TangramCypher.Model;
 
 namespace TangramCypher.ApplicationLayer.Actor
 {
@@ -47,6 +48,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         private readonly IOnionServiceClient onionService;
         private readonly IWalletService walletService;
         private readonly ICoinService coinService;
+        private readonly IUnitOfWork unitOfWork;
         private readonly Client client;
 
         public event MessagePumpEventHandler MessagePump;
@@ -65,12 +67,13 @@ namespace TangramCypher.ApplicationLayer.Actor
             }
         }
 
-        public ActorService(IOnionServiceClient onionService, IWalletService walletService, ICoinService coinService, IConfiguration configuration, ILogger logger)
+        public ActorService(IOnionServiceClient onionService, IWalletService walletService, ICoinService coinService, IConfiguration configuration, ILogger logger, IUnitOfWork unitOfWork)
         {
             this.onionService = onionService;
             this.walletService = walletService;
             this.coinService = coinService;
             this.logger = logger;
+            this.unitOfWork = unitOfWork;
 
             client = onionService.OnionEnabled.Equals(1) ?
                 new Client(logger, new DotNetTor.SocksPort.SocksPortHandler(onionService.SocksHost, onionService.SocksPort)) :
@@ -460,28 +463,27 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <returns>Wallet transactions</returns>
         public async Task<List<TransactionDto>> Sync()
         {
-            var transactions = await walletService.Transactions(Identifier(), MasterKey());
-
-            if (transactions == null)
+            var txns = await unitOfWork.GetTransactionRepository().All(Identifier(), MasterKey());
+            if (txns == null)
             {
                 UpdateMessagePump("Nothing to sync ...");
                 return null;
             }
 
-            var tasks = transactions.Select(tx => GetAsync<CoinDto>(tx.Hash, RestApiMethod.Coin));
+            var tasks = txns.Select(tx => GetAsync<CoinDto>(tx.Hash, RestApiMethod.Coin));
             var results = await Task.WhenAll(tasks);
             var coins = results.Where(c => c != null).ToList();
-            var newTransactions = new List<TransactionDto>();
+            var newTxns = new List<TransactionDto>();
 
             coins.ForEach((CoinDto coin) =>
             {
                 coin = coin.FormatCoinFromBase64();
-                newTransactions.Add(transactions.FirstOrDefault(x => x.Hash.Equals(coin.Hash)));
+                newTxns.Add(txns.FirstOrDefault(x => x.Hash.Equals(coin.Hash)));
             });
 
             UpdateMessagePump("Synced wallet ...");
 
-            return newTransactions;
+            return newTxns;
         }
 
 
@@ -992,7 +994,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             catch (FormatException)
             { formattedCoin = coin; }
 
-            var transaction = new TransactionDto
+            var txn = new TransactionDto
             {
                 TransactionId = Guid.NewGuid().ToString(),
                 Amount = total,
@@ -1007,7 +1009,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             };
 
             //TODO: Could possibility fail.. need recovery..
-            var added = await walletService.Put(Identifier(), MasterKey(), transaction.Hash, transaction, "transactions", "Hash");
+            var added = await unitOfWork.GetTransactionRepository().Put(Identifier(), MasterKey(), StoreKey.HashKey, txn.Hash, txn);
 
             return added;
         }

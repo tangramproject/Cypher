@@ -7,10 +7,13 @@
 // work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
 
 using System;
+using System.Collections.Generic;
 
 namespace TangramCypher.Model
 {
     public interface ITransactionRepository : IRepository<TransactionDto>
     {
+        ulong Sum(IEnumerable<ulong> source);
+        ulong Sum(IEnumerable<TransactionDto> source, TransactionType transactionType);
     }
 }

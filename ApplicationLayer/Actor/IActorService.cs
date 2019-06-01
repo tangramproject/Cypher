@@ -13,6 +13,7 @@ using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 using TangramCypher.ApplicationLayer.Coin;
 using TangramCypher.ApplicationLayer.Wallet;
+using TangramCypher.Model;
 
 namespace TangramCypher.ApplicationLayer.Actor
 {

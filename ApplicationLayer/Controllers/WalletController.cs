@@ -14,6 +14,7 @@ using TangramCypher.ApplicationLayer.Actor;
 using TangramCypher.ApplicationLayer.Vault;
 using TangramCypher.ApplicationLayer.Wallet;
 using TangramCypher.Helper;
+using TangramCypher.Model;
 
 namespace TangramCypher.ApplicationLayer.Controllers
 {
@@ -24,12 +25,14 @@ namespace TangramCypher.ApplicationLayer.Controllers
         private readonly IActorService actorService;
         private readonly IWalletService walletService;
         private readonly IVaultServiceClient vaultServiceClient;
+        private readonly IUnitOfWork unitOfWork;
 
-        public WalletController(IActorService actorService, IWalletService walletService, IVaultServiceClient vaultServiceClient)
+        public WalletController(IActorService actorService, IWalletService walletService, IVaultServiceClient vaultServiceClient, IUnitOfWork unitOfWork)
         {
             this.actorService = actorService;
             this.walletService = walletService;
             this.vaultServiceClient = vaultServiceClient;
+            this.unitOfWork = unitOfWork;
         }
 
         [HttpPost("address", Name = "CreateWalletAddress")]
@@ -158,8 +161,8 @@ namespace TangramCypher.ApplicationLayer.Controllers
         [HttpPost("transactions", Name = "WalletTransactions")]
         public async Task<IActionResult> WalletTransactions([FromBody] CredentialsDto credentials)
         {
-            var creds = await walletService.Transactions(credentials.Identifier.ToSecureString(), credentials.Password.ToSecureString());
-            return new OkObjectResult(creds);
+            var txns = await unitOfWork.GetTransactionRepository().All(credentials.Identifier.ToSecureString(), credentials.Password.ToSecureString());
+            return new OkObjectResult(txns);
         }
 
         [HttpPost("vaultunseal", Name = "VaultUnseal")]

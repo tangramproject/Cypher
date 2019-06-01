@@ -7,6 +7,7 @@
 // work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
 
 using System.Collections.Generic;
+using TangramCypher.Model;
 
 namespace TangramCypher.ApplicationLayer.Wallet
 {

@@ -11,6 +11,7 @@ using System.Security;
 using System.Threading.Tasks;
 using TangramCypher.ApplicationLayer.Actor;
 using TangramCypher.ApplicationLayer.Coin;
+using TangramCypher.Model;
 
 namespace TangramCypher.ApplicationLayer.Wallet
 {
@@ -22,8 +23,6 @@ namespace TangramCypher.ApplicationLayer.Wallet
         SecureString NewID(int bytes = 32);
         SecureString Passphrase();
         byte[] HashPassword(SecureString passphrase);
-        Task<TransactionDto> Transaction(SecureString identifier, SecureString password, string hash);
-        Task<List<TransactionDto>> Transactions(SecureString identifier, SecureString password);
         Task<ulong> TotalTransactionAmount(SecureString identifier, SecureString password, string stamp);
         Task<TransactionDto> LastTransaction(SecureString identifier, SecureString password, TransactionType transactionType);
         Task<SecureString> StoreKey(SecureString identifier, SecureString password, string storeKey);
@@ -34,7 +33,6 @@ namespace TangramCypher.ApplicationLayer.Wallet
         byte[] NetworkAddress(CoinDto coin, NetworkApiMethod networkApi = null);
         byte[] NetworkAddress(byte[] pk, NetworkApiMethod networkApi = null);
         string ProverPassword(SecureString password, int version);
-        Task<bool> ClearTransactions(SecureString identifier, SecureString password);
         Task<string> RandomAddress(SecureString identifier, SecureString password);
         Task<string> Profile(SecureString identifier, SecureString password);
         Task<IEnumerable<string>> WalletList();
