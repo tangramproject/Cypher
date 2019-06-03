@@ -11,6 +11,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace TangramCypher.Model
 {
+    //TODO: Use byte array..
     public class CredentialsDto
     {
         [Required]

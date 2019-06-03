@@ -43,7 +43,6 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
 
             actorService.MessagePump += ActorService_MessagePump;
         }
-
         public override async Task Execute()
         {
 
@@ -64,15 +63,22 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
 
                         try
                         {
-                            var sent = await actorService
-                                      .MasterKey(password)
-                                      .Identifier(identifier)
-                                      .Amount(t)
-                                      .ToAddress(address)
-                                      .Memo(memo)
-                                      .SendPayment();
+                            await actorService.Tansfer(new SendPaymentDto
+                            {
+                                Credentials = new CredentialsDto
+                                {
+                                    Identifier = identifier.ToUnSecureString(),
+                                    Password = password.ToUnSecureString()
+                                },
+                                ToAddress = address,
+                                Memo = memo,
+                                Amount = 1000
+                            });
 
-                            if (sent.Equals(false))
+                            // Should return Committed..
+                            var state = actorService.State;
+
+                            if (actorService.State != State.Committed)
                             {
                                 var failedMessage = JsonConvert.SerializeObject(actorService.GetLastError().GetValue("message"));
                                 logger.LogCritical(failedMessage);

@@ -45,7 +45,6 @@ namespace TangramCypher.ApplicationLayer.Actor
         SecureString SecretKey();
         ActorService SecretKey(SecureString sk);
         Task<MessageDto> EstablishPubKeyMessage();
-        Task<bool> SendPayment();
         Task<JObject> SendPaymentMessage(bool send);
         string ToAddress();
         ActorService ToAddress(string address);
@@ -56,5 +55,10 @@ namespace TangramCypher.ApplicationLayer.Actor
         Task SetRandomAddress();
         Task SetSecretKey();
         Task SetPublicKey();
+        Task<bool> Spendable();
+        Task<bool> CommitReceiver();
+        Task Unlock();
+        Task Tansfer(SendPaymentDto sender);
+        State State { get; }
     }
 }

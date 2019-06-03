@@ -27,10 +27,11 @@ using TangramCypher.ApplicationLayer.Coin;
 using Dawn;
 using TangramCypher.ApplicationLayer.Onion;
 using TangramCypher.Model;
+using Stateless;
 
 namespace TangramCypher.ApplicationLayer.Actor
 {
-    public class ActorService : IActorService
+    public partial class ActorService : IActorService
     {
         protected SecureString masterKey;
         protected string toAdress;
@@ -50,6 +51,8 @@ namespace TangramCypher.ApplicationLayer.Actor
         private readonly ICoinService coinService;
         private readonly IUnitOfWork unitOfWork;
         private readonly Client client;
+        private readonly StateMachine<State, Trigger> machine;
+        private readonly StateMachine<State, Trigger>.TriggerWithParameters<SendPaymentDto> transferTrigger;
 
         public event MessagePumpEventHandler MessagePump;
         protected void OnMessagePump(MessagePumpEventArgs e)
@@ -80,6 +83,11 @@ namespace TangramCypher.ApplicationLayer.Actor
                 new Client(logger);
 
             apiRestSection = configuration.GetSection(Constant.ApiGateway);
+
+            machine = new StateMachine<State, Trigger>(State.New);
+            transferTrigger = machine.SetTriggerParameters<SendPaymentDto>(Trigger.Verify);
+
+            Configure();
         }
 
         /// <summary>
@@ -722,41 +730,61 @@ namespace TangramCypher.ApplicationLayer.Actor
             return address;
         }
 
-        //TODO Needs refactoring..
-        /// <summary>
-        /// Sends the payment.
-        /// </summary>
-        /// <returns>The payment.</returns>
-        public async Task<bool> SendPayment()
+        public async Task Unlock()
         {
-            bool TestToAddress() => Util.FormatNetworkAddress(DecodeAddress(ToAddress()).ToArray()) != null;
-            if (TestToAddress().Equals(false))
+            try
+            {
+                await SetRandomAddress();
+                await SetSecretKey();
+                await SetPublicKey();
+            }
+            catch (Exception ex)
             {
                 lastError = JObject.FromObject(new
                 {
                     success = false,
-                    message = "Failed to read the recipient public key!"
+                    message = ex.Message
                 });
-                return false;
+                logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
+                throw ex;
             }
+        }
 
-            var isSpendable = await Spendable();
-            if (isSpendable.Equals(false))
-                return false;
+        public async Task<bool> CommitReceiver()
+        {
+            var receiver = await Util.TriesUntilCompleted<bool>(async () =>
+            {
+                async Task<bool> CommitCoin()
+                {
+                    bool sent;
 
-            await SetRandomAddress();
-            await SetSecretKey();
-            await SetPublicKey();
+                    UpdateMessagePump("Buys committing receiver coin ...");
 
-            var spend = await Util.TriesUntilCompleted<CoinDto>(async () => { return await Spend(); }, 10, 100);
-            if (spend == null)
-                return false;
+                    var coin = coinService.BuildReceiver(MasterKey()).Coin();
 
-            var receiver = await Util.TriesUntilCompleted<bool>(async () => { return await SendReceiverCoin(); }, 10, 100, true);
-            if (receiver.Equals(false))
-                return false;
+                    coin.Network = walletService.NetworkAddress(coin).ToHex();
+                    coin = await AddAsync(coin.FormatCoinToBase64(), RestApiMethod.PostCoin);
 
-            return true;
+                    if (coin != null)
+                        sent = true;
+                    else
+                    {
+                        lastError = JObject.FromObject(new
+                        {
+                            success = false,
+                            message = "Failed to post receiver coin!"
+                        });
+                        sent = false;
+                    }
+
+                    return sent;
+                }
+
+                return await CommitCoin();
+
+            }, 10, 100, true);
+
+            return receiver;
         }
 
         /// <summary>
@@ -864,6 +892,35 @@ namespace TangramCypher.ApplicationLayer.Actor
         }
 
         /// <summary>
+        /// Spendable.
+        /// </summary>
+        /// <returns>The spendable.</returns>
+        public async Task<bool> Spendable()
+        {
+            bool canSpend;
+            var balance = await CheckBalance();
+
+            if (balance >= Amount())
+                canSpend = true;
+            else
+            {
+                lastError = JObject.FromObject(new
+                {
+                    success = false,
+                    message = new
+                    {
+                        available = balance,
+                        spend = Amount()
+                    }
+                });
+
+                canSpend = false;
+            }
+
+            return canSpend;
+        }
+
+        /// <summary>
         /// Builds the redemption key message.
         /// </summary>
         /// <returns>The redemption key message.</returns>
@@ -913,12 +970,24 @@ namespace TangramCypher.ApplicationLayer.Actor
             return messageStore;
         }
 
+        //TODO: Needs refactoring...
         /// <summary>
         /// Spend.
         /// </summary>
         /// <returns>The spend.</returns>
         private async Task<CoinDto> Spend()
         {
+            bool TestToAddress() => Util.FormatNetworkAddress(DecodeAddress(ToAddress()).ToArray()) != null;
+            if (TestToAddress().Equals(false))
+            {
+                lastError = JObject.FromObject(new
+                {
+                    success = false,
+                    message = "Failed to read the recipient public key!"
+                });
+                return null;
+            }
+
             CoinDto coin = null;
             var transactionCoin = await walletService.SortChange(Identifier(), MasterKey(), Amount());
 
@@ -1098,35 +1167,6 @@ namespace TangramCypher.ApplicationLayer.Actor
         }
 
         /// <summary>
-        /// Spendable.
-        /// </summary>
-        /// <returns>The spendable.</returns>
-        private async Task<bool> Spendable()
-        {
-            bool canSpend;
-            var balance = await CheckBalance();
-
-            if (balance >= Amount())
-                canSpend = true;
-            else
-            {
-                lastError = JObject.FromObject(new
-                {
-                    success = false,
-                    message = new
-                    {
-                        available = balance,
-                        spend = Amount()
-                    }
-                });
-
-                canSpend = false;
-            }
-
-            return canSpend;
-        }
-
-        /// <summary>
         /// Sends the receiver coin.
         /// </summary>
         /// <returns>The receiver coin.</returns>
@@ -1154,30 +1194,6 @@ namespace TangramCypher.ApplicationLayer.Actor
                 default:
                     sent = true;
                     break;
-            }
-
-            return sent;
-        }
-
-        /// <summary>
-        /// Resends the receiver coin.
-        /// </summary>
-        /// <returns>The send receiver coin.</returns>
-        /// <param name="count">Count.</param>
-        private async Task<bool> ReSendReceiverCoin(int count = 0)
-        {
-            var sent = await SendReceiverCoin();
-
-            if (sent.Equals(true))
-            {
-                count = 3;
-                return true;
-            }
-
-            if (!count.Equals(3))
-            {
-                count++;
-                await ReSendReceiverCoin(count);
             }
 
             return sent;

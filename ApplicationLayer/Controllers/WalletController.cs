@@ -40,7 +40,7 @@ namespace TangramCypher.ApplicationLayer.Controllers
         {
             var keySet = walletService.CreateKeySet();
             var added = await unitOfWork.GetKeySetRepository().Put(credentials.Identifier.ToSecureString(), credentials.Password.ToSecureString(), StoreKey.AddressKey, keySet.Address, keySet);
-            
+
             if (added)
                 return new CreatedResult("httpWallet", new { success = added });
 
@@ -117,15 +117,19 @@ namespace TangramCypher.ApplicationLayer.Controllers
 
             try
             {
-                var sent = await actorService
-                                 .MasterKey(sendPaymentDto.Credentials.Password.ToSecureString())
-                                 .Identifier(sendPaymentDto.Credentials.Identifier.ToSecureString())
-                                 .Amount(sendPaymentDto.Amount)
-                                 .ToAddress(sendPaymentDto.ToAddress)
-                                 .Memo(sendPaymentDto.Memo)
-                                 .SendPayment();
+                await actorService.Tansfer(new SendPaymentDto
+                {
+                    Credentials = new CredentialsDto
+                    {
+                        Identifier = sendPaymentDto.Credentials.Identifier,
+                        Password = sendPaymentDto.Credentials.Password
+                    },
+                    ToAddress = sendPaymentDto.ToAddress,
+                    Memo = sendPaymentDto.Memo,
+                    Amount = 1000
+                });
 
-                if (sent.Equals(false))
+                if (actorService.State != State.Committed)
                 {
                     var failedMessage = JsonConvert.SerializeObject(actorService.GetLastError().GetValue("message"));
                     return new ObjectResult(new { error = failedMessage, statusCode = 500 });
