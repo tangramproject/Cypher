@@ -27,7 +27,7 @@ namespace TangramCypher.ApplicationLayer.Coin
         string DeriveKey(int version, string stamp, SecureString secret, int bytes = 32);
         string NewStamp();
         byte[] Hash(CoinDto coin);
-        (string, string) HotRelease(int version, string stamp, SecureString secret);
+        RedemptionKeyDto HotRelease(SecureString secret, string memo);
         void MakeSingleCoin(SecureString secret);
         ProofStruct ProofStruct();
         string PartialRelease(int version, string stamp, string memo, SecureString secret);

@@ -230,21 +230,25 @@ namespace TangramCypher.ApplicationLayer.Coin
         }
 
         /// <summary>
-        ///  Releases two secret keys to continue hashchaing for sender/recipient.
+        /// Releases two secret keys to continue hashchaing for sender/recipient.
         /// </summary>
-        /// <returns>The release.</returns>
-        /// <param name="version">Version.</param>
-        /// <param name="stamp">Stamp.</param>
-        /// <param name="secret">secret.</param>
-        public (string, string) HotRelease(int version, string stamp, SecureString secret)
+        /// <param name="secret"></param>
+        /// <param name="memo"></param>
+        /// <returns></returns>
+        public RedemptionKeyDto HotRelease(SecureString secret, string memo)
         {
-            Guard.Argument(stamp, nameof(stamp)).NotNull().NotEmpty();
-            Guard.Argument(secret, nameof(secret)).NotNull();
-
-            var key1 = DeriveKey(version + 1, stamp, secret);
-            var key2 = DeriveKey(version + 2, stamp, secret);
-
-            return (key1, key2);
+            var (key1, key2) = HotRelease(Coin().Version, Coin().Stamp, secret);
+            var redemption = new RedemptionKeyDto
+            {
+                Amount = TransactionCoin().Input,
+                Blind = TransactionCoin().Blind,
+                Hash = Coin().Hash,
+                Key1 = key1,
+                Key2 = key2,
+                Memo = memo,
+                Stamp = Coin().Stamp
+            };
+            return redemption;
         }
 
         /// <summary>
@@ -501,6 +505,24 @@ namespace TangramCypher.ApplicationLayer.Coin
         {
             this.transactionCoin = transactionCoin;
             return this;
+        }
+
+        /// <summary>
+        ///  Releases two secret keys to continue hashchaing for sender/recipient.
+        /// </summary>
+        /// <returns>The release.</returns>
+        /// <param name="version">Version.</param>
+        /// <param name="stamp">Stamp.</param>
+        /// <param name="secret">secret.</param>
+        private (string, string) HotRelease(int version, string stamp, SecureString secret)
+        {
+            Guard.Argument(stamp, nameof(stamp)).NotNull().NotEmpty();
+            Guard.Argument(secret, nameof(secret)).NotNull();
+
+            var key1 = DeriveKey(version + 1, stamp, secret);
+            var key2 = DeriveKey(version + 2, stamp, secret);
+
+            return (key1, key2);
         }
 
         /// <summary>

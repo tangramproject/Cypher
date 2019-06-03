@@ -873,17 +873,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             try
             {
-                var (key1, key2) = coinService.HotRelease(coinService.Coin().Version, coinService.Coin().Stamp, MasterKey());
-                var redemption = new RedemptionKeyDto
-                {
-                    Amount = coinService.TransactionCoin().Input,
-                    Blind = coinService.TransactionCoin().Blind,
-                    Hash = coinService.Coin().Hash,
-                    Key1 = key1,
-                    Key2 = key2,
-                    Memo = Memo(),
-                    Stamp = coinService.Coin().Stamp
-                };
+                var redemption = coinService.HotRelease(MasterKey(), Memo());
                 var innerMessage = JObject.FromObject(new
                 {
                     payment = true,
@@ -898,7 +888,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                 messageStore = new MessageStoreDto
                 {
                     DateTime = DateTime.Now,
-                    Hash = coinService.Coin().Hash,
+                    Hash = redemption.Hash,
                     PublicKey = Sodium.Utilities.BinaryToHex(DecodeAddress(ToAddress()).ToArray()),
                     Memo = Memo(),
                     Message = new MessageDto
