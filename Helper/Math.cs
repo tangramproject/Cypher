@@ -11,7 +11,7 @@ using System.Numerics;
 
 namespace TangramCypher.Helper
 {
-    public static class Maths
+    public static class Math
     {
         public static BigInteger Mod(BigInteger a, BigInteger n)
         {
@@ -65,7 +65,7 @@ namespace TangramCypher.Helper
             if (n == 0) return 0;
             if (n > 0)
             {
-                int bitLength = Convert.ToInt32(Math.Ceiling(BigInteger.Log(n, 2)));
+                int bitLength = Convert.ToInt32(System.Math.Ceiling(BigInteger.Log(n, 2)));
                 var root = BigInteger.One << (bitLength / 2);
 
                 while (!IsSqrt(n, root))

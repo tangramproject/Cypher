@@ -28,6 +28,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
     public class WalletTransferCommand : Command
     {
         readonly IActorService actorService;
+        readonly IWalletService walletService;
         readonly IConsole console;
         readonly ILogger logger;
 
@@ -38,6 +39,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
         public WalletTransferCommand(IServiceProvider serviceProvider)
         {
             actorService = serviceProvider.GetService<IActorService>();
+            walletService = serviceProvider.GetService<IWalletService>();
             console = serviceProvider.GetService<IConsole>();
             logger = serviceProvider.GetService<ILogger>();
 
@@ -63,22 +65,17 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
 
                         try
                         {
-                            await actorService.Tansfer(new SendPaymentDto
+                            var session = new Session(identifier, password)
                             {
-                                Credentials = new CredentialsDto
-                                {
-                                    Identifier = identifier.ToUnSecureString(),
-                                    Password = password.ToUnSecureString()
-                                },
-                                ToAddress = address,
+                                Amount = t.ConvertToUInt64(),
+                                ForwardMessage = yesNo,
                                 Memo = memo,
-                                Amount = 1000
-                            });
+                                RecipientAddress = address
+                            };
 
-                            // Should return Committed..
-                            var state = actorService.State;
+                            await actorService.Tansfer(session);
 
-                            if (actorService.State != State.Committed)
+                            if (actorService.State != State.Completed)
                             {
                                 var failedMessage = JsonConvert.SerializeObject(actorService.GetLastError().GetValue("message"));
                                 logger.LogCritical(failedMessage);
@@ -86,26 +83,11 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                                 return;
                             }
 
-                            switch (yesNo)
-                            {
-                                case true:
-                                    var networkMessage = await actorService.SendPaymentMessage(true);
-                                    var success = networkMessage.GetValue("success").ToObject<bool>();
+                            spinner.Stop();
+                            session = actorService.GetSession(session.SessionId);
+                            
+                            SaveRedemptionKeyLocal(session.MessageStore.Message);
 
-                                    if (success.Equals(false))
-                                        spinner.Fail(JsonConvert.SerializeObject(networkMessage.GetValue("message")));
-
-                                    break;
-
-                                case false:
-                                    var localMessage = await actorService.SendPaymentMessage(false);
-
-                                    spinner.Stop();
-
-                                    SaveRedemptionKeyLocal(localMessage);
-
-                                    break;
-                            }
                         }
                         catch (Exception ex)
                         {
@@ -114,17 +96,15 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                         }
                         finally
                         {
-                            spinner.Text = $"Available Balance: {Convert.ToString(await actorService.CheckBalance())}";
+                            spinner.Text = $"Available Balance: {Convert.ToString(await walletService.AvailableBalance(identifier, password))}";
                         }
                     });
                 }
             }
         }
 
-        private void SaveRedemptionKeyLocal(JObject message)
+        private void SaveRedemptionKeyLocal(MessageDto message)
         {
-            var msg = message.GetValue("message").ToObject<MessageDto>();
-
             console.ForegroundColor = ConsoleColor.Magenta;
             console.WriteLine("\nOptions:");
             console.WriteLine("Save redemption key to file [1]");
@@ -137,7 +117,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
             var content =
                 "--------------Begin Redemption Key--------------" +
                 Environment.NewLine +
-                JsonConvert.SerializeObject(msg) +
+                JsonConvert.SerializeObject(message) +
                 Environment.NewLine +
                 "--------------End Redemption Key----------------";
 

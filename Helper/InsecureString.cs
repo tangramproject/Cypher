@@ -90,7 +90,7 @@ namespace TangramCypher.Helper
                     }
 #if DEBUG
                     var disposed = "¡DISPOSED¡";
-                    disposed = disposed.Substring(0, Math.Min(disposed.Length, _secureString.Length));
+                    disposed = disposed.Substring(0, System.Math.Min(disposed.Length, _secureString.Length));
                     for (int i = 0; i < disposed.Length; ++i)
                     {
                         insecurePointer[i] = disposed[i];

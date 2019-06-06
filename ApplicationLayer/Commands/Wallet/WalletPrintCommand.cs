@@ -66,34 +66,15 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                         {
                             spinner.Text = "Transferring money";
 
-                            actorService
-                                  .MasterKey(password)
-                                  .Identifier(identifier)
-                                  .ToAddress(address)
-                                  .Memo(memo);
+                          var session = new Session(identifier, password)
+                            {
+                                Amount = amount.ConvertToUInt64(),
+                                ForwardMessage = true,
+                                Memo = memo,
+                                RecipientAddress = address
+                            };
 
-                            await actorService.SetRandomAddress();
-                            await actorService.SetSecretKey();
-                            await actorService.SetPublicKey();
-
-                            var coin = coinService
-                                .TransactionCoin(new TransactionCoinDto { Input = (ulong)amount })
-                                .BuildReceiver(password)
-                                .Coin();
-
-                            coin.Hash = coinService.Hash(coin).ToHex();
-                            coin.Network = walletService.NetworkAddress(coin).ToHex();
-
-                            var c = SendCoin(coin);
-
-                            if (c == null)
-                                spinner.Fail("Something went wrong ;(");
-
-                            var networkMessage = await actorService.SendPaymentMessage(true);
-                            var success = networkMessage.GetValue("success").ToObject<bool>();
-
-                            if (success.Equals(false))
-                                spinner.Fail(JsonConvert.SerializeObject(networkMessage.GetValue("message")));
+                            await actorService.Tansfer(session);
 
                         }
                         catch (Exception ex)

@@ -27,6 +27,7 @@ namespace TangramCypher
 {
     class Program
     {
+        [Obsolete]
         static async Task Main(string[] args)
         {
             var builder = new HostBuilder()

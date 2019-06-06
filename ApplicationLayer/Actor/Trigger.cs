@@ -15,6 +15,10 @@ namespace TangramCypher.ApplicationLayer.Actor
         Verify,
         Unlock,
         Torch,
-        Commit
+        Commit,
+        PaymentAgreement,
+        PrepareRedemptionKey,
+        PublicKeyAgreement,
+        Complete
     }
 }

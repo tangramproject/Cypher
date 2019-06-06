@@ -82,28 +82,21 @@ namespace TangramCypher.ApplicationLayer.Controllers
 
             try
             {
-                if (receivePaymentDto.RedemptionMessage != null)
-                {
-                    await actorService
-                      .MasterKey(receivePaymentDto.Credentials.Password.ToSecureString())
-                      .Identifier(receivePaymentDto.Credentials.Identifier.ToSecureString())
-                      .FromAddress(receivePaymentDto.FromAddress)
-                      .ReceivePaymentRedemptionKey(JsonConvert.SerializeObject(receivePaymentDto.RedemptionMessage));
-                }
-                else
-                {
-                    await actorService
-                          .MasterKey(receivePaymentDto.Credentials.Password.ToSecureString())
-                          .Identifier(receivePaymentDto.Credentials.Identifier.ToSecureString())
-                          .FromAddress(receivePaymentDto.FromAddress)
-                          .ReceivePayment();
-                }
+                // if (receivePaymentDto.RedemptionMessage != null)
+                // {
+                //     await actorService
+                //       .ReceivePaymentRedemptionKey(JsonConvert.SerializeObject(receivePaymentDto.RedemptionMessage));
+                // }
+                // else
+                // {
+                //     await actorService.ReceivePayment();
+                // }
 
-                balance = await actorService.CheckBalance();
+                balance = await walletService.AvailableBalance(receivePaymentDto.Credentials.Identifier.ToSecureString(), receivePaymentDto.Credentials.Password.ToSecureString());
             }
             catch (Exception ex)
             {
-                balance = await actorService.CheckBalance();
+                balance = await walletService.AvailableBalance(receivePaymentDto.Credentials.Identifier.ToSecureString(), receivePaymentDto.Credentials.Password.ToSecureString());
                 return new ObjectResult(new { error = ex.Message, statusCode = 500, balance = balance });
             }
 
@@ -117,45 +110,35 @@ namespace TangramCypher.ApplicationLayer.Controllers
 
             try
             {
-                await actorService.Tansfer(new SendPaymentDto
-                {
-                    Credentials = new CredentialsDto
-                    {
-                        Identifier = sendPaymentDto.Credentials.Identifier,
-                        Password = sendPaymentDto.Credentials.Password
-                    },
-                    ToAddress = sendPaymentDto.ToAddress,
-                    Memo = sendPaymentDto.Memo,
-                    Amount = 1000
-                });
+                await actorService.Tansfer(null);
 
-                if (actorService.State != State.Committed)
-                {
-                    var failedMessage = JsonConvert.SerializeObject(actorService.GetLastError().GetValue("message"));
-                    return new ObjectResult(new { error = failedMessage, statusCode = 500 });
-                }
+                // if (actorService.State != State.Committed)
+                // {
+                //     var failedMessage = JsonConvert.SerializeObject(actorService.GetLastError().GetValue("message"));
+                //     return new ObjectResult(new { error = failedMessage, statusCode = 500 });
+                // }
 
-                if (sendPaymentDto.CreateRedemptionKey)
-                {
-                    var message = await actorService.SendPaymentMessage(false);
-                    var notification = message.GetValue("message").ToObject<MessageDto>();
+                // if (sendPaymentDto.CreateRedemptionKey)
+                // {
+                //     var message = await actorService.SendPaymentMessage(false);
+                //     var notification = message.GetValue("message").ToObject<MessageDto>();
 
-                    return new OkObjectResult(new { message = notification });
-                }
-                else
-                {
-                    var networkMessage = await actorService.SendPaymentMessage(true);
-                    var success = networkMessage.GetValue("success").ToObject<bool>();
+                //     return new OkObjectResult(new { message = notification });
+                // }
+                // else
+                // {
+                //     var networkMessage = await actorService.SendPaymentMessage(true);
+                //     var success = networkMessage.GetValue("success").ToObject<bool>();
 
-                    if (success.Equals(false))
-                        return new ObjectResult(new { error = JsonConvert.SerializeObject(networkMessage.GetValue("message")), statusCode = 500 });
+                //     if (success.Equals(false))
+                //         return new ObjectResult(new { error = JsonConvert.SerializeObject(networkMessage.GetValue("message")), statusCode = 500 });
 
-                    balance = await actorService.CheckBalance();
-                }
+                //     balance = await actorService.CheckBalance(sendPaymentDto.Credentials.Identifier.ToSecureString(), sendPaymentDto.Credentials.Password.ToSecureString());
+                // }
             }
             catch (Exception ex)
             {
-                balance = await actorService.CheckBalance();
+                balance = await walletService.AvailableBalance(sendPaymentDto.Credentials.Identifier.ToSecureString(), sendPaymentDto.Credentials.Password.ToSecureString());
                 return new ObjectResult(new { error = ex.Message, statusCode = 500, balance = balance });
             }
 

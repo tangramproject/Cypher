@@ -59,11 +59,8 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
 
                         try
                         {
-                            await actorService
-                                  .MasterKey(password)
-                                  .Identifier(identifier)
-                                  .FromAddress(address)
-                                  .ReceivePayment();
+                            var session = new Session(identifier, password) { SenderAdress = address };
+                            await actorService.ReceivePayment(session);
                         }
                         catch (Exception ex)
                         {
@@ -73,7 +70,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                         finally
                         {
                             var transaction = await walletService.LastTransaction(identifier, password, TransactionType.Receive);
-                            var balance = Convert.ToString(await actorService.CheckBalance());
+                            var balance = Convert.ToString(await walletService.AvailableBalance(identifier, password));
 
                             spinner.Text = $"Received:{transaction.Amount}  Available Balance: {balance}";
                         }

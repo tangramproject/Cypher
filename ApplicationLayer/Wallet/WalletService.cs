@@ -442,19 +442,5 @@ namespace TangramCypher.ApplicationLayer.Wallet
                 return Prover.GetHashStringNumber(hash).ToByteArray().ToHex();
             }
         }
-
-        /// <summary>
-        /// naT UInt64 format.
-        /// </summary>
-        /// <returns>The t.</returns>
-        /// <param name="value">Value.</param>
-        public ulong MulWithNaT(ulong value) => (ulong)(value * Constant.NanoTan);
-
-        /// <summary>
-        /// naT UInt64 format.
-        /// </summary>
-        /// <param name="value"></param>
-        /// <returns></returns>
-        public ulong DivWithNaT(ulong value) => (ulong)(value / Constant.NanoTan);
     }
 }

@@ -49,11 +49,8 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
 
                     line = option == 1 ? LocalFile(path) : await WebFile(path);
 
-                    var message = await actorService
-                        .MasterKey(password)
-                        .Identifier(identifier)
-                        .FromAddress(address)
-                        .ReceivePaymentRedemptionKey(line);
+                    var session = new Session(identifier, password) { SenderAdress = address };
+                    var message = await actorService.ReceivePaymentRedemptionKey(session, line);
 
                     console.WriteLine(JsonConvert.SerializeObject(message));
                 }

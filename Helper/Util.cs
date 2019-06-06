@@ -37,16 +37,6 @@ namespace TangramCypher.Helper
             return stack.Pop();
         }
 
-        public static RedemptionKeyDto FreeCommitmentKey(string base58Key)
-        {
-            var base58 = Base58.Bitcoin.Decode(base58Key);
-            var proof = Encoding.UTF8.GetString(base58).Substring(0, 64);
-            var key1 = Encoding.UTF8.GetString(base58).Substring(64, 128);
-            var key2 = Encoding.UTF8.GetString(base58).Substring(128, 192);
-
-            return new RedemptionKeyDto() { Key1 = key1, Key2 = key1, Stamp = proof };
-        }
-
         public static IEnumerable<string> Split(string str, int chunkSize)
         {
             return Enumerable.Range(0, str.Length / chunkSize)
@@ -167,18 +157,9 @@ namespace TangramCypher.Helper
         {
             var intH = new BigInteger(hash);
             var subString = BigInteger.Parse(intH.ToString().Substring(0, bytes));
-            var result = Maths.Mod(subString, prime);
+            var result = Math.Mod(subString, prime);
 
             return result;
-        }
-
-        public static void AddProperty(ExpandoObject expando, string propertyName, object propertyValue)
-        {
-            var expandoDict = expando as IDictionary<string, object>;
-            if (expandoDict.ContainsKey(propertyName))
-                expandoDict[propertyName] = propertyValue;
-            else
-                expandoDict.Add(propertyName, propertyValue);
         }
 
         public static void LogException(IConsole console, ILogger logger, Exception e)

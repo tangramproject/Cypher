@@ -31,7 +31,5 @@ namespace TangramCypher.ApplicationLayer.Wallet
         string ProverPassword(SecureString password, int version);
         Task<string> Profile(SecureString identifier, SecureString password);
         Task<IEnumerable<string>> WalletList();
-        ulong MulWithNaT(ulong value);
-        ulong DivWithNaT(ulong value);
     }
 }

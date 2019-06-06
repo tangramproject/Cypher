@@ -15,7 +15,7 @@ namespace TangramCypher.Model
     {
         public CredentialsDto Credentials { get; set; }
         public double Amount { get; set; }
-        public string ToAddress { get; set; }
+        public string Address { get; set; }
         public bool CreateRedemptionKey { get; set; }
         public string Memo { get; set; }
     }

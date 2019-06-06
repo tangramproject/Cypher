@@ -14,8 +14,10 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Security;
 using System.Text;
+using Dawn;
 using Newtonsoft.Json;
 using Sodium;
+using TangramCypher.ApplicationLayer.Actor;
 using TangramCypher.ApplicationLayer.Coin;
 using TangramCypher.Model;
 
@@ -74,7 +76,7 @@ namespace TangramCypher.Helper
                 Marshal.ZeroFreeGlobalAllocUnicode(unmanagedString);
             }
         }
-        public static byte[] ToArray(this SecureString s)
+        internal static byte[] ToArray(this SecureString s)
         {
             if (s == null)
                 throw new NullReferenceException();
@@ -99,6 +101,22 @@ namespace TangramCypher.Helper
             }
             return result.ToArray();
         }
+
+        internal static void ZeroString(this string value)
+        {
+            var handle = GCHandle.Alloc(value, GCHandleType.Pinned);
+            unsafe
+            {
+                var pValue = (char*)handle.AddrOfPinnedObject();
+                for (int index = 0; index < value.Length; index++)
+                {
+                    pValue[index] = char.MinValue;
+                }
+            }
+
+            handle.Free();
+        }
+
         public static CoinDto FormatCoinToBase64(this CoinDto coin)
         {
             var formattedCoin = new CoinDto
@@ -142,6 +160,38 @@ namespace TangramCypher.Helper
             formattedCoin.Version = coin.Version;
 
             return formattedCoin;
+        }
+
+
+        public static ulong MulWithNaT(this ulong value) => (ulong)(value * Constant.NanoTan);
+
+        public static ulong DivWithNaT(ulong value) => (ulong)(value / Constant.NanoTan);
+
+        public static ulong ConvertToUInt64(this double value)
+        {
+            Guard.Argument(value, nameof(value)).NotZero().NotNegative();
+
+            ulong amount;
+
+            try
+            {
+                var parts = value.ToString().Split(new char[] { '.', ',' });
+                var part1 = (ulong)System.Math.Truncate(value);
+
+                if (parts.Length.Equals(1))
+                    amount = part1.MulWithNaT();
+                else
+                {
+                    var part2 = (ulong)((value - part1) * UInt64.Parse("1".PadRight(parts[1].Length + 1, '0')) + 0.5);
+                    amount = part1.MulWithNaT() + UInt64.Parse(part2.ToString());
+                }
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+
+            return amount;
         }
     }
 }

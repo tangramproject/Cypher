@@ -20,45 +20,15 @@ namespace TangramCypher.ApplicationLayer.Actor
     public interface IActorService
     {
         event MessagePumpEventHandler MessagePump;
-
         Task<T> AddAsync<T>(T payload, RestApiMethod apiMethod);
-        ulong Amount();
-        ActorService Amount(double value);
         Task<T> GetAsync<T>(string address, RestApiMethod apiMethod);
-        Task<ulong> CheckBalance();
         JObject GetLastError();
+        Session GetSession(Guid sessionId);
         Task<IEnumerable<T>> GetRangeAsync<T>(string address, int skip, int take, RestApiMethod apiMethod);
-        Span<byte> DecodeAddress(string key);
-        SecureString MasterKey();
-        ActorService MasterKey(SecureString password);
-        byte[] Cypher(string message, byte[] pk);
-        byte[] ToSharedKey(byte[] pk);
-        SecureString Identifier();
-        ActorService Identifier(SecureString walletId);
-        string Memo();
-        ActorService Memo(string text);
-        string OpenBoxSeal(string cypher, KeySetDto keySet);
-        SecureString PublicKey();
-        ActorService PublicKey(SecureString pk);
-        Task ReceivePayment();
-        Task<JObject> ReceivePaymentRedemptionKey(string cypher);
-        SecureString SecretKey();
-        ActorService SecretKey(SecureString sk);
-        Task<MessageDto> EstablishPubKeyMessage();
-        Task<JObject> SendPaymentMessage(bool send);
-        string ToAddress();
-        ActorService ToAddress(string address);
-        Task<List<TransactionDto>> Sync();
-        string FromAddress();
-        ActorService FromAddress(string address);
-        Task<bool> Payment(RedemptionKeyDto redemptionKey, CoinDto coin);
-        Task SetRandomAddress();
-        Task SetSecretKey();
-        Task SetPublicKey();
-        Task<bool> Spendable();
-        Task<bool> CommitReceiver();
-        Task Unlock();
-        Task Tansfer(SendPaymentDto sender);
         State State { get; }
+        Task Tansfer(Session Session);
+        Task ReceivePayment(Session session);
+        Task<JObject> ReceivePaymentRedemptionKey(Session session, string cypher);
+
     }
 }

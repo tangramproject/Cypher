@@ -7,7 +7,11 @@
 // work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
 
 using System;
+using System.Security;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using Stateless;
 using Stateless.Graph;
 using TangramCypher.Helper;
 using TangramCypher.Model;
@@ -17,20 +21,19 @@ namespace TangramCypher.ApplicationLayer.Actor
 {
     public partial class ActorService
     {
-        private bool canSpend;
-        public bool CanSpend => canSpend;
-
-        private CoinDto burnt;
-        public CoinDto Burnt => burnt;
-
-        private bool committed;
-        public bool Committed => committed;
-
         public State State => machine.State;
 
         public string Graph() => UmlDotGraph.Format(machine.GetInfo());
 
-        public async Task Tansfer(SendPaymentDto sender) => await machine.FireAsync(transferTrigger, sender);
+        public async Task Tansfer(Session session)
+        {
+            session = SessionAddOrUpdate(session);
+            await machine.FireAsync<Guid>(verifyTrigger, session.SessionId);
+        }
+
+        private async Task TransferPublicKeyAgreement(Guid sessionId) => await machine.FireAsync(publicKeyAgreementTrgger, sessionId);
+
+        private async Task TransferPaymentAgreement(Guid sessionId) => await machine.FireAsync(paymentTrgger, sessionId);
 
         private void Configure()
         {
@@ -39,45 +42,74 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             machine.Configure(State.Audited)
                 .SubstateOf(State.New)
-                .OnEntryFromAsync(transferTrigger, OnCheckBalance)
+                .OnEntryFromAsync(verifyTrigger, async (Guid sessionId) =>
+                {
+                    await SufficientFunds(sessionId);
+                    await machine.FireAsync(Trigger.Unlock);
+                })
                 .PermitReentry(Trigger.Verify)
-                .PermitIf(Trigger.Unlock, State.Keys, () => CanSpend);
+                .PermitIf(Trigger.Unlock, State.Keys, () => true);
 
             machine.Configure(State.Keys)
-                .OnEntryAsync(async () =>
+                .OnEntryFromAsync(unlockTrigger, async (Guid sessionId) =>
                {
-                   await Unlock();
+                   await Unlock(sessionId);
                    await machine.FireAsync(Trigger.Torch);
                })
                 .Permit(Trigger.Torch, State.Burned);
 
             machine.Configure(State.Burned)
-                .OnEntryAsync(async () =>
+                .OnEntryFromAsync(burnTrigger, async (Guid sessionId) =>
                 {
-                    burnt = await Util.TriesUntilCompleted<CoinDto>(async () => { return await Spend(); }, 10, 100);
+                    await Burn(sessionId);
                     await machine.FireAsync(Trigger.Commit);
                 })
-                .PermitIf(Trigger.Commit, State.Committed, () => Burnt == null ? false : true);
+                .PermitIf(Trigger.Commit, State.Committed, () => true);
 
             machine.Configure(State.Committed)
-                .OnEntryAsync(async () =>
+                .OnEntryFromAsync(commitReceiverTrigger, async (Guid sessionId) =>
                 {
-                    committed = await CommitReceiver();
-                });
+                    await CommitReceiver(sessionId);
+                    await machine.FireAsync(Trigger.PrepareRedemptionKey);
+                })
+                .PermitIf(Trigger.PrepareRedemptionKey, State.RedemptionKey, () => true);
+
+            machine.Configure(State.RedemptionKey)
+                .OnEntryFromAsync(redemptionKeyTrigger, async (Guid sessionId) =>
+                {
+                    RedemptionKeyMessage(sessionId);
+
+                    var session = GetSession(sessionId);
+                    var added = await unitOfWork
+                                        .GetRedemptionRepository()
+                                        .Put(session.Identifier, session.MasterKey, StoreKey.HashKey, session.MessageStore.Hash, session.MessageStore);
+                })
+                .PermitIf(Trigger.PublicKeyAgreement, State.PublicKeyAgree, () => true);
+
+            machine.Configure(State.PublicKeyAgree)
+                .OnEntryFromAsync(publicKeyAgreementTrgger, async (Guid sessionId) =>
+                {
+                    await PublicKeyAgreementMessage(sessionId);
+                })
+                .PermitIf(Trigger.PaymentAgreement, State.Payment, () => true);
+
+            machine.Configure(State.Payment)
+                .OnEntryFromAsync(paymentTrgger, async (Guid sessionId) =>
+                {
+                    var session = GetSession(sessionId);
+                    session.PaymentAgreementMessage = await Util.TriesUntilCompleted<MessageDto>(
+                                    async () => { return await AddAsync(session.MessageStore.Message, RestApiMethod.PostMessage); }, 10, 100);
+                    SessionAddOrUpdate(session);
+                })
+                .Permit(Trigger.Complete, State.Completed);
         }
 
-        protected async Task OnCheckBalance(SendPaymentDto sender)
+        private void Configure(string stateString)
         {
-            this
-                .MasterKey(sender.Credentials.Password.ToSecureString())
-                .Identifier(sender.Credentials.Identifier.ToSecureString())
-                .Amount(sender.Amount)
-                .Memo(sender.Memo)
-                .ToAddress(sender.ToAddress);
+            var state = (State)Enum.Parse(typeof(State), stateString);
+            machine = new StateMachine<State, Trigger>(State);
 
-            canSpend = await Spendable();
-
-            await machine.FireAsync(Trigger.Unlock);
+            Configure();
         }
     }
 }

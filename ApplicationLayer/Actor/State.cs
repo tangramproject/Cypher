@@ -19,6 +19,8 @@ namespace TangramCypher.ApplicationLayer.Actor {
         Holder,
         Owner,
         New,
-        Completed
+        Completed,
+        RedemptionKey,
+        PublicKeyAgree
     }
 }
