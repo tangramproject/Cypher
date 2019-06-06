@@ -56,12 +56,29 @@ namespace TangramCypher.Helper
                 action();
             }
         }
+        [SecurityCritical]
         public static SecureString ToSecureString(this string value)
         {
-            var secureString = new SecureString();
-            Array.ForEach(value.ToArray(), secureString.AppendChar);
-            secureString.MakeReadOnly();
-            return secureString;
+            unsafe
+            {
+                fixed (char* chr = value)
+                {
+                    return new SecureString(chr, value.Length);
+                }
+            }
+        }
+        [SecurityCritical]
+        public static SecureString ToSecureString(this byte[] value)
+        {
+            unsafe
+            {
+                fixed (char* chr = value.Cast<char>().ToArray())
+                {
+                    return new SecureString(chr, value.Length);
+                }
+            }
+
+            //  Array.Clear(value, 0, value.Length);
         }
         public static string ToUnSecureString(this SecureString secureString)
         {
@@ -165,7 +182,7 @@ namespace TangramCypher.Helper
 
         public static ulong MulWithNaT(this ulong value) => (ulong)(value * Constant.NanoTan);
 
-        public static ulong DivWithNaT(ulong value) => (ulong)(value / Constant.NanoTan);
+        public static ulong DivWithNaT(this ulong value) => (ulong)(value / Constant.NanoTan);
 
         public static ulong ConvertToUInt64(this double value)
         {

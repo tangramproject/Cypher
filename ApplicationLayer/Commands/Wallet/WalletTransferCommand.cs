@@ -83,10 +83,10 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                                 return;
                             }
 
-                            spinner.Stop();
                             session = actorService.GetSession(session.SessionId);
-                            
-                            SaveRedemptionKeyLocal(session.MessageStore.Message);
+
+                            if (session.ForwardMessage.Equals(false))
+                                SaveRedemptionKeyLocal(session.MessageStore.Message);
 
                         }
                         catch (Exception ex)
@@ -96,7 +96,8 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                         }
                         finally
                         {
-                            spinner.Text = $"Available Balance: {Convert.ToString(await walletService.AvailableBalance(identifier, password))}";
+                            var balance = await walletService.AvailableBalance(identifier, password);
+                            spinner.Text = $"Available Balance: {balance.DivWithNaT().ToString("F9")}";
                         }
                     });
                 }
@@ -105,6 +106,9 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
 
         private void SaveRedemptionKeyLocal(MessageDto message)
         {
+            spinner.Text = string.Empty;
+            spinner.Stop();
+
             console.ForegroundColor = ConsoleColor.Magenta;
             console.WriteLine("\nOptions:");
             console.WriteLine("Save redemption key to file [1]");

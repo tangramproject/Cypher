@@ -14,6 +14,6 @@ namespace TangramCypher.Model
         public string Proof { get; set; }
         public string PublicKey { get; set; }
         public string Signature { get; set; }
-        public string Sum { get; set; }
+        public string RangeProof { get; set; }
     }
 }

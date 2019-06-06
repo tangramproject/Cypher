@@ -17,6 +17,7 @@ namespace TangramCypher.ApplicationLayer.Actor
     {
         public ulong Amount { get; set; }
         public CoinDto Burnt { get; set; }
+        public SecureString Blind { get; set; }
         public CoinDto Committed { get; set; }
         public bool ForwardMessage { get; set; }
         public SecureString Identifier { get; }

@@ -84,6 +84,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             apiRestSection = configuration.GetSection(Constant.ApiGateway);
 
+            Sessions = new ConcurrentDictionary<Guid, Session>();
             machine = new StateMachine<State, Trigger>(State.New);
 
             verifyTrigger = machine.SetTriggerParameters<Guid>(Trigger.Verify);
@@ -519,9 +520,12 @@ namespace TangramCypher.ApplicationLayer.Actor
         {
             MessageDto msg = null;
             var session = GetSession(sessionId);
+
+            UpdateMessagePump("Busy committing public key agreement ...");
+
             try
             {
-                var pk = Util.FormatNetworkAddress(session.RecipientAddress.FromHex());
+                var pk = Util.FormatNetworkAddress(DecodeAddress(session.RecipientAddress).ToArray());
                 var msgAddress = Cryptography.GenericHashWithKey(pk.ToHex(), pk);
                 var senderPk = session.PublicKey.ToUnSecureString();
                 var innerMessage = JObject.FromObject(new
@@ -580,6 +584,8 @@ namespace TangramCypher.ApplicationLayer.Actor
 
         private async Task Unlock(Guid sessionId)
         {
+            UpdateMessagePump("Unlocking ...");
+
             try
             {
                 await SetRandomAddress(sessionId);
@@ -600,14 +606,15 @@ namespace TangramCypher.ApplicationLayer.Actor
 
         private async Task CommitReceiver(Guid sessionId)
         {
-            var session = GetSession(sessionId);
             var receiver = await Util.TriesUntilCompleted<CoinDto>(async () =>
             {
                 async Task<CoinDto> CommitCoin()
                 {
+                    var session = GetSession(sessionId);
+
                     UpdateMessagePump("Busy committing receiver coin ...");
 
-                    var coin = coinService.BuildReceiver(session.MasterKey).Coin();
+                    var (coin, blind) = coinService.Receiver(session.MasterKey, session.Amount);
 
                     coin.Network = walletService.NetworkAddress(coin).ToHex();
                     coin = await AddAsync(coin.FormatCoinToBase64(), RestApiMethod.PostCoin);
@@ -623,15 +630,19 @@ namespace TangramCypher.ApplicationLayer.Actor
                         return null;
                     }
 
+                    session.Committed = coin;
+                    session.Blind = blind.ToSecureString();
+
+                    Array.Clear(blind, 0, blind.Length);
+
+                    SessionAddOrUpdate(session);
+
                     return coin;
                 }
 
                 return await CommitCoin();
 
             }, 10, 100);
-
-            session.Committed = receiver;
-            SessionAddOrUpdate(session);
         }
 
         /// <summary>
@@ -688,6 +699,8 @@ namespace TangramCypher.ApplicationLayer.Actor
         {
             Guard.Argument(sessionId, nameof(sessionId)).HasValue();
 
+            UpdateMessagePump("Checking funds ...");
+
             var session = GetSession(sessionId);
             var balance = await walletService.AvailableBalance(session.Identifier, session.MasterKey);
 
@@ -719,9 +732,21 @@ namespace TangramCypher.ApplicationLayer.Actor
             MessageStoreDto messageStore = null;
             var session = GetSession(sessionId);
 
+            UpdateMessagePump("Preparing redemption key ...");
+
             try
             {
-                var redemption = coinService.HotRelease(session.MasterKey, session.Memo); ;
+                var (key1, key2) = coinService.HotRelease(session.Committed.Version, session.Committed.Stamp, session.MasterKey);
+                var redemption = new RedemptionKeyDto
+                {
+                    Amount = session.Amount,
+                    Blind = session.Blind.ToUnSecureString(),
+                    Hash = session.Committed.Hash,
+                    Key1 = key1,
+                    Key2 = key2,
+                    Memo = session.Memo,
+                    Stamp = session.Committed.Stamp
+                };
                 var innerMessage = JObject.FromObject(new
                 {
                     payment = true,
@@ -745,8 +770,6 @@ namespace TangramCypher.ApplicationLayer.Actor
                         Body = cypher.ToBase64()
                     }
                 };
-
-                coinService.ClearCache();
             }
             catch (Exception ex)
             {
@@ -769,11 +792,14 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <returns>The spend.</returns>
         private async Task Burn(Guid sessionId)
         {
-            var session = GetSession(sessionId);
             var sender = await Util.TriesUntilCompleted<CoinDto>(async () =>
              {
                  async Task<CoinDto> CommitCoin()
                  {
+                     var session = GetSession(sessionId);
+                     
+                     UpdateMessagePump("Busy committing sender coin ...");
+
                      bool TestToAddress() => Util.FormatNetworkAddress(DecodeAddress(session.RecipientAddress).ToArray()) != null;
                      if (TestToAddress().Equals(false))
                      {
@@ -798,10 +824,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                          return null;
                      }
 
-                     var senderCoin = coinService
-                                     .TransactionCoin(transactionCoin)
-                                     .BuildSender(session.MasterKey)
-                                     .Coin();
+                     var senderCoin = coinService.Sender(session.MasterKey, transactionCoin);
 
                      if (senderCoin == null)
                      {
@@ -831,7 +854,10 @@ namespace TangramCypher.ApplicationLayer.Actor
                      coin.Network = walletService.NetworkAddress(coin).ToBase64();
 
                      //TODO: Could possibility fail.. need recovery..
-                     var added = await AddWalletTransaction(session.SessionId, coin, coinService.TransactionCoin().Input, session.Memo, null, TransactionType.Send);
+                     var added = await AddWalletTransaction(session.SessionId, coin, transactionCoin.Input, session.Memo, null, TransactionType.Send);
+
+                     session.Burnt = coin;
+                     SessionAddOrUpdate(session);
 
                      return coin;
                  }
@@ -839,9 +865,6 @@ namespace TangramCypher.ApplicationLayer.Actor
                  return await CommitCoin();
 
              }, 10, 100);
-
-            session.Burnt = sender;
-            SessionAddOrUpdate(session);
         }
 
         /// <summary>
