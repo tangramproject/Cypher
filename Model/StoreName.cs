@@ -20,8 +20,8 @@ namespace TangramCypher.Model
         public static readonly StoreName Track = new StoreName(2, "track");
         public static readonly StoreName StoreKeys = new StoreName(3, "storeKeys");
         public static readonly StoreName Redemption = new StoreName(4, "redemption");
-        public static readonly StoreName Receiver = new StoreName(4, "receiver");
-        public static readonly StoreName PublicKeyAgreement = new StoreName(4, "publickeyagreement");
+        public static readonly StoreName Receiver = new StoreName(5, "receiver");
+        public static readonly StoreName PublicKeyAgreement = new StoreName(6, "publickeyagreement");
 
         private StoreName(int value, string name)
         {

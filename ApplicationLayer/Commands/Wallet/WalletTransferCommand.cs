@@ -29,6 +29,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
     {
         readonly IActorService actorService;
         readonly IWalletService walletService;
+        readonly IUnitOfWork unitOfWork;
         readonly IConsole console;
         readonly ILogger logger;
 
@@ -40,6 +41,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
         {
             actorService = serviceProvider.GetService<IActorService>();
             walletService = serviceProvider.GetService<IWalletService>();
+            unitOfWork = serviceProvider.GetService<IUnitOfWork>();
             console = serviceProvider.GetService<IConsole>();
             logger = serviceProvider.GetService<ILogger>();
 
@@ -55,7 +57,6 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                 var amount = Prompt.GetString("Amount:", null, ConsoleColor.Red);
                 var memo = Prompt.GetString("Memo:", null, ConsoleColor.Green);
                 var yesNo = Prompt.GetYesNo("Send redemption key to message pool?", true, ConsoleColor.Yellow);
-
 
                 if (double.TryParse(amount, out double t))
                 {
@@ -85,10 +86,13 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
 
                             session = actorService.GetSession(session.SessionId);
 
-                            //TODO: Gets this from repo
-                            // if (session.ForwardMessage.Equals(false))
-                            //     SaveRedemptionKeyLocal(session.MessageStore.Message);
-
+                            if (session.ForwardMessage.Equals(false))
+                            {
+                                var messageStore = await unitOfWork
+                                                        .GetRedemptionRepository()
+                                                        .Get(session.Identifier, session.MasterKey, StoreKey.TransactionIdKey, session.SessionId.ToString());
+                                 SaveRedemptionKeyLocal(messageStore.Message);
+                            }
                         }
                         catch (Exception ex)
                         {
