@@ -18,6 +18,8 @@ namespace TangramCypher.Model
         private IRedemptionRepository redemptionRepository;
         private IKeySetRepository keySetRepository;
         private ITrackRepository trackRepository;
+        private IReceiverRepository receiverRepository;
+        private IPublicKeyAgreementRepository publicKeyAgreementRepository;
 
         public UnitOfWork(IVaultServiceClient vaultServiceClient, ILogger logger)
         {
@@ -25,6 +27,8 @@ namespace TangramCypher.Model
             SetRedemptionRepository(new RedemptionRepository(vaultServiceClient, logger));
             SetKeySetRepository(new KeySetRepository(vaultServiceClient, logger));
             SetTrackRepository(new TrackRepository(vaultServiceClient, logger));
+            SetReceiverRepository(new ReceiverRepository(vaultServiceClient, logger));
+            SetPublicKeyAgreementRepository(new PublicKeyAgreementRepository(vaultServiceClient, logger));
         }
 
         public ITransactionRepository GetTransactionRepository()
@@ -62,8 +66,29 @@ namespace TangramCypher.Model
             return trackRepository;
         }
 
-        private void SetTrackRepository(ITrackRepository value) {
+        private void SetTrackRepository(ITrackRepository value)
+        {
             trackRepository = value;
+        }
+
+        private void SetReceiverRepository(IReceiverRepository value)
+        {
+            receiverRepository = value;
+        }
+
+        public IReceiverRepository GetReceiverRepository()
+        {
+            return receiverRepository;
+        }
+
+        public IPublicKeyAgreementRepository GetPublicKeyAgreementRepository()
+        {
+            return publicKeyAgreementRepository;
+        }
+
+        private void SetPublicKeyAgreementRepository(IPublicKeyAgreementRepository value)
+        {
+            publicKeyAgreementRepository = value;
         }
 
         public void Dispose()

@@ -20,5 +20,6 @@ namespace TangramCypher.Model
         Task<IEnumerable<TEntity>> All(SecureString identifier, SecureString password);
         Task<bool> Truncate(SecureString identifier, SecureString password);
         Task<bool> AddOrReplace(SecureString identifier, SecureString password, StoreKey name, string key, TEntity value);
+        Task<bool> Delete(SecureString identifier, SecureString password, StoreKey name, string key);
     }
 }

@@ -14,8 +14,9 @@ namespace TangramCypher.Model
     {
         public DateTime DateTime { get; set; }
         public string Hash { get; set; }
-        public string PublicKey { get; set; }
-        public MessageDto Message { get; set; }
         public string Memo { get; set; }
+        public MessageDto Message { get; set; }
+        public string PublicKey { get; set; }
+        public Guid TransactionId { get; set; }
     }
 }

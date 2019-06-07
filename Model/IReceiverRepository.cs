@@ -7,13 +7,12 @@
 // work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
 
 using System;
+using System.Collections.Generic;
 
 namespace TangramCypher.Model
 {
-    public class MessageDto
+    public interface IReceiverRepository : IRepository<CoinDto>
     {
-        public string Address { get; set; }
-        public string Body { get; set; }
-        public Guid TransactionId { get; set; }
+
     }
 }

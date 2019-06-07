@@ -16,17 +16,12 @@ namespace TangramCypher.ApplicationLayer.Actor
     public class Session : IEqualityComparer<Session>
     {
         public ulong Amount { get; set; }
-        public CoinDto Burnt { get; set; }
         public SecureString Blind { get; set; }
-        public CoinDto Committed { get; set; }
         public bool ForwardMessage { get; set; }
         public SecureString Identifier { get; }
         public SecureString MasterKey { get; }
         public string Memo { get; set; }
-        public MessageStoreDto MessageStore { get; set; }
-        public MessageDto PaymentAgreementMessage { get; set; }
         public SecureString PublicKey { get; set; }
-        public MessageDto PublicKeyAgreementMessage { get; set; }
         public string RecipientAddress { get; set; }
         public SecureString SecretKey { get; set; }
         public string SenderAdress { get; set; }

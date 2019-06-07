@@ -6,6 +6,8 @@
 // You should have received a copy of the license along with this
 // work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
 
+using System;
+
 namespace TangramCypher.Model
 {
     public class CoinDto
@@ -16,7 +18,8 @@ namespace TangramCypher.Model
         public string Keeper { get; set; }
         public string Principle { get; set; }
         public string Stamp { get; set; }
-        public int Version { get; set; }
         public string Network { get; set; }
+        public Guid TransactionId { get; set; }
+        public int Version { get; set; }
     }
 }

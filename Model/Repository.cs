@@ -26,6 +26,7 @@ namespace TangramCypher.Model
         private static readonly AsyncLock addOrReplaceMutex = new AsyncLock();
         private static readonly AsyncLock putMutex = new AsyncLock();
         private static readonly AsyncLock truncateMutex = new AsyncLock();
+        private static readonly AsyncLock deleteMutex = new AsyncLock();
 
         private readonly IVaultServiceClient vaultServiceClient;
         private readonly ILogger logger;
@@ -51,7 +52,10 @@ namespace TangramCypher.Model
         {
             Guard.Argument(identifier, nameof(identifier)).NotNull();
             Guard.Argument(password, nameof(password)).NotNull();
-            Guard.Argument(name, nameof(name)).In(new StoreKey[] { StoreKey.AddressKey, StoreKey.HashKey, StoreKey.PublicKey, StoreKey.SecretKey });
+            Guard.Argument(name, nameof(name)).In(new StoreKey[]
+            {
+                StoreKey.AddressKey, StoreKey.HashKey, StoreKey.PublicKey, StoreKey.SecretKey, StoreKey.TransactionIdKey
+            });
             Guard.Argument(key, nameof(key)).NotNull().NotEmpty();
             Guard.Argument(value, nameof(value)).NotNull();
 
@@ -142,7 +146,10 @@ namespace TangramCypher.Model
         {
             Guard.Argument(identifier, nameof(identifier)).NotNull();
             Guard.Argument(password, nameof(password)).NotNull();
-            Guard.Argument(name, nameof(name)).In(new StoreKey[] { StoreKey.AddressKey, StoreKey.HashKey, StoreKey.PublicKey, StoreKey.SecretKey });
+            Guard.Argument(name, nameof(name)).In(new StoreKey[]
+            {
+                StoreKey.AddressKey, StoreKey.HashKey, StoreKey.PublicKey, StoreKey.SecretKey, StoreKey.TransactionIdKey
+            });
             Guard.Argument(key, nameof(key)).NotNull().NotEmpty();
 
             TEntity tEntity = default(TEntity);
@@ -174,6 +181,50 @@ namespace TangramCypher.Model
             return tEntity;
         }
 
+        public async Task<bool> Delete(SecureString identifier, SecureString password, StoreKey name, string key)
+        {
+            Guard.Argument(identifier, nameof(identifier)).NotNull();
+            Guard.Argument(password, nameof(password)).NotNull();
+            Guard.Argument(name, nameof(name)).In(new StoreKey[]
+            {
+                StoreKey.AddressKey, StoreKey.HashKey, StoreKey.PublicKey, StoreKey.SecretKey, StoreKey.TransactionIdKey
+            });
+            Guard.Argument(key, nameof(key)).NotNull().NotEmpty();
+
+            bool deleted = false;
+
+            using (var insecureIdentifier = identifier.Insecure())
+            {
+                using (await deleteMutex.LockAsync())
+                {
+                    try
+                    {
+                        var vault = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
+
+                        if (vault.Data.TryGetValue(store.ToString(), out object stores))
+                        {
+                            foreach (JObject item in ((JArray)stores).Children().ToList())
+                            {
+                                var obj = item.GetValue(name.ToString());
+                                if (obj.Value<string>().Equals(key))
+                                    ((JArray)stores).Remove();
+                            }
+
+                            await vaultServiceClient.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", vault.Data);
+
+                            deleted = true;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex.Message);
+                    }
+                }
+            }
+
+            return deleted;
+        }
+
         /// <summary>
         /// Adds a new entity.
         /// </summary>
@@ -188,7 +239,10 @@ namespace TangramCypher.Model
         {
             Guard.Argument(identifier, nameof(identifier)).NotNull();
             Guard.Argument(password, nameof(password)).NotNull();
-            Guard.Argument(name, nameof(name)).In(new StoreKey[] { StoreKey.AddressKey, StoreKey.HashKey, StoreKey.PublicKey, StoreKey.SecretKey });
+            Guard.Argument(name, nameof(name)).In(new StoreKey[]
+            {
+                StoreKey.AddressKey, StoreKey.HashKey, StoreKey.PublicKey, StoreKey.SecretKey, StoreKey.TransactionIdKey
+            });
             Guard.Argument(key, nameof(key)).NotNull().NotEmpty();
             Guard.Argument(value, nameof(value)).NotNull();
 

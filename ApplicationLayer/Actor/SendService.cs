@@ -62,6 +62,8 @@ namespace TangramCypher.ApplicationLayer.Actor
                    await Unlock(sessionId);
                    await machine.FireAsync(burnTrigger, sessionId);
                })
+                .PermitReentry(Trigger.Unlock)
+                .Permit(Trigger.Verify, State.Audited)
                 .Permit(Trigger.Torch, State.Burned);
 
             machine.Configure(State.Burned)
@@ -70,35 +72,35 @@ namespace TangramCypher.ApplicationLayer.Actor
                     await Burn(sessionId);
                     await machine.FireAsync(commitReceiverTrigger, sessionId);
                 })
+                .PermitReentry(Trigger.Torch)
+                .Permit(Trigger.Verify, State.Audited)
                 .Permit(Trigger.Commit, State.Committed);
 
             machine.Configure(State.Committed)
                 .OnEntryFromAsync(commitReceiverTrigger, async (Guid sessionId) =>
                 {
                     await CommitReceiver(sessionId);
-                    await machine.FireAsync(redemptionKeyTrigger, sessionId);
-                })
-                .Permit(Trigger.PrepareRedemptionKey, State.RedemptionKey);
-
-            machine.Configure(State.RedemptionKey)
-                .OnEntryFromAsync(redemptionKeyTrigger, async (Guid sessionId) =>
-                {
-                    RedemptionKeyMessage(sessionId);
-
-                    var session = GetSession(sessionId);
-                    var added = await unitOfWork
-                                        .GetRedemptionRepository()
-                                        .Put(session.Identifier, session.MasterKey, StoreKey.HashKey, session.MessageStore.Hash, session.MessageStore);
                     await machine.FireAsync(publicKeyAgreementTrgger, sessionId);
                 })
+                .PermitReentry(Trigger.Verify)
                 .Permit(Trigger.PublicKeyAgreement, State.PublicKeyAgree);
 
             machine.Configure(State.PublicKeyAgree)
                 .OnEntryFromAsync(publicKeyAgreementTrgger, async (Guid sessionId) =>
                 {
                     await PublicKeyAgreementMessage(sessionId);
+                    await machine.FireAsync(redemptionKeyTrigger, sessionId);
+                })
+                .PermitReentry(Trigger.Verify)
+                .Permit(Trigger.PrepareRedemptionKey, State.RedemptionKey);
+
+            machine.Configure(State.RedemptionKey)
+                .OnEntryFromAsync(redemptionKeyTrigger, async (Guid sessionId) =>
+                {
+                    await RedemptionKeyMessage(sessionId);
                     await machine.FireAsync(paymentTrgger, sessionId);
                 })
+                .PermitReentry(Trigger.Verify)
                 .Permit(Trigger.PaymentAgreement, State.Payment);
 
             machine.Configure(State.Payment)
@@ -108,15 +110,13 @@ namespace TangramCypher.ApplicationLayer.Actor
 
                     var session = GetSession(sessionId);
 
-                    session.PaymentAgreementMessage = await Util.TriesUntilCompleted<MessageDto>(
-                                    async () => { return await AddAsync(session.MessageStore.Message, RestApiMethod.PostMessage); }, 10, 100);
-
-                    SessionAddOrUpdate(session);
                     machine.Fire(Trigger.Complete);
                 })
+                .PermitReentry(Trigger.Verify)
                 .Permit(Trigger.Complete, State.Completed);
 
-            machine.Configure(State.Completed).PermitReentry(Trigger.Verify);
+            machine.Configure(State.Completed)
+                .Permit(Trigger.Verify, State.Audited);
         }
 
         private void Configure(string stateString)

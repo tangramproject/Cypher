@@ -12,9 +12,11 @@ namespace TangramCypher.Model
 {
     public interface IUnitOfWork : IDisposable
     {
-        ITransactionRepository GetTransactionRepository();
-        IRedemptionRepository GetRedemptionRepository();
         IKeySetRepository GetKeySetRepository();
+        IReceiverRepository GetReceiverRepository();
+        IRedemptionRepository GetRedemptionRepository();
         ITrackRepository GetTrackRepository();
+        ITransactionRepository GetTransactionRepository();
+        IPublicKeyAgreementRepository GetPublicKeyAgreementRepository();
     }
 }

@@ -85,8 +85,9 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
 
                             session = actorService.GetSession(session.SessionId);
 
-                            if (session.ForwardMessage.Equals(false))
-                                SaveRedemptionKeyLocal(session.MessageStore.Message);
+                            //TODO: Gets this from repo
+                            // if (session.ForwardMessage.Equals(false))
+                            //     SaveRedemptionKeyLocal(session.MessageStore.Message);
 
                         }
                         catch (Exception ex)

@@ -20,6 +20,7 @@ namespace TangramCypher.Model
         public static readonly StoreKey PublicKey = new StoreKey(2, Constant.PublicKey);
         public static readonly StoreKey SecretKey = new StoreKey(3, Constant.SecretKey);
         public static readonly StoreKey HashKey = new StoreKey(4, Constant.Hash);
+        public static readonly StoreKey TransactionIdKey = new StoreKey(5, "TransactionId");
 
         private StoreKey(int value, string name)
         {
