@@ -108,37 +108,38 @@ namespace TangramCypher.ApplicationLayer.Controllers
         {
             double balance = 0d;
 
+            var session = new Session(sendPaymentDto.Credentials.Identifier.ToSecureString(), sendPaymentDto.Credentials.Password.ToSecureString())
+            {
+                Amount = sendPaymentDto.Amount.ConvertToUInt64(),
+                ForwardMessage = sendPaymentDto.CreateRedemptionKey,
+                Memo = sendPaymentDto.Memo,
+                RecipientAddress = sendPaymentDto.Address
+            };
+
             try
             {
-                await actorService.Tansfer(null);
+                await actorService.Tansfer(session);
 
-                // if (actorService.State != State.Committed)
-                // {
-                //     var failedMessage = JsonConvert.SerializeObject(actorService.GetLastError().GetValue("message"));
-                //     return new ObjectResult(new { error = failedMessage, statusCode = 500 });
-                // }
+                if (actorService.State != State.Committed)
+                {
+                    var failedMessage = JsonConvert.SerializeObject(actorService.GetLastError().GetValue("message"));
+                    return new ObjectResult(new { error = failedMessage, statusCode = 500 });
+                }
 
-                // if (sendPaymentDto.CreateRedemptionKey)
-                // {
-                //     var message = await actorService.SendPaymentMessage(false);
-                //     var notification = message.GetValue("message").ToObject<MessageDto>();
+                session = actorService.GetSession(session.SessionId);
 
-                //     return new OkObjectResult(new { message = notification });
-                // }
-                // else
-                // {
-                //     var networkMessage = await actorService.SendPaymentMessage(true);
-                //     var success = networkMessage.GetValue("success").ToObject<bool>();
+                var messageStore = await unitOfWork
+                                            .GetRedemptionRepository()
+                                            .Get(session.Identifier, session.MasterKey, StoreKey.TransactionIdKey, session.SessionId.ToString());
 
-                //     if (success.Equals(false))
-                //         return new ObjectResult(new { error = JsonConvert.SerializeObject(networkMessage.GetValue("message")), statusCode = 500 });
+                balance = await walletService.AvailableBalance(session.Identifier, session.MasterKey);
 
-                //     balance = await actorService.CheckBalance(sendPaymentDto.Credentials.Identifier.ToSecureString(), sendPaymentDto.Credentials.Password.ToSecureString());
-                // }
+                if (sendPaymentDto.CreateRedemptionKey)
+                    return new OkObjectResult(new { message = messageStore.Message });
             }
             catch (Exception ex)
             {
-                balance = await walletService.AvailableBalance(sendPaymentDto.Credentials.Identifier.ToSecureString(), sendPaymentDto.Credentials.Password.ToSecureString());
+                balance = await walletService.AvailableBalance(session.Identifier, session.MasterKey);
                 return new ObjectResult(new { error = ex.Message, statusCode = 500, balance = balance });
             }
 
