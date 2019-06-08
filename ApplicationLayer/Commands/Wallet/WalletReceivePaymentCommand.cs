@@ -59,7 +59,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
 
                         try
                         {
-                            var session = new Session(identifier, password) { SenderAdress = address };
+                            var session = new Session(identifier, password) { SenderAddress = address };
                             await actorService.ReceivePayment(session);
                         }
                         catch (Exception ex)

@@ -23,7 +23,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         public SecureString PublicKey { get; set; }
         public string RecipientAddress { get; set; }
         public SecureString SecretKey { get; set; }
-        public string SenderAdress { get; set; }
+        public string SenderAddress { get; set; }
         public bool SufficientFunds { get; set; }
         public Guid SessionId { get; }
 
@@ -36,13 +36,13 @@ namespace TangramCypher.ApplicationLayer.Actor
 
         public bool Equals(Session x, Session y)
         {
-            return x.Identifier == y.Identifier && x.MasterKey == y.MasterKey && x.SenderAdress == y.SenderAdress && x.RecipientAddress == y.RecipientAddress && x.SessionId == y.SessionId;
+            return x.Identifier == y.Identifier && x.MasterKey == y.MasterKey && x.SenderAddress == y.SenderAddress && x.RecipientAddress == y.RecipientAddress && x.SessionId == y.SessionId;
         }
 
         public int GetHashCode(Session session)
         {
             Session s = (Session)session;
-            return s.SenderAdress.GetHashCode();
+            return s.SenderAddress.GetHashCode();
         }
     }
 }

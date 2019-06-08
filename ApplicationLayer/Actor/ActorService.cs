@@ -265,7 +265,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             SessionAddOrUpdate(session);
 
             await Unlock(session.SessionId);
-            await Util.TriesUntilCompleted<bool>(async () => { return await ReceivePayment(session.SessionId, session.SenderAdress); }, 10, 100, true);
+            await Util.TriesUntilCompleted<bool>(async () => { return await ReceivePayment(session.SessionId, session.SenderAddress); }, 10, 100, true);
         }
 
         /// <summary>
@@ -326,7 +326,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             SessionAddOrUpdate(session);
 
-            bool TestFromAddress() => Util.FormatNetworkAddress(DecodeAddress(session.SenderAdress).ToArray()) != null;
+            bool TestFromAddress() => Util.FormatNetworkAddress(DecodeAddress(session.SenderAddress).ToArray()) != null;
             if (TestFromAddress().Equals(false))
             {
                 return JObject.FromObject(new
@@ -338,7 +338,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             await SetSecretKey(session.SessionId);
 
-            var pk = Util.FormatNetworkAddress(DecodeAddress(session.SenderAdress).ToArray());
+            var pk = Util.FormatNetworkAddress(DecodeAddress(session.SenderAddress).ToArray());
             var message = JObject.Parse(cypher).ToObject<MessageDto>();
             var rmsg = ReadMessage(session.SecretKey, message.Body, pk);
             var (isPayment, store) = ParseMessage(rmsg);
@@ -655,7 +655,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             var session = GetSession(sessionId);
             var rnd = await unitOfWork.GetKeySetRepository().RandomAddress(session.Identifier, session.MasterKey);
 
-            session.SenderAdress = rnd;
+            session.SenderAddress = rnd;
             SessionAddOrUpdate(session);
         }
 
@@ -673,7 +673,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         private async Task SetSecretKey(Guid sessionId)
         {
             var session = GetSession(sessionId);
-            var keySet = await unitOfWork.GetKeySetRepository().Get(session.Identifier, session.MasterKey, StoreKey.AddressKey, session.SenderAdress);
+            var keySet = await unitOfWork.GetKeySetRepository().Get(session.Identifier, session.MasterKey, StoreKey.AddressKey, session.SenderAddress);
 
             session.SecretKey = keySet.SecretKey.ToSecureString();
             SessionAddOrUpdate(session);
@@ -686,7 +686,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         private async Task SetPublicKey(Guid sessionId)
         {
             var session = GetSession(sessionId);
-            var keySet = await unitOfWork.GetKeySetRepository().Get(session.Identifier, session.MasterKey, StoreKey.AddressKey, session.SenderAdress);
+            var keySet = await unitOfWork.GetKeySetRepository().Get(session.Identifier, session.MasterKey, StoreKey.AddressKey, session.SenderAddress);
 
             session.PublicKey = keySet.PublicKey.ToSecureString();
             SessionAddOrUpdate(session);
@@ -995,7 +995,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                                 existingVal.PublicKey = session.PublicKey;
                                 existingVal.RecipientAddress = session.RecipientAddress;
                                 existingVal.SecretKey = session.SecretKey;
-                                existingVal.SenderAdress = session.SenderAdress;
+                                existingVal.SenderAddress = session.SenderAddress;
                                 existingVal.SufficientFunds = session.SufficientFunds;
 
                                 return existingVal;
