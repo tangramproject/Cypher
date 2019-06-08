@@ -53,7 +53,8 @@ namespace TangramCypher.ApplicationLayer.Actor
                 {
                     await SufficientFunds(sessionId);
 
-                    if (lastError == null)
+                    var session = GetSession(sessionId);
+                    if (session.LastError == null)
                         await machine.FireAsync(unlockTrigger, sessionId);
                     else
                         machine.Fire(Trigger.Failed);
@@ -67,7 +68,8 @@ namespace TangramCypher.ApplicationLayer.Actor
                {
                    await Unlock(sessionId);
 
-                   if (lastError == null)
+                   var session = GetSession(sessionId);
+                   if (session.LastError == null)
                        await machine.FireAsync(burnTrigger, sessionId);
                    else
                        machine.Fire(Trigger.Failed);
@@ -82,7 +84,8 @@ namespace TangramCypher.ApplicationLayer.Actor
                 {
                     await Burn(sessionId);
 
-                    if (lastError == null)
+                    var session = GetSession(sessionId);
+                    if (session.LastError == null)
                         await machine.FireAsync(commitReceiverTrigger, sessionId);
                     else
                         machine.Fire(Trigger.Failed);

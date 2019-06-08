@@ -78,7 +78,8 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
 
                             if (actorService.State != State.Completed)
                             {
-                                var failedMessage = JsonConvert.SerializeObject(actorService.GetLastError().GetValue("message"));
+                                session = actorService.GetSession(session.SessionId);
+                                var failedMessage = JsonConvert.SerializeObject(session.LastError.GetValue("message"));
                                 logger.LogCritical(failedMessage);
                                 spinner.Fail(failedMessage);
                                 return;
@@ -91,7 +92,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                                 var messageStore = await unitOfWork
                                                         .GetRedemptionRepository()
                                                         .Get(session.Identifier, session.MasterKey, StoreKey.TransactionIdKey, session.SessionId.ToString());
-                                 SaveRedemptionKeyLocal(messageStore.Message);
+                                SaveRedemptionKeyLocal(messageStore.Message);
                             }
                         }
                         catch (Exception ex)

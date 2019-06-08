@@ -122,7 +122,8 @@ namespace TangramCypher.ApplicationLayer.Controllers
 
                 if (actorService.State != State.Committed)
                 {
-                    var failedMessage = JsonConvert.SerializeObject(actorService.GetLastError().GetValue("message"));
+                    session = actorService.GetSession(session.SessionId);
+                    var failedMessage = JsonConvert.SerializeObject(session.LastError.GetValue("message"));
                     return new ObjectResult(new { error = failedMessage, statusCode = 500 });
                 }
 

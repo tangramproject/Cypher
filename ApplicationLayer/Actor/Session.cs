@@ -9,6 +9,7 @@
 using System;
 using System.Collections.Generic;
 using System.Security;
+using Newtonsoft.Json.Linq;
 using TangramCypher.Model;
 
 namespace TangramCypher.ApplicationLayer.Actor
@@ -18,6 +19,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         public ulong Amount { get; set; }
         public bool ForwardMessage { get; set; }
         public SecureString Identifier { get; }
+        public JObject LastError { get; set; }
         public SecureString MasterKey { get; }
         public string Memo { get; set; }
         public SecureString PublicKey { get; set; }

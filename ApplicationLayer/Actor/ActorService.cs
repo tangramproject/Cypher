@@ -34,8 +34,6 @@ namespace TangramCypher.ApplicationLayer.Actor
 {
     public partial class ActorService : IActorService
     {
-        private JObject lastError;
-
         private readonly IConfigurationSection apiRestSection;
         private readonly ILogger logger;
         private readonly IOnionServiceClient onionService;
@@ -550,7 +548,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             }
             catch (Exception ex)
             {
-                lastError = JObject.FromObject(new
+                session.LastError = JObject.FromObject(new
                 {
                     success = false,
                     message = ex.Message
@@ -585,7 +583,6 @@ namespace TangramCypher.ApplicationLayer.Actor
 
         private async Task Unlock(Guid sessionId)
         {
-            lastError = null;
             UpdateMessagePump("Unlocking ...");
 
             try
@@ -596,7 +593,8 @@ namespace TangramCypher.ApplicationLayer.Actor
             }
             catch (Exception ex)
             {
-                lastError = JObject.FromObject(new
+                var session = GetSession(sessionId);
+                session.LastError = JObject.FromObject(new
                 {
                     success = false,
                     message = ex.Message
@@ -610,6 +608,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         private async Task CommitReceiver(Guid sessionId)
         {
             var session = GetSession(sessionId);
+            session.LastError = null;
 
             UpdateMessagePump("Busy committing receiver coin ...");
 
@@ -617,7 +616,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             if (receiverCoin == null)
             {
-                lastError = JObject.FromObject(new
+                session.LastError = JObject.FromObject(new
                 {
                     success = false,
                     message = "Failed to build receiver coin!"
@@ -660,12 +659,6 @@ namespace TangramCypher.ApplicationLayer.Actor
             SessionAddOrUpdate(session);
         }
 
-        /// <summary>
-        /// Gets the last error.
-        /// </summary>
-        /// <returns>The last error.</returns>
-        public JObject GetLastError() => lastError;
-
         //TODO: Need a better way of handling secret key.. 
         /// <summary>
         /// Sets the secret key.
@@ -701,10 +694,11 @@ namespace TangramCypher.ApplicationLayer.Actor
         {
             Guard.Argument(sessionId, nameof(sessionId)).HasValue();
 
-            lastError = null;
             UpdateMessagePump("Checking funds ...");
 
             var session = GetSession(sessionId);
+            session.LastError = null;
+
             var balance = await walletService.AvailableBalance(session.Identifier, session.MasterKey);
 
             if (balance >= session.Amount)
@@ -714,7 +708,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             }
             else
             {
-                lastError = JObject.FromObject(new
+                session.LastError = JObject.FromObject(new
                 {
                     success = false,
                     message = new
@@ -733,6 +727,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         private async Task RedemptionKeyMessage(Guid sessionId)
         {
             var session = GetSession(sessionId);
+            session.LastError = null;
 
             UpdateMessagePump("Preparing redemption key ...");
 
@@ -798,7 +793,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             }
             catch (Exception ex)
             {
-                lastError = JObject.FromObject(new
+                session.LastError = JObject.FromObject(new
                 {
                     success = false,
                     message = ex.Message
@@ -814,19 +809,19 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <returns>The spend.</returns>
         private async Task Burn(Guid sessionId)
         {
-            lastError = null;
             var sender = await Util.TriesUntilCompleted<CoinDto>(async () =>
              {
                  async Task<CoinDto> CommitCoin()
                  {
                      var session = GetSession(sessionId);
+                     session.LastError = null;
 
                      UpdateMessagePump("Busy committing sender coin ...");
 
                      bool TestToAddress() => Util.FormatNetworkAddress(DecodeAddress(session.RecipientAddress).ToArray()) != null;
                      if (TestToAddress().Equals(false))
                      {
-                         lastError = JObject.FromObject(new
+                         session.LastError = JObject.FromObject(new
                          {
                              success = false,
                              message = "Failed to read the recipient public key!"
@@ -839,7 +834,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
                      if (purchase == null)
                      {
-                         lastError = JObject.FromObject(new
+                         session.LastError = JObject.FromObject(new
                          {
                              success = false,
                              message = "Not enough coin on a sigle chain for the request!"
@@ -851,7 +846,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
                      if (senderCoin == null)
                      {
-                         lastError = JObject.FromObject(new
+                         session.LastError = JObject.FromObject(new
                          {
                              success = false,
                              message = "Failed to build sender coin!"
@@ -867,7 +862,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
                      if (coin == null)
                      {
-                         lastError = JObject.FromObject(new
+                         session.LastError = JObject.FromObject(new
                          {
                              success = false,
                              message = "Failed to send the request!"

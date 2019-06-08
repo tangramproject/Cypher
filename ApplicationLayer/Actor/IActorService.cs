@@ -22,7 +22,6 @@ namespace TangramCypher.ApplicationLayer.Actor
         event MessagePumpEventHandler MessagePump;
         Task<T> AddAsync<T>(T payload, RestApiMethod apiMethod);
         Task<T> GetAsync<T>(string address, RestApiMethod apiMethod);
-        JObject GetLastError();
         Session GetSession(Guid sessionId);
         Task<IEnumerable<T>> GetRangeAsync<T>(string address, int skip, int take, RestApiMethod apiMethod);
         State State { get; }
