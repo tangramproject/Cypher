@@ -93,7 +93,7 @@ namespace TangramCypher.ApplicationLayer.Coin
                 {
                     //TODO: Refactor signature to handle lambda expressions..
                     var txnsAll = await unitOfWork.GetTransactionRepository().All(identifier, secret);
-                    var txns = txnsAll.Where(tx => tx.TransactionId == purchase.Chain.Select(p => p.ToString()).FirstOrDefault());
+                    var txns = txnsAll.Where(tx => purchase.Chain.Any(id => id == Guid.Parse(tx.TransactionId)));
 
                     var received = txns.FirstOrDefault(tx => tx.TransactionType == TransactionType.Receive);
 
