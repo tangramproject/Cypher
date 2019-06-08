@@ -20,15 +20,18 @@ using TangramCypher.ApplicationLayer.Wallet;
 using Dawn;
 using Microsoft.Extensions.Logging;
 using TangramCypher.Model;
+using System.Threading.Tasks;
 
 namespace TangramCypher.ApplicationLayer.Coin
 {
     public class CoinService : ICoinService
     {
+        private readonly IUnitOfWork unitOfWork;
         private readonly ILogger logger;
 
-        public CoinService(ILogger logger)
+        public CoinService(IUnitOfWork unitOfWork, ILogger logger)
         {
+            this.unitOfWork = unitOfWork;
             this.logger = logger;
         }
 
@@ -74,7 +77,7 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// Builds the sender.
         /// </summary>
         /// <returns>The sender.</returns>
-        public CoinDto Sender(SecureString secret, TransactionCoinDto transactionCoin)
+        public async Task<CoinDto> Sender(SecureString identifier, SecureString secret, PurchaseDto purchase)
         {
             CoinDto coin = null;
             byte[] blindSum = new byte[32];
@@ -84,24 +87,28 @@ namespace TangramCypher.ApplicationLayer.Coin
             using (var pedersen = new Pedersen())
             using (var rangeProof = new RangeProof())
             {
-                coin = MakeSingleCoin(secret, transactionCoin.Stamp, transactionCoin.Version);
+                coin = MakeSingleCoin(secret, purchase.Stamp, purchase.Version);
 
                 try
                 {
-                    var received = transactionCoin.Chain.FirstOrDefault(tx => tx.TransactionType == TransactionType.Receive);
+                    //TODO: Refactor signature to handle lambda expressions..
+                    var txnsAll = await unitOfWork.GetTransactionRepository().All(identifier, secret);
+                    var txns = txnsAll.Where(tx => tx.TransactionId == purchase.Chain.Select(p => p.ToString()).FirstOrDefault());
 
-                    var blindNeg = DeriveKey(transactionCoin.Input, received.Stamp, coin.Version, secret);
-                    var commitNeg = pedersen.Commit(transactionCoin.Input, blindNeg);
+                    var received = txns.FirstOrDefault(tx => tx.TransactionType == TransactionType.Receive);
 
-                    var commitNegs = transactionCoin.Chain
-                                   .Where(tx => tx.TransactionType == TransactionType.Send)
-                                   .Select(c => pedersen.Commit(c.Amount, DeriveKey(c.Amount, c.Stamp, c.Version, secret))).ToList();
+                    var blindNeg = DeriveKey(purchase.Input, received.Stamp, coin.Version, secret);
+                    var commitNeg = pedersen.Commit(purchase.Input, blindNeg);
+
+                    var commitNegs = txns
+                                      .Where(tx => tx.TransactionType == TransactionType.Send)
+                                      .Select(c => pedersen.Commit(c.Amount, DeriveKey(c.Amount, c.Stamp, c.Version, secret))).ToList();
 
                     commitNegs.Add(commitNeg);
 
-                    var blindNegSums = transactionCoin.Chain
-                                    .Where(tx => tx.TransactionType == TransactionType.Send)
-                                    .Select(c => DeriveKey(c.Amount, c.Stamp, c.Version, secret)).ToList();
+                    var blindNegSums = txns
+                                        .Where(tx => tx.TransactionType == TransactionType.Send)
+                                        .Select(c => DeriveKey(c.Amount, c.Stamp, c.Version, secret)).ToList();
 
                     blindNegSums.Add(blindNeg);
 
@@ -114,7 +121,7 @@ namespace TangramCypher.ApplicationLayer.Coin
                     throw ex;
                 }
 
-                AttachEnvelope(blindSum, commitSum, transactionCoin.Output, secret, ref coin);
+                AttachEnvelope(blindSum, commitSum, purchase.Output, secret, ref coin);
             }
 
             return coin;

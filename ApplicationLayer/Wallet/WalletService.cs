@@ -204,7 +204,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <param name="identifier">Identifier.</param>
         /// <param name="password">Password.</param>
         /// <param name="amount">Amount.</param>
-        public async Task<TransactionCoinDto> SortChange(SecureString identifier, SecureString password, ulong amount)
+        public async Task<PurchaseDto> SortChange(SecureString identifier, SecureString password, ulong amount, Guid sessionId)
         {
             Guard.Argument(identifier, nameof(identifier)).NotNull();
             Guard.Argument(password, nameof(password)).NotNull();
@@ -214,7 +214,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
             if (txns == null)
                 return null;
 
-            TransactionCoinDto transactionCoin = null;
+            PurchaseDto purchase = null;
             TransactionDto[] txsIn = txns.Where(tx => tx.TransactionType == TransactionType.Receive).OrderBy(tx => tx.Version).ToArray();
             TransactionDto[] target = new TransactionDto[txsIn.Length];
 
@@ -226,19 +226,20 @@ namespace TangramCypher.ApplicationLayer.Wallet
 
                 if (balance >= amountFor)
                 {
-                    transactionCoin = new TransactionCoinDto
+                    purchase = new PurchaseDto
                     {
                         Balance = balance,
                         Input = amount,
                         Output = balance - amount,
-                        Stamp = transaction.Stamp
+                        Stamp = transaction.Stamp,
+                        TransactionId = sessionId
                     };
 
-                    transactionCoin.Chain = txns.Where(tx => tx.Stamp.Equals(transaction.Stamp)).ToList();
-                    transactionCoin.Version = transactionCoin.Chain.Last().Version;
+                    purchase.Chain = txns.Where(tx => tx.Stamp.Equals(transaction.Stamp)).Select(tx => Guid.Parse(tx.TransactionId)).ToHashSet();
+                    purchase.Version = txns.Where(tx => tx.Stamp.Equals(transaction.Stamp) && tx.TransactionId.Equals(purchase.Chain.Last().ToString())).Last().Version;
 
-                    if (transactionCoin.Output.Equals(0))
-                        transactionCoin.Spent = true;
+                    if (purchase.Output.Equals(0))
+                        purchase.Spent = true;
 
                     break;
                 }
@@ -247,7 +248,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
                 txsIn = txsIn.Where((source, index) => index != idx).ToArray();
             }
 
-            return transactionCoin;
+            return purchase;
         }
 
         /// <summary>

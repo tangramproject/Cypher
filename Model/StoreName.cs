@@ -22,7 +22,7 @@ namespace TangramCypher.Model
         public static readonly StoreName Redemption = new StoreName(4, "redemption");
         public static readonly StoreName Receiver = new StoreName(5, "receiver");
         public static readonly StoreName PublicKeyAgreement = new StoreName(6, "publickeyagreement");
-
+        public static readonly StoreName Purchase = new StoreName(7, "purchase");
         private StoreName(int value, string name)
         {
             this.value = value;

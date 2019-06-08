@@ -8,6 +8,7 @@
 
 using System.Collections.Generic;
 using System.Security;
+using System.Threading.Tasks;
 using Secp256k1_ZKP.Net;
 using TangramCypher.ApplicationLayer.Actor;
 using TangramCypher.ApplicationLayer.Wallet;
@@ -18,7 +19,7 @@ namespace TangramCypher.ApplicationLayer.Coin
     public interface ICoinService
     {
         (CoinDto, byte[]) Receiver(SecureString secret, ulong input);
-        CoinDto Sender(SecureString secret, TransactionCoinDto transactionCoin);
+        Task<CoinDto> Sender(SecureString identifier, SecureString secret, PurchaseDto purchase);
         (CoinDto, CoinDto) CoinSwap(SecureString secret, CoinDto coin, RedemptionKeyDto redemptionKey);
         CoinDto DeriveCoin(CoinDto coin, SecureString secret);
         byte[] DeriveKey(ulong amount, string stamp, int version, SecureString secret);

@@ -21,6 +21,7 @@ using TangramCypher.Helper;
 
 namespace TangramCypher.Model
 {
+    //TODO Better repository handling...
     public abstract class Repository<TEntity> : IRepository<TEntity> where TEntity : class
     {
         private static readonly AsyncLock addOrReplaceMutex = new AsyncLock();

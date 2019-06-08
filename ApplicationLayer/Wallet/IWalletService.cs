@@ -6,6 +6,7 @@
 // You should have received a copy of the license along with this
 // work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
 
+using System;
 using System.Collections.Generic;
 using System.Security;
 using System.Threading.Tasks;
@@ -25,7 +26,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
         byte[] HashPassword(SecureString passphrase);
         Task<ulong> TotalTransactionAmount(SecureString identifier, SecureString password, string stamp);
         Task<TransactionDto> LastTransaction(SecureString identifier, SecureString password, TransactionType transactionType);
-        Task<TransactionCoinDto> SortChange(SecureString identifier, SecureString password, ulong amount);
+        Task<PurchaseDto> SortChange(SecureString identifier, SecureString password, ulong amount, Guid sessionId);
         byte[] NetworkAddress(CoinDto coin, NetworkApiMethod networkApi = null);
         byte[] NetworkAddress(byte[] pk, NetworkApiMethod networkApi = null);
         string ProverPassword(SecureString password, int version);

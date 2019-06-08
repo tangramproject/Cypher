@@ -627,15 +627,23 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             receiverCoin.Network = walletService.NetworkAddress(receiverCoin).ToHex();
             receiverCoin.TransactionId = session.SessionId;
-            session.Blind = blind.ToHex().ToSecureString();
-
-            SessionAddOrUpdate(session);
-
-            Array.Clear(blind, 0, blind.Length);
 
             var added = await unitOfWork
                          .GetReceiverRepository()
                          .Put(session.Identifier, session.MasterKey, StoreKey.TransactionIdKey, receiverCoin.TransactionId.ToString(), receiverCoin);
+
+            var purchase = await unitOfWork
+                            .GetPurchaseRepository()
+                            .Get(session.Identifier, session.MasterKey, StoreKey.TransactionIdKey, session.SessionId.ToString());
+
+            purchase.Blind = blind.ToHex();
+
+            added = await unitOfWork
+                            .GetPurchaseRepository()
+                            .AddOrReplace(session.Identifier, session.MasterKey, StoreKey.TransactionIdKey, session.SessionId.ToString(), purchase);
+
+            purchase.Blind.ZeroString();
+            Array.Clear(blind, 0, blind.Length);
         }
 
         /// <summary>
@@ -728,6 +736,10 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             try
             {
+                var purchase = await unitOfWork
+                                        .GetPurchaseRepository()
+                                        .Get(session.Identifier, session.MasterKey, StoreKey.TransactionIdKey, session.SessionId.ToString());
+
                 var receiverCoin = await unitOfWork
                                             .GetReceiverRepository()
                                             .Get(session.Identifier, session.MasterKey, StoreKey.TransactionIdKey, session.SessionId.ToString());
@@ -736,7 +748,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                 var redemption = new RedemptionKeyDto
                 {
                     Amount = session.Amount,
-                    Blind = session.Blind.ToUnSecureString(),
+                    Blind = purchase.Blind,
                     Hash = receiverCoin.Hash,
                     Key1 = key1,
                     Key2 = key2,
@@ -820,9 +832,9 @@ namespace TangramCypher.ApplicationLayer.Actor
                      }
 
                      CoinDto coin = null;
-                     var transactionCoin = await walletService.SortChange(session.Identifier, session.MasterKey, session.Amount);
+                     var purchase = await walletService.SortChange(session.Identifier, session.MasterKey, session.Amount, session.SessionId);
 
-                     if (transactionCoin == null)
+                     if (purchase == null)
                      {
                          lastError = JObject.FromObject(new
                          {
@@ -832,7 +844,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                          return null;
                      }
 
-                     var senderCoin = coinService.Sender(session.MasterKey, transactionCoin);
+                     var senderCoin = await coinService.Sender(session.Identifier, session.MasterKey, purchase);
 
                      if (senderCoin == null)
                      {
@@ -860,12 +872,16 @@ namespace TangramCypher.ApplicationLayer.Actor
                          return null;
                      }
 
+                     var added = await unitOfWork
+                                        .GetPurchaseRepository()
+                                        .Put(session.Identifier, session.MasterKey, StoreKey.TransactionIdKey, purchase.TransactionId.ToString(), purchase);
+
                      //TODO: Need to update node side..
                      coin.Network = walletService.NetworkAddress(coin).ToBase64();
                      coin.TransactionId = session.SessionId;
 
                      //TODO: Could possibility fail.. need recovery..
-                     var added = await AddWalletTransaction(session.SessionId, coin, transactionCoin.Input, session.Memo, null, TransactionType.Send);
+                     added = await AddWalletTransaction(session.SessionId, coin, purchase.Input, session.Memo, null, TransactionType.Send);
 
                      return coin;
                  }
@@ -895,7 +911,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             var txn = new TransactionDto
             {
-                TransactionId = sessionId.ToString(),
+                TransactionId = Guid.NewGuid().ToString(),
                 Amount = total,
                 Blind = blind == null ? string.Empty : blind.ToHex(),
                 Commitment = formattedCoin.Envelope.Commitment,
@@ -974,7 +990,6 @@ namespace TangramCypher.ApplicationLayer.Actor
                                     throw new ArgumentException("Duplicate session ids are not allowed: {0}.", session.SessionId.ToString());
 
                                 existingVal.Amount = session.Amount;
-                                existingVal.Blind = session.Blind;
                                 existingVal.ForwardMessage = session.ForwardMessage;
                                 existingVal.Memo = session.Memo;
                                 existingVal.PublicKey = session.PublicKey;

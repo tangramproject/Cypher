@@ -18,5 +18,6 @@ namespace TangramCypher.Model
         ITrackRepository GetTrackRepository();
         ITransactionRepository GetTransactionRepository();
         IPublicKeyAgreementRepository GetPublicKeyAgreementRepository();
+        IPurchaseRepository GetPurchaseRepository();
     }
 }

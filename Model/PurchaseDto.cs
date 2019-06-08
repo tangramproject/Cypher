@@ -6,20 +6,22 @@
 // You should have received a copy of the license along with this
 // work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
 
+using System;
 using System.Collections.Generic;
 using TangramCypher.Model;
 
 namespace TangramCypher.Model
 {
-    public class TransactionCoinDto
+    public class PurchaseDto
     {
         public ulong Balance { get; set; }
         public string Blind { get; set; }
-        public IList<TransactionDto> Chain { get; set; }
+        public HashSet<Guid> Chain { get; set; }
         public ulong Input { get; set; }
         public ulong Output { get; set; }
         public bool Spent { get; set; }
         public string Stamp { get; set; }
+        public Guid TransactionId { get; set; }
         public int Version { get; set; }
     }
 }

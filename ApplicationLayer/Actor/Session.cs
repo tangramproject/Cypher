@@ -16,7 +16,6 @@ namespace TangramCypher.ApplicationLayer.Actor
     public class Session : IEqualityComparer<Session>
     {
         public ulong Amount { get; set; }
-        public SecureString Blind { get; set; }
         public bool ForwardMessage { get; set; }
         public SecureString Identifier { get; }
         public SecureString MasterKey { get; }
