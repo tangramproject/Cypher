@@ -68,24 +68,28 @@ namespace TangramCypher.Model
                 {
                     try
                     {
-                        var found = false;
                         var vault = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
 
-                        if (vault.Data.TryGetValue(store.ToString(), out object msgs))
+                        if (vault.Data.TryGetValue(store.ToString(), out object d))
                         {
-                            foreach (JObject item in ((JArray)msgs).Children().ToList())
-                            {
-                                var pk = item.GetValue(name.ToString());
-                                found = pk.Value<string>().Equals(key);
-                            }
+                            var wallet = (JArray)d;
+                            var jToken = wallet.FirstOrDefault(x => x.Value<string>(name.ToString()) == key);
 
-                            if (!found)
-                                ((JArray)msgs).Add(JObject.FromObject(value));
-                            else
-                                ((JArray)msgs).Replace(JObject.FromObject(value));
+                            switch (jToken)
+                            {
+                                case null:
+                                    wallet.Add(JObject.FromObject(value));
+                                    break;
+                                default:
+                                    wallet.RemoveAt(wallet.IndexOf(jToken));
+                                    wallet.Add(JObject.FromObject(value));
+                                    break;
+                            }
                         }
                         else
+                        {
                             vault.Data.Add(store.ToString(), new List<TEntity> { value });
+                        }
 
                         await vaultServiceClient.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", vault.Data);
 
@@ -161,16 +165,13 @@ namespace TangramCypher.Model
                 {
                     var vault = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
 
-                    if (vault.Data.TryGetValue(store.ToString(), out object stores))
+                    if (vault.Data.TryGetValue(store.ToString(), out object d))
                     {
-                        foreach (JObject item in ((JArray)stores).Children().ToList())
-                        {
-                            var obj = item.GetValue(name.ToString());
-                            if (obj.Value<string>().Equals(key))
-                            {
-                                tEntity = item.ToObject<TEntity>();
-                            }
-                        }
+                        var wallet = (JArray)d;
+                        var jToken = wallet.FirstOrDefault(x => x.Value<string>(name.ToString()) == key);
+
+                        if (jToken != null)
+                            tEntity = jToken.ToObject<TEntity>();
                     }
                 }
                 catch (Exception ex)
@@ -202,18 +203,17 @@ namespace TangramCypher.Model
                     {
                         var vault = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
 
-                        if (vault.Data.TryGetValue(store.ToString(), out object stores))
+                        if (vault.Data.TryGetValue(store.ToString(), out object d))
                         {
-                            foreach (JObject item in ((JArray)stores).Children().ToList())
+                            var wallet = (JArray)d;
+                            var jToken = wallet.FirstOrDefault(x => x.Value<string>(name.ToString()) == key);
+
+                            if (jToken != null)
                             {
-                                var obj = item.GetValue(name.ToString());
-                                if (obj.Value<string>().Equals(key))
-                                    ((JArray)stores).Remove();
+                                wallet.RemoveAt(wallet.IndexOf(jToken));
+                                await vaultServiceClient.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", vault.Data);
+                                deleted = true;
                             }
-
-                            await vaultServiceClient.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", vault.Data);
-
-                            deleted = true;
                         }
                     }
                     catch (Exception ex)
@@ -255,21 +255,20 @@ namespace TangramCypher.Model
                 {
                     try
                     {
-                        var found = false;
                         var vault = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
 
-                        if (vault.Data.TryGetValue(store.ToString(), out object txs))
+                        if (vault.Data.TryGetValue(store.ToString(), out object d))
                         {
-                            foreach (JObject item in ((JArray)txs).Children().ToList())
-                            {
-                                var hash = item.GetValue(name.ToString());
-                                found = hash.Value<string>().Equals(key);
-                            }
-                            if (!found)
-                                ((JArray)txs).Add(JObject.FromObject(value));
+                            var wallet = (JArray)d;
+                            var jToken = wallet.FirstOrDefault(x => x.Value<string>(name.ToString()) == key);
+
+                            if (jToken == null)
+                                wallet.Add(JObject.FromObject(value));
                         }
                         else
+                        {
                             vault.Data.Add(store.ToString(), new List<TEntity> { value });
+                        }
 
                         await vaultServiceClient.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", vault.Data);
 
