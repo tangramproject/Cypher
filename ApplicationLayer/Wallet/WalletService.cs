@@ -229,6 +229,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
                     purchase = new PurchaseDto
                     {
                         Balance = balance,
+                        DateTime = DateTime.Now,
                         Input = amount,
                         Output = balance - amount,
                         Stamp = transaction.Stamp,

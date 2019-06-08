@@ -21,6 +21,7 @@ namespace TangramCypher.ApplicationLayer.Actor {
         New,
         Completed,
         RedemptionKey,
-        PublicKeyAgree
+        PublicKeyAgree,
+        Failure
     }
 }

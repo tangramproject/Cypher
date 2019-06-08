@@ -17,6 +17,7 @@ namespace TangramCypher.Model
         public ulong Balance { get; set; }
         public string Blind { get; set; }
         public HashSet<Guid> Chain { get; set; }
+        public DateTime DateTime { get; set; }
         public ulong Input { get; set; }
         public ulong Output { get; set; }
         public bool Spent { get; set; }

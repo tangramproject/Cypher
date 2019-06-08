@@ -19,6 +19,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         PaymentAgreement,
         PrepareRedemptionKey,
         PublicKeyAgreement,
-        Complete
+        Complete,
+        Failed
     }
 }

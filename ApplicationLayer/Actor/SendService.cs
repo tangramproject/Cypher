@@ -7,6 +7,7 @@
 // work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
 
 using System;
+using System.Collections.Generic;
 using System.Security;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -51,30 +52,45 @@ namespace TangramCypher.ApplicationLayer.Actor
                 .OnEntryFromAsync(verifyTrigger, async (Guid sessionId) =>
                 {
                     await SufficientFunds(sessionId);
-                    await machine.FireAsync(unlockTrigger, sessionId);
+
+                    if (lastError == null)
+                        await machine.FireAsync(unlockTrigger, sessionId);
+                    else
+                        machine.Fire(Trigger.Failed);
                 })
                 .PermitReentry(Trigger.Verify)
-                .Permit(Trigger.Unlock, State.Keys);
+                .Permit(Trigger.Unlock, State.Keys)
+                .Permit(Trigger.Failed, State.Failure);
 
             machine.Configure(State.Keys)
                 .OnEntryFromAsync(unlockTrigger, async (Guid sessionId) =>
                {
                    await Unlock(sessionId);
-                   await machine.FireAsync(burnTrigger, sessionId);
+
+                   if (lastError == null)
+                       await machine.FireAsync(burnTrigger, sessionId);
+                   else
+                       machine.Fire(Trigger.Failed);
                })
                 .PermitReentry(Trigger.Unlock)
                 .Permit(Trigger.Verify, State.Audited)
-                .Permit(Trigger.Torch, State.Burned);
+                .Permit(Trigger.Torch, State.Burned)
+                .Permit(Trigger.Failed, State.Failure);
 
             machine.Configure(State.Burned)
                 .OnEntryFromAsync(burnTrigger, async (Guid sessionId) =>
                 {
                     await Burn(sessionId);
-                    await machine.FireAsync(commitReceiverTrigger, sessionId);
+
+                    if (lastError == null)
+                        await machine.FireAsync(commitReceiverTrigger, sessionId);
+                    else
+                        machine.Fire(Trigger.Failed);
                 })
                 .PermitReentry(Trigger.Torch)
                 .Permit(Trigger.Verify, State.Audited)
-                .Permit(Trigger.Commit, State.Committed);
+                .Permit(Trigger.Commit, State.Committed)
+                .Permit(Trigger.Failed, State.Failure);
 
             machine.Configure(State.Committed)
                 .OnEntryFromAsync(commitReceiverTrigger, async (Guid sessionId) =>
@@ -110,12 +126,31 @@ namespace TangramCypher.ApplicationLayer.Actor
 
                     var session = GetSession(sessionId);
 
+                    //TODO.. 
+                    var rece = await unitOfWork
+                                .GetReceiverRepository()
+                                .Get(session.Identifier, session.MasterKey, StoreKey.TransactionIdKey, session.SessionId.ToString());
+
+                    var pub = await unitOfWork
+                                .GetPublicKeyAgreementRepository()
+                                .Get(session.Identifier, session.MasterKey, StoreKey.TransactionIdKey, session.SessionId.ToString());
+
+                    var redem = await unitOfWork
+                                    .GetRedemptionRepository()
+                                    .Get(session.Identifier, session.MasterKey, StoreKey.TransactionIdKey, session.SessionId.ToString());
+
+                    var coins = await PostParallel(new List<CoinDto>() { rece }, RestApiMethod.PostCoin);
+                    var msgs = await PostParallel(new List<MessageDto> { pub, redem.Message }, RestApiMethod.PostMessage);
+
                     machine.Fire(Trigger.Complete);
                 })
                 .PermitReentry(Trigger.Verify)
                 .Permit(Trigger.Complete, State.Completed);
 
             machine.Configure(State.Completed)
+                .Permit(Trigger.Verify, State.Audited);
+
+            machine.Configure(State.Failure)
                 .Permit(Trigger.Verify, State.Audited);
         }
 

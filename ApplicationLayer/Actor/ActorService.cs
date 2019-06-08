@@ -585,6 +585,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
         private async Task Unlock(Guid sessionId)
         {
+            lastError = null;
             UpdateMessagePump("Unlocking ...");
 
             try
@@ -700,6 +701,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         {
             Guard.Argument(sessionId, nameof(sessionId)).HasValue();
 
+            lastError = null;
             UpdateMessagePump("Checking funds ...");
 
             var session = GetSession(sessionId);
@@ -737,12 +739,12 @@ namespace TangramCypher.ApplicationLayer.Actor
             try
             {
                 var purchase = await unitOfWork
-                                        .GetPurchaseRepository()
-                                        .Get(session.Identifier, session.MasterKey, StoreKey.TransactionIdKey, session.SessionId.ToString());
+                                .GetPurchaseRepository()
+                                .Get(session.Identifier, session.MasterKey, StoreKey.TransactionIdKey, session.SessionId.ToString());
 
                 var receiverCoin = await unitOfWork
-                                            .GetReceiverRepository()
-                                            .Get(session.Identifier, session.MasterKey, StoreKey.TransactionIdKey, session.SessionId.ToString());
+                                    .GetReceiverRepository()
+                                    .Get(session.Identifier, session.MasterKey, StoreKey.TransactionIdKey, session.SessionId.ToString());
 
                 var (key1, key2) = coinService.HotRelease(receiverCoin.Version, receiverCoin.Stamp, session.MasterKey);
                 var redemption = new RedemptionKeyDto
@@ -781,8 +783,8 @@ namespace TangramCypher.ApplicationLayer.Actor
                 };
 
                 var added = await unitOfWork
-                                     .GetRedemptionRepository()
-                                     .Put(session.Identifier, session.MasterKey, StoreKey.HashKey, messageStore.Hash, messageStore);
+                            .GetRedemptionRepository()
+                            .Put(session.Identifier, session.MasterKey, StoreKey.TransactionIdKey, session.SessionId.ToString(), messageStore);
 
                 key1.ZeroString();
                 key2.ZeroString();
@@ -812,6 +814,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <returns>The spend.</returns>
         private async Task Burn(Guid sessionId)
         {
+            lastError = null;
             var sender = await Util.TriesUntilCompleted<CoinDto>(async () =>
              {
                  async Task<CoinDto> CommitCoin()
@@ -1002,6 +1005,21 @@ namespace TangramCypher.ApplicationLayer.Actor
                             });
 
             return mSession;
+        }
+
+        private async Task<IEnumerable<T>> PostParallel<T>(IEnumerable<T> payload, RestApiMethod apiMethod)
+        {
+            var tasks = new List<Task<IEnumerable<T>>>();
+            var batchSize = 100;
+            int numberOfBatches = (int)System.Math.Ceiling((double)payload.Count() / batchSize);
+
+            for (int i = 0; i < numberOfBatches; i++)
+            {
+                var current = payload.Skip(i * batchSize).Take(batchSize);
+                tasks.Add(AddAsync(payload, apiMethod));
+            }
+
+            return (await Task.WhenAll(tasks)).SelectMany(u => u);
         }
     }
 }
