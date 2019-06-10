@@ -70,9 +70,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             Configure();
         }
 
-        private void ConfigureStateAudited()
-        {
-            machine.Configure(State.Audited)
+        private void ConfigureStateAudited() => machine.Configure(State.Audited)
                 .SubstateOf(State.New)
                 .OnEntryFromAsync(verifyTrigger, async (Guid sessionId) =>
                 {
@@ -90,11 +88,8 @@ namespace TangramCypher.ApplicationLayer.Actor
                 .PermitReentry(Trigger.Verify)
                 .Permit(Trigger.Unlock, State.Keys)
                 .Permit(Trigger.Failed, State.Failure);
-        }
 
-        private void ConfigureStateKeys()
-        {
-            machine.Configure(State.Keys)
+        private void ConfigureStateKeys() => machine.Configure(State.Keys)
                 .OnEntryFromAsync(unlockTrigger, async (Guid sessionId) =>
                 {
                     var unlocked = await Unlock(sessionId);
@@ -112,11 +107,8 @@ namespace TangramCypher.ApplicationLayer.Actor
                 .Permit(Trigger.Verify, State.Audited)
                 .Permit(Trigger.Torch, State.Burned)
                 .Permit(Trigger.Failed, State.Failure);
-        }
 
-        private void ConfigureStateBurned()
-        {
-            machine.Configure(State.Burned)
+        private void ConfigureStateBurned() => machine.Configure(State.Burned)
                 .OnEntryFromAsync(burnTrigger, async (Guid sessionId) =>
                 {
                     var burnt = await Burn(sessionId);
@@ -134,11 +126,8 @@ namespace TangramCypher.ApplicationLayer.Actor
                 .Permit(Trigger.Verify, State.Audited)
                 .Permit(Trigger.Commit, State.Committed)
                 .Permit(Trigger.Failed, State.Failure);
-        }
 
-        private void ConfigureStateCommitted()
-        {
-            machine.Configure(State.Committed)
+        private void ConfigureStateCommitted() => machine.Configure(State.Committed)
                   .OnEntryFromAsync(commitReceiverTrigger, async (Guid sessionId) =>
                   {
                       var committed = await CommitReceiver(sessionId);
@@ -152,14 +141,12 @@ namespace TangramCypher.ApplicationLayer.Actor
                           machine.Fire(Trigger.Failed);
                       }
                   })
-                  .PermitReentry(Trigger.Verify)
+                  .PermitReentry(Trigger.Commit)
+                  .Permit(Trigger.Verify, State.Audited)
                   .Permit(Trigger.PublicKeyAgreement, State.PublicKeyAgree)
                   .Permit(Trigger.Failed, State.Failure);
-        }
 
-        private void ConfigureStatePublicKeyAgree()
-        {
-            machine.Configure(State.PublicKeyAgree)
+        private void ConfigureStatePublicKeyAgree() => machine.Configure(State.PublicKeyAgree)
                 .OnEntryFromAsync(publicKeyAgreementTrgger, async (Guid sessionId) =>
                 {
                     var pubAgreed = await PublicKeyAgreementMessage(sessionId);
@@ -173,14 +160,12 @@ namespace TangramCypher.ApplicationLayer.Actor
                         machine.Fire(Trigger.Failed);
                     }
                 })
-                .PermitReentry(Trigger.Verify)
+                .PermitReentry(Trigger.PublicKeyAgreement)
                 .Permit(Trigger.PrepareRedemptionKey, State.RedemptionKey)
+                .Permit(Trigger.Verify, State.Audited)
                 .Permit(Trigger.Failed, State.Failure);
-        }
 
-        private void ConfigureStatRedeptionKey()
-        {
-            machine.Configure(State.RedemptionKey)
+        private void ConfigureStatRedeptionKey() => machine.Configure(State.RedemptionKey)
                 .OnEntryFromAsync(redemptionKeyTrigger, async (Guid sessionId) =>
                 {
                     var redeemed = await RedemptionKeyMessage(sessionId);
@@ -194,14 +179,12 @@ namespace TangramCypher.ApplicationLayer.Actor
                         machine.Fire(Trigger.Failed);
                     }
                 })
-                .PermitReentry(Trigger.Verify)
+                .PermitReentry(Trigger.PrepareRedemptionKey)
                 .Permit(Trigger.PaymentAgreement, State.Payment)
+                .Permit(Trigger.Verify, State.Audited)
                 .Permit(Trigger.Failed, State.Failure);
-        }
 
-        private void ConfigureStatePayment()
-        {
-            machine.Configure(State.Payment)
+        private void ConfigureStatePayment() => machine.Configure(State.Payment)
                 .OnEntryFromAsync(paymentTrgger, async (Guid sessionId) =>
                 {
                     UpdateMessagePump("Busy committing payment agreement ...");
@@ -230,9 +213,9 @@ namespace TangramCypher.ApplicationLayer.Actor
 
                     machine.Fire(Trigger.Complete);
                 })
-                .PermitReentry(Trigger.Verify)
+                .PermitReentry(Trigger.PaymentAgreement)
                 .Permit(Trigger.Complete, State.Completed)
+                .Permit(Trigger.Verify, State.Audited)
                 .Permit(Trigger.Failed, State.Failure);
-        }
     }
 }
