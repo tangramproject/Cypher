@@ -96,13 +96,13 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
         {
             spinner.Text = "Sending printed coin ;)";
 
-            var coinResult = actorService.AddAsync(coin.FormatCoinToBase64(), RestApiMethod.PostCoin).GetAwaiter().GetResult();
+            var coinResult = actorService.Client.AddAsync(coin.FormatCoinToBase64(), RestApiMethod.PostCoin).GetAwaiter().GetResult();
             if (coinResult == null)
             {
                 for (int i = 0; i < 10; i++)
                 {
                     spinner.Text = $"Retrying sending coin {i} of 10";
-                    coinResult = actorService.AddAsync(coin.FormatCoinToBase64(), RestApiMethod.PostCoin).GetAwaiter().GetResult();
+                    coinResult = actorService.Client.AddAsync(coin.FormatCoinToBase64(), RestApiMethod.PostCoin).GetAwaiter().GetResult();
 
                     Task.Delay(100).Wait();
 

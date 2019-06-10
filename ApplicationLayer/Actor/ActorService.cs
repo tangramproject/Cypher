@@ -34,7 +34,6 @@ namespace TangramCypher.ApplicationLayer.Actor
 {
     public partial class ActorService : IActorService
     {
-        private readonly IConfigurationSection apiRestSection;
         private readonly ILogger logger;
         private readonly IOnionServiceClient onionService;
         private readonly IWalletService walletService;
@@ -77,10 +76,8 @@ namespace TangramCypher.ApplicationLayer.Actor
             this.unitOfWork = unitOfWork;
 
             client = onionService.OnionEnabled.Equals(1) ?
-                new Client(logger, new DotNetTor.SocksPort.SocksPortHandler(onionService.SocksHost, onionService.SocksPort)) :
-                new Client(logger);
-
-            apiRestSection = configuration.GetSection(Constant.ApiGateway);
+                new Client(configuration, logger, new DotNetTor.SocksPort.SocksPortHandler(onionService.SocksHost, onionService.SocksPort)) :
+                new Client(configuration, logger);
 
             Sessions = new ConcurrentDictionary<Guid, Session>();
             machine = new StateMachine<State, Trigger>(State.New);
@@ -99,115 +96,15 @@ namespace TangramCypher.ApplicationLayer.Actor
         }
 
         /// <summary>
-        /// Add async.
+        /// Get the client.
         /// </summary>
-        /// <returns>The async.</returns>
-        /// <param name="payload">Payload.</param>
-        /// <param name="apiMethod">API method.</param>
-        /// <typeparam name="T">The 1st type parameter.</typeparam>
-        public async Task<TaskResult<T>> AddAsync<T>(T payload, RestApiMethod apiMethod)
-        {
-            Guard.Argument(payload, nameof(payload)).Equals(null);
-
-            JObject jObject = null;
-            var cts = new CancellationTokenSource();
-
-            try
-            {
-                var baseAddress = GetBaseAddress();
-                var path = apiRestSection.GetSection(Constant.Routing).GetValue<string>(apiMethod.ToString());
-
-                cts.CancelAfter(60000);
-                jObject = await client.PostAsync(payload, baseAddress, path, cts.Token);
-
-                if (jObject == null)
-                {
-                    return TaskResult<T>.CreateFailure(JObject.FromObject(new
-                    {
-                        success = false,
-                        message = "Please check the logs for any details."
-                    }));
-                }
-            }
-            catch (OperationCanceledException ex)
-            {
-                logger.LogWarning(ex.Message);
-                return TaskResult<T>.CreateFailure(ex);
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex.Message);
-                return TaskResult<T>.CreateFailure(ex);
-            }
-
-            return TaskResult<T>.CreateSuccess(jObject.ToObject<T>());
-        }
+        public Client Client => client;
 
         /// <summary>
-        /// Get async.
+        /// Get the session.
         /// </summary>
-        /// <returns>The async.</returns>
-        /// <param name="address">Address.</param>
-        /// <param name="apiMethod">API method.</param>
-        /// <typeparam name="T">The 1st type parameter.</typeparam>
-        public async Task<T> GetAsync<T>(string address, RestApiMethod apiMethod)
-        {
-            Guard.Argument(address, nameof(address)).NotNull().NotEmpty();
-
-            JObject jObject = null;
-            var cts = new CancellationTokenSource();
-
-            try
-            {
-                var baseAddress = GetBaseAddress();
-                var path = string.Format(apiRestSection.GetSection(Constant.Routing).GetValue<string>(apiMethod.ToString()), address);
-
-                cts.CancelAfter(60000);
-                jObject = await client.GetAsync<T>(baseAddress, path, cts.Token);
-            }
-            catch (OperationCanceledException ex)
-            {
-                logger.LogWarning(ex.Message);
-            }
-
-            return jObject == null ? (default) : jObject.ToObject<T>();
-        }
-
-        /// <summary>
-        /// Get range async.
-        /// </summary>
-        /// <returns>The range async.</returns>
-        /// <param name="address">Address.</param>
-        /// <param name="skip">Skip.</param>
-        /// <param name="take">Take.</param>
-        /// <param name="apiMethod">API method.</param>
-        /// <typeparam name="T">The 1st type parameter.</typeparam>
-        public async Task<IEnumerable<T>> GetRangeAsync<T>(string address, int skip, int take, RestApiMethod apiMethod)
-        {
-            Guard.Argument(address, nameof(address)).NotNull().NotEmpty();
-
-            IEnumerable<T> messages = null; ;
-            var cts = new CancellationTokenSource();
-
-            try
-            {
-                var baseAddress = GetBaseAddress();
-                var path = string.Format(apiRestSection.GetSection(Constant.Routing).GetValue<string>(apiMethod.ToString()), address, skip, take);
-
-                cts.CancelAfter(60000);
-
-                var returnMessages = await client.GetRangeAsync(baseAddress, path, cts.Token);
-
-                messages = returnMessages?.Select(m => m.ToObject<T>());
-            }
-            catch (OperationCanceledException ex)
-            {
-                logger.LogWarning(ex.Message);
-            }
-
-            return Task.FromResult(messages).Result;
-        }
-
+        /// <param name="sessionId"></param>
+        /// <returns></returns>
         public Session GetSession(Guid sessionId) => Sessions.GetValueOrDefault(sessionId);
 
         /// <summary>
@@ -299,16 +196,16 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             UpdateMessagePump("Downloading messages ...");
 
-            JObject count = null;
+            TaskResult<JObject> count = null;
             int countValue = 0;
             if (track.Result == null)
-                count = await GetAsync<JObject>(msgAddress, RestApiMethod.MessageCount);
+                count = await client.GetAsync<JObject>(msgAddress, RestApiMethod.MessageCount);
 
-            countValue = count == null ? 1 : count.Value<int>("count");
+            countValue = count.Result == null ? 1 : count.Result.Value<int>("count");
 
             messages = track == null
-                ? await GetRangeAsync<MessageDto>(msgAddress, 0, countValue, RestApiMethod.MessageRange)
-                : await GetRangeAsync<MessageDto>(msgAddress, track.Result.Skip, countValue, RestApiMethod.MessageRange);
+                ? await client.GetRangeAsync<MessageDto>(msgAddress, 0, countValue, RestApiMethod.MessageRange)
+                : await client.GetRangeAsync<MessageDto>(msgAddress, track.Result.Skip, countValue, RestApiMethod.MessageRange);
 
             if (sharedKey)
                 pk = Util.FormatNetworkAddress(receiverPk);
@@ -449,13 +346,13 @@ namespace TangramCypher.ApplicationLayer.Actor
             try
             {
                 var redemptionKey = JsonConvert.DeserializeObject<RedemptionKeyDto>(message);
-                var coin = await GetAsync<CoinDto>(redemptionKey.Hash, RestApiMethod.Coin);
+                var coinResult = await client.GetAsync<CoinDto>(redemptionKey.Hash, RestApiMethod.Coin);
 
-                if (coin == null)
+                if (coinResult.Success.Equals(false))
                     return false;
 
                 var session = GetSession(sessionId);
-                var (swap1, swap2) = coinService.CoinSwap(session.SecretKey, coin, redemptionKey);
+                var (swap1, swap2) = coinService.CoinSwap(session.SecretKey, coinResult.Result, redemptionKey);
 
                 var keeperPass = await CoinPass(session.SecretKey, swap1, 3);
                 if (keeperPass.Equals(false))
@@ -467,7 +364,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                     return false;
 
                 //TODO: Could possibility fail.. need recovery..
-                var added = await AddWalletTransaction(session.SessionId, coin, redemptionKey.Amount, redemptionKey.Memo, redemptionKey.Blind.FromHex(), TransactionType.Receive);
+                var added = await AddWalletTransaction(session.SessionId, coinResult.Result, redemptionKey.Amount, redemptionKey.Memo, redemptionKey.Blind.FromHex(), TransactionType.Receive);
                 if (added.Equals(false))
                     return false;
 
@@ -500,7 +397,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             if (status.Equals(mode))
             {
-                var returnCoin = await AddAsync(coin.FormatCoinToBase64(), RestApiMethod.PostCoin);
+                var returnCoin = await client.AddAsync(coin.FormatCoinToBase64(), RestApiMethod.PostCoin);
                 if (returnCoin != null)
                     canPass = true;
             }
@@ -632,14 +529,9 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             UpdateMessagePump("Busy committing receiver coin ...");
 
-            CoinDto receiverCoin = null;
-            byte[] blind = null;
-
-            var taskResult = coinService.Receiver(session.MasterKey, session.Amount, out receiverCoin, out blind);
+            var taskResult = coinService.Receiver(session.MasterKey, session.Amount, out CoinDto receiverCoin, out byte[] blind);
             if (!taskResult.Success)
-            {
                 return TaskResult<bool>.CreateFailure(taskResult.Exception);
-            }
 
             try
             {
@@ -880,20 +772,33 @@ namespace TangramCypher.ApplicationLayer.Actor
                 }));
             }
 
-            //TODO: Cleanup..
-            sender.Result.Network = walletService.NetworkAddress(sender.Result).ToHex();
-            sender.Result.TransactionId = session.SessionId;
+            try
+            {
+                //TODO: Cleanup..
+                sender.Result.Network = walletService.NetworkAddress(sender.Result).ToHex();
+                sender.Result.TransactionId = session.SessionId;
 
-            //TODO: Need steps.. If Success
-            var addSender = await unitOfWork
-                               .GetSenderRepository()
-                               .Put(session, StoreKey.TransactionIdKey, sender.Result.TransactionId.ToString(), sender.Result);
-            //TODO: Need steps.. If Success
-            var addPurchase = await unitOfWork
-                               .GetPurchaseRepository()
-                               .Put(session, StoreKey.TransactionIdKey, purchase.Result.TransactionId.ToString(), purchase.Result);
-            //TODO: Need steps.. If Success
-            var addTxn = await AddWalletTransaction(session.SessionId, sender.Result, purchase.Result.Input, session.Memo, null, TransactionType.Send);
+                //TODO: Need steps.. If Success
+                var addSender = await unitOfWork
+                                   .GetSenderRepository()
+                                   .Put(session, StoreKey.TransactionIdKey, sender.Result.TransactionId.ToString(), sender.Result);
+                //TODO: Need steps.. If Success
+                var addPurchase = await unitOfWork
+                                   .GetPurchaseRepository()
+                                   .Put(session, StoreKey.TransactionIdKey, purchase.Result.TransactionId.ToString(), purchase.Result);
+                //TODO: Need steps.. If Success
+                var addTxn = await AddWalletTransaction(session.SessionId, sender.Result, purchase.Result.Input, session.Memo, null, TransactionType.Send);
+
+            }
+            catch (Exception ex)
+            {
+                logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
+                return TaskResult<bool>.CreateFailure(JObject.FromObject(new
+                {
+                    success = false,
+                    message = ex.Message
+                }));
+            }
 
             return TaskResult<bool>.CreateSuccess(true);
         }
@@ -969,15 +874,6 @@ namespace TangramCypher.ApplicationLayer.Actor
         }
 
         /// <summary>
-        /// Get the base address.
-        /// </summary>
-        /// <returns>The base address.</returns>
-        private Uri GetBaseAddress()
-        {
-            return new Uri(apiRestSection.GetValue<string>(Constant.Endpoint));
-        }
-
-        /// <summary>
         /// Updates the message pump.
         /// </summary>
         /// <param name="message">Message.</param>
@@ -1013,7 +909,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
         private async Task<IEnumerable<TaskResult<T>>> PostParallel<T>(IEnumerable<T> payload, RestApiMethod apiMethod)
         {
-            var tasks = payload.Select(async p => await Util.TriesUntilCompleted<TaskResult<T>>(async () => { return await AddAsync(p, apiMethod); }, 10, 100));
+            var tasks = payload.Select(async p => await Util.TriesUntilCompleted<TaskResult<T>>(async () => { return await client.AddAsync(p, apiMethod); }, 10, 100));
             return await Task.WhenAll(tasks);
         }
 
@@ -1033,11 +929,11 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             var c = await Util.TriesUntilCompleted<TaskResult<CoinDto>>(async () =>
             {
-                return await AddAsync(coin.FormatCoinToBase64(), RestApiMethod.PostCoin);
-            }, 10, 100);
+                return await client.AddAsync(coin.FormatCoinToBase64(), RestApiMethod.PostCoin);
+            },
+            10, 100);
 
             var added = await AddWalletTransaction(session.SessionId, coin, session.Amount, "Added Test Coin", blind, TransactionType.Receive);
         }
-
     }
 }
