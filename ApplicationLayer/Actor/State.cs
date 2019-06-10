@@ -6,8 +6,10 @@
 // You should have received a copy of the license along with this
 // work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
 
-namespace TangramCypher.ApplicationLayer.Actor {
-    public enum State {
+namespace TangramCypher.ApplicationLayer.Actor
+{
+    public enum State
+    {
         Audited,
         Burned,
         Keys,
@@ -22,6 +24,7 @@ namespace TangramCypher.ApplicationLayer.Actor {
         Completed,
         RedemptionKey,
         PublicKeyAgree,
-        Failure
+        Failure,
+        Reversed
     }
 }

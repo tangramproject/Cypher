@@ -20,6 +20,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         PrepareRedemptionKey,
         PublicKeyAgreement,
         Complete,
-        Failed
+        Failed,
+        RollBack
     }
 }

@@ -191,30 +191,67 @@ namespace TangramCypher.ApplicationLayer.Actor
 
                     var session = GetSession(sessionId);
 
-                    //TODO.. 
+                    try
+                    {
+                        var send = await unitOfWork
+                                    .GetSenderRepository()
+                                    .Get(session, StoreKey.TransactionIdKey, session.SessionId.ToString());
+
+                        var rece = await unitOfWork
+                                    .GetReceiverRepository()
+                                    .Get(session, StoreKey.TransactionIdKey, session.SessionId.ToString());
+
+                        var publ = await unitOfWork
+                                    .GetPublicKeyAgreementRepository()
+                                    .Get(session, StoreKey.TransactionIdKey, session.SessionId.ToString());
+
+                        var rede = await unitOfWork
+                                    .GetRedemptionRepository()
+                                    .Get(session, StoreKey.TransactionIdKey, session.SessionId.ToString());
+
+                        //TODO: Could fail silently.. need to iterate.. 
+                        var coins = await PostParallel(new List<CoinDto>() { send.Result.FormatCoinToBase64(), rece.Result.FormatCoinToBase64() }, RestApiMethod.PostCoin);
+                        var msgs = await PostParallel(new List<MessageDto> { publ.Result, rede.Result.Message }, RestApiMethod.PostMessage);
+
+                        machine.Fire(Trigger.Complete);
+                    }
+                    catch (Exception ex)
+                    {
+                        session = GetSession(sessionId);
+                        session.LastError = JObject.FromObject(new
+                        {
+                            success = false,
+                            message = ex.Message
+                        });
+                        SessionAddOrUpdate(session);
+                        await machine.FireAsync(Trigger.RollBack);
+                    }
+                })
+                .PermitReentry(Trigger.PaymentAgreement)
+                .Permit(Trigger.Complete, State.Completed)
+                .Permit(Trigger.Verify, State.Audited)
+                .Permit(Trigger.Failed, State.Failure)
+                .Permit(Trigger.RollBack, State.Reversed);
+
+
+        private void ConfigureStateReversed() => machine.Configure(State.Reversed)
+                .OnEntryFromAsync(reversedTrgger, async (Guid sessionId) =>
+                {
+                    var session = GetSession(sessionId);
                     var send = await unitOfWork
                                 .GetSenderRepository()
                                 .Get(session, StoreKey.TransactionIdKey, session.SessionId.ToString());
 
-                    var rece = await unitOfWork
-                                .GetReceiverRepository()
-                                .Get(session, StoreKey.TransactionIdKey, session.SessionId.ToString());
+                    if (send.Success)
+                    {
+                        var deleted = await unitOfWork
+                                        .GetTransactionRepository()
+                                        .Delete(session, StoreKey.HashKey, send.Result.Hash);
+                    }
 
-                    var publ = await unitOfWork
-                                .GetPublicKeyAgreementRepository()
-                                .Get(session, StoreKey.TransactionIdKey, session.SessionId.ToString());
-
-                    var rede = await unitOfWork
-                                .GetRedemptionRepository()
-                                .Get(session, StoreKey.TransactionIdKey, session.SessionId.ToString());
-
-                    var coins = await PostParallel(new List<CoinDto>() { send.Result.FormatCoinToBase64(), rece.Result.FormatCoinToBase64() }, RestApiMethod.PostCoin);
-                    var msgs = await PostParallel(new List<MessageDto> { publ.Result, rede.Result.Message }, RestApiMethod.PostMessage);
-
-                    machine.Fire(Trigger.Complete);
+                    machine.Fire(Trigger.Failed);
                 })
-                .PermitReentry(Trigger.PaymentAgreement)
-                .Permit(Trigger.Complete, State.Completed)
+                .PermitReentry(Trigger.RollBack)
                 .Permit(Trigger.Verify, State.Audited)
                 .Permit(Trigger.Failed, State.Failure);
     }

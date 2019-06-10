@@ -48,6 +48,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         private readonly StateMachine<State, Trigger>.TriggerWithParameters<Guid> redemptionKeyTrigger;
         private readonly StateMachine<State, Trigger>.TriggerWithParameters<Guid> publicKeyAgreementTrgger;
         private readonly StateMachine<State, Trigger>.TriggerWithParameters<Guid> paymentTrgger;
+        private readonly StateMachine<State, Trigger>.TriggerWithParameters<Guid> reversedTrgger;
 
         private ConcurrentDictionary<Guid, Session> Sessions { get; }
 
@@ -89,6 +90,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             redemptionKeyTrigger = machine.SetTriggerParameters<Guid>(Trigger.PrepareRedemptionKey);
             publicKeyAgreementTrgger = machine.SetTriggerParameters<Guid>(Trigger.PublicKeyAgreement);
             paymentTrgger = machine.SetTriggerParameters<Guid>(Trigger.PaymentAgreement);
+            reversedTrgger = machine.SetTriggerParameters<Guid>(Trigger.RollBack);
 
             Configure();
 
@@ -881,7 +883,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         {
             Guard.Argument(message, nameof(message)).NotNull().NotEmpty();
             OnMessagePump(new MessagePumpEventArgs { Message = message });
-            Task.Delay(500);
+            Task.Delay(100);
         }
 
         private Session SessionAddOrUpdate(Session session)
