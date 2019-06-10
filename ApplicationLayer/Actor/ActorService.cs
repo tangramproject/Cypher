@@ -94,6 +94,8 @@ namespace TangramCypher.ApplicationLayer.Actor
             paymentTrgger = machine.SetTriggerParameters<Guid>(Trigger.PaymentAgreement);
 
             Configure();
+
+            //Test().GetAwaiter().GetResult();
         }
 
         /// <summary>
@@ -103,7 +105,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <param name="payload">Payload.</param>
         /// <param name="apiMethod">API method.</param>
         /// <typeparam name="T">The 1st type parameter.</typeparam>
-        public async Task<T> AddAsync<T>(T payload, RestApiMethod apiMethod)
+        public async Task<TaskResult<T>> AddAsync<T>(T payload, RestApiMethod apiMethod)
         {
             Guard.Argument(payload, nameof(payload)).Equals(null);
 
@@ -117,13 +119,23 @@ namespace TangramCypher.ApplicationLayer.Actor
 
                 cts.CancelAfter(60000);
                 jObject = await client.PostAsync(payload, baseAddress, path, cts.Token);
+
+                if (jObject == null)
+                {
+                    TaskResult<T>.CreateFailure(JObject.FromObject(new
+                    {
+                        success = false,
+                        message = "Please check the logs for any details."
+                    }));
+                }
             }
             catch (OperationCanceledException ex)
             {
                 logger.LogWarning(ex.Message);
+                return TaskResult<T>.CreateFailure(ex);
             }
 
-            return jObject == null ? (default) : jObject.ToObject<T>();
+            return TaskResult<T>.CreateSuccess(jObject.ToObject<T>());
         }
 
         /// <summary>
@@ -191,12 +203,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             return Task.FromResult(messages).Result;
         }
 
-        public Session GetSession(Guid sessionId)
-        {
-            Session retrievedValue;
-            Sessions.TryGetValue(sessionId, out retrievedValue);
-            return retrievedValue;
-        }
+        public Session GetSession(Guid sessionId) => Sessions.GetValueOrDefault(sessionId);
 
         /// <summary>
         /// Decodes the address.
@@ -260,7 +267,8 @@ namespace TangramCypher.ApplicationLayer.Actor
         {
             Guard.Argument(session, nameof(session)).NotNull();
 
-            SessionAddOrUpdate(session);
+            session = SessionAddOrUpdate(session);
+            session.LastError = null;
 
             await Unlock(session.SessionId);
             await Util.TriesUntilCompleted<bool>(async () => { return await ReceivePayment(session.SessionId, session.SenderAddress); }, 10, 100, true);
@@ -282,20 +290,20 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             msgAddress = sharedKey ? pk.ToHex() : Cryptography.GenericHashWithKey(pk.ToHex(), pk).ToHex();
 
-            var track = await unitOfWork.GetTrackRepository().Get(session.Identifier, session.MasterKey, StoreKey.PublicKey, pk.ToHex());
+            var track = await unitOfWork.GetTrackRepository().Get(session, StoreKey.PublicKey, pk.ToHex());
 
             UpdateMessagePump("Downloading messages ...");
 
             JObject count = null;
             int countValue = 0;
-            if (track == null)
+            if (track.Result == null)
                 count = await GetAsync<JObject>(msgAddress, RestApiMethod.MessageCount);
 
             countValue = count == null ? 1 : count.Value<int>("count");
 
             messages = track == null
                 ? await GetRangeAsync<MessageDto>(msgAddress, 0, countValue, RestApiMethod.MessageRange)
-                : await GetRangeAsync<MessageDto>(msgAddress, track.Skip, countValue, RestApiMethod.MessageRange);
+                : await GetRangeAsync<MessageDto>(msgAddress, track.Result.Skip, countValue, RestApiMethod.MessageRange);
 
             if (sharedKey)
                 pk = Util.FormatNetworkAddress(receiverPk);
@@ -317,21 +325,23 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// </summary>
         /// <returns>The payment redemption key.</returns>
         /// <param name="cypher">Cypher.</param>
-        public async Task<JObject> ReceivePaymentRedemptionKey(Session session, string cypher)
+        public async Task<string> ReceivePaymentRedemptionKey(Session session, string cypher)
         {
             Guard.Argument(session, nameof(session)).NotNull();
             Guard.Argument(cypher, nameof(cypher)).NotNull().NotEmpty();
 
-            SessionAddOrUpdate(session);
+            session = SessionAddOrUpdate(session);
+            session.LastError = null;
 
             bool TestFromAddress() => Util.FormatNetworkAddress(DecodeAddress(session.SenderAddress).ToArray()) != null;
             if (TestFromAddress().Equals(false))
             {
-                return JObject.FromObject(new
+                session.LastError = JObject.FromObject(new
                 {
                     success = false,
                     message = "Failed to read the recipient public key!"
                 });
+                return null;
             }
 
             await SetSecretKey(session.SessionId);
@@ -347,7 +357,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             {
                 var availableBal = await walletService.AvailableBalance(session.Identifier, session.MasterKey);
                 var transaction = await walletService.LastTransaction(session.Identifier, session.MasterKey, TransactionType.Receive);
-                return JObject.FromObject(new
+                return JsonConvert.SerializeObject(JObject.FromObject(new
                 {
                     success = true,
                     message = new
@@ -356,10 +366,10 @@ namespace TangramCypher.ApplicationLayer.Actor
                         received = transaction.Amount,
                         available = availableBal
                     }
-                });
+                }));
             }
 
-            return JObject.FromObject(new
+            session.LastError = JObject.FromObject(new
             {
                 success = false,
                 message = new
@@ -367,6 +377,8 @@ namespace TangramCypher.ApplicationLayer.Actor
                     available = previousBal
                 }
             });
+
+            return null;
         }
 
         /// <summary>
@@ -418,7 +430,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                     };
 
                     //TODO: Could possibility fail.. need recovery..
-                    var added = await unitOfWork.GetTrackRepository().AddOrReplace(session.Identifier, session.MasterKey, StoreKey.PublicKey, track.PublicKey, track);
+                    var added = await unitOfWork.GetTrackRepository().AddOrReplace(session, StoreKey.PublicKey, track.PublicKey, track);
                 }
 
                 skip++;
@@ -459,9 +471,8 @@ namespace TangramCypher.ApplicationLayer.Actor
             catch (Exception ex)
             {
                 logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
+                throw ex;
             }
-
-            return false;
         }
 
         /// <summary>
@@ -517,9 +528,10 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// Establishes first time public key message.
         /// </summary>
         /// <returns>The pub key message.</returns>
-        private async Task PublicKeyAgreementMessage(Guid sessionId)
+        private async Task<TaskResult<bool>> PublicKeyAgreementMessage(Guid sessionId)
         {
             var session = GetSession(sessionId);
+            session.LastError = null;
 
             UpdateMessagePump("Busy committing public key agreement ...");
 
@@ -542,19 +554,22 @@ namespace TangramCypher.ApplicationLayer.Actor
                     TransactionId = session.SessionId
                 };
 
-                var added = await unitOfWork
+                //TODO:.. Need steps.. If Success
+                var addPubKeyAgreement = await unitOfWork
                                     .GetPublicKeyAgreementRepository()
-                                    .Put(session.Identifier, session.MasterKey, StoreKey.TransactionIdKey, session.SessionId.ToString(), payload);
+                                    .Put(session, StoreKey.TransactionIdKey, payload.TransactionId.ToString(), payload);
             }
             catch (Exception ex)
             {
-                session.LastError = JObject.FromObject(new
+                logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
+                return TaskResult<bool>.CreateFailure(JObject.FromObject(new
                 {
                     success = false,
                     message = ex.Message
-                });
-                logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
+                }));
             }
+
+            return TaskResult<bool>.CreateSuccess(true);
         }
 
         /// <summary>
@@ -581,7 +596,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             return address;
         }
 
-        private async Task Unlock(Guid sessionId)
+        private async Task<TaskResult<bool>> Unlock(Guid sessionId)
         {
             UpdateMessagePump("Unlocking ...");
 
@@ -593,57 +608,62 @@ namespace TangramCypher.ApplicationLayer.Actor
             }
             catch (Exception ex)
             {
-                var session = GetSession(sessionId);
-                session.LastError = JObject.FromObject(new
+                logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
+                return TaskResult<bool>.CreateFailure(JObject.FromObject(new
                 {
                     success = false,
                     message = ex.Message
-                });
-                logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
-                throw ex;
+                }));
             }
+
+            return TaskResult<bool>.CreateSuccess(true);
         }
 
         //TODO: Cleanup
-        private async Task CommitReceiver(Guid sessionId)
+        private async Task<TaskResult<bool>> CommitReceiver(Guid sessionId)
         {
             var session = GetSession(sessionId);
             session.LastError = null;
 
             UpdateMessagePump("Busy committing receiver coin ...");
 
-            var (receiverCoin, blind) = coinService.Receiver(session.MasterKey, session.Amount);
+            CoinDto receiverCoin = null;
+            byte[] blind = null;
 
-            if (receiverCoin == null)
+            var taskResult = coinService.Receiver(session.MasterKey, session.Amount, out receiverCoin, out blind);
+            if (!taskResult.Success)
             {
-                session.LastError = JObject.FromObject(new
-                {
-                    success = false,
-                    message = "Failed to build receiver coin!"
-                });
-
-                throw new NullReferenceException("CommitReceiver check last error.");
+                return TaskResult<bool>.CreateFailure(taskResult.Exception);
             }
 
-            receiverCoin.Network = walletService.NetworkAddress(receiverCoin).ToHex();
-            receiverCoin.TransactionId = session.SessionId;
+            try
+            {
+                receiverCoin.Network = walletService.NetworkAddress(receiverCoin).ToHex();
+                receiverCoin.TransactionId = session.SessionId;
 
-            var added = await unitOfWork
-                         .GetReceiverRepository()
-                         .Put(session.Identifier, session.MasterKey, StoreKey.TransactionIdKey, receiverCoin.TransactionId.ToString(), receiverCoin);
+                var receiverRepo = unitOfWork.GetReceiverRepository();
+                var purchaseRepo = unitOfWork.GetPurchaseRepository();
+                //TODO: Need steps.. If Success
+                var addReceiver = await receiverRepo.Put(session, StoreKey.TransactionIdKey, receiverCoin.TransactionId.ToString(), receiverCoin);
+                var purchase = await purchaseRepo.Get(session, StoreKey.TransactionIdKey, session.SessionId.ToString());
 
-            var purchase = await unitOfWork
-                            .GetPurchaseRepository()
-                            .Get(session.Identifier, session.MasterKey, StoreKey.TransactionIdKey, session.SessionId.ToString());
+                purchase.Result.Blind = blind.ToHex();
+                var addPurchase = await purchaseRepo.AddOrReplace(session, StoreKey.TransactionIdKey, session.SessionId.ToString(), purchase.Result);
 
-            purchase.Blind = blind.ToHex();
+                purchase.Result.Blind.ZeroString();
+                Array.Clear(blind, 0, blind.Length);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
+                return TaskResult<bool>.CreateFailure(JObject.FromObject(new
+                {
+                    success = false,
+                    message = ex.Message
+                }));
+            }
 
-            added = await unitOfWork
-                            .GetPurchaseRepository()
-                            .AddOrReplace(session.Identifier, session.MasterKey, StoreKey.TransactionIdKey, session.SessionId.ToString(), purchase);
-
-            purchase.Blind.ZeroString();
-            Array.Clear(blind, 0, blind.Length);
+            return TaskResult<bool>.CreateSuccess(true);
         }
 
         /// <summary>
@@ -667,9 +687,9 @@ namespace TangramCypher.ApplicationLayer.Actor
         private async Task SetSecretKey(Guid sessionId)
         {
             var session = GetSession(sessionId);
-            var keySet = await unitOfWork.GetKeySetRepository().Get(session.Identifier, session.MasterKey, StoreKey.AddressKey, session.SenderAddress);
+            var keySet = await unitOfWork.GetKeySetRepository().Get(session, StoreKey.AddressKey, session.SenderAddress);
 
-            session.SecretKey = keySet.SecretKey.ToSecureString();
+            session.SecretKey = keySet.Result.SecretKey.ToSecureString();
             SessionAddOrUpdate(session);
         }
 
@@ -680,9 +700,9 @@ namespace TangramCypher.ApplicationLayer.Actor
         private async Task SetPublicKey(Guid sessionId)
         {
             var session = GetSession(sessionId);
-            var keySet = await unitOfWork.GetKeySetRepository().Get(session.Identifier, session.MasterKey, StoreKey.AddressKey, session.SenderAddress);
+            var keySet = await unitOfWork.GetKeySetRepository().Get(session, StoreKey.AddressKey, session.SenderAddress);
 
-            session.PublicKey = keySet.PublicKey.ToSecureString();
+            session.PublicKey = keySet.Result.PublicKey.ToSecureString();
             SessionAddOrUpdate(session);
         }
 
@@ -690,41 +710,49 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// Sufficient funds.
         /// </summary>
         /// <returns>The Sufficient funds.</returns>
-        private async Task SufficientFunds(Guid sessionId)
+        private async Task<TaskResult<Session>> SufficientFunds(Guid sessionId)
         {
             Guard.Argument(sessionId, nameof(sessionId)).HasValue();
-
             UpdateMessagePump("Checking funds ...");
 
             var session = GetSession(sessionId);
-            session.LastError = null;
-
             var balance = await walletService.AvailableBalance(session.Identifier, session.MasterKey);
 
-            if (balance >= session.Amount)
-            {
-                session.SufficientFunds = true;
-                SessionAddOrUpdate(session);
-            }
+            if (balance.Success)
+                if (balance.Result >= session.Amount)
+                {
+                    session.SufficientFunds = true;
+                    session = SessionAddOrUpdate(session);
+                }
+                else
+                {
+                    return TaskResult<Session>.CreateFailure(JObject.FromObject(new
+                    {
+                        success = false,
+                        message = new
+                        {
+                            available = balance,
+                            spend = session.Amount
+                        }
+                    }));
+                }
             else
             {
-                session.LastError = JObject.FromObject(new
+                return TaskResult<Session>.CreateFailure(JObject.FromObject(new
                 {
                     success = false,
-                    message = new
-                    {
-                        available = balance,
-                        spend = session.Amount
-                    }
-                });
+                    message = "Please check the error logs for any details."
+                }));
             }
+
+            return TaskResult<Session>.CreateSuccess(session);
         }
 
         /// <summary>
         /// Builds the redemption key message.
         /// </summary>
         /// <returns>The redemption key message.</returns>
-        private async Task RedemptionKeyMessage(Guid sessionId)
+        private async Task<TaskResult<bool>> RedemptionKeyMessage(Guid sessionId)
         {
             var session = GetSession(sessionId);
             session.LastError = null;
@@ -733,24 +761,25 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             try
             {
+                //TODO:.. Need steps.. If Success
                 var purchase = await unitOfWork
                                 .GetPurchaseRepository()
-                                .Get(session.Identifier, session.MasterKey, StoreKey.TransactionIdKey, session.SessionId.ToString());
-
+                                .Get(session, StoreKey.TransactionIdKey, session.SessionId.ToString());
+                //TODO:.. Need steps.. If Success
                 var receiverCoin = await unitOfWork
                                     .GetReceiverRepository()
-                                    .Get(session.Identifier, session.MasterKey, StoreKey.TransactionIdKey, session.SessionId.ToString());
+                                    .Get(session, StoreKey.TransactionIdKey, session.SessionId.ToString());
 
-                var (key1, key2) = coinService.HotRelease(receiverCoin.Version, receiverCoin.Stamp, session.MasterKey);
+                var (key1, key2) = coinService.HotRelease(receiverCoin.Result.Version, receiverCoin.Result.Stamp, session.MasterKey);
                 var redemption = new RedemptionKeyDto
                 {
                     Amount = session.Amount,
-                    Blind = purchase.Blind,
-                    Hash = receiverCoin.Hash,
+                    Blind = purchase.Result.Blind,
+                    Hash = receiverCoin.Result.Hash,
                     Key1 = key1,
                     Key2 = key2,
                     Memo = session.Memo,
-                    Stamp = receiverCoin.Stamp
+                    Stamp = receiverCoin.Result.Stamp
                 };
                 var innerMessage = JObject.FromObject(new
                 {
@@ -762,7 +791,6 @@ namespace TangramCypher.ApplicationLayer.Actor
                 var cypher = Cypher(Encoding.UTF8.GetString(paddedBuf), pk);
                 var sharedKey = ToSharedKey(session.SecretKey, pk.ToArray());
                 var msgAddress = Cryptography.GenericHashWithKey(sharedKey.ToHex(), pk);
-
                 var messageStore = new MessageStoreDto
                 {
                     DateTime = DateTime.Now,
@@ -777,9 +805,10 @@ namespace TangramCypher.ApplicationLayer.Actor
                     TransactionId = session.SessionId
                 };
 
-                var added = await unitOfWork
-                            .GetRedemptionRepository()
-                            .Put(session.Identifier, session.MasterKey, StoreKey.TransactionIdKey, session.SessionId.ToString(), messageStore);
+                //TODO:.. Need steps.. If Success
+                var addRedemption = await unitOfWork
+                                    .GetRedemptionRepository()
+                                    .Put(session, StoreKey.TransactionIdKey, session.SessionId.ToString(), messageStore);
 
                 key1.ZeroString();
                 key2.ZeroString();
@@ -793,13 +822,15 @@ namespace TangramCypher.ApplicationLayer.Actor
             }
             catch (Exception ex)
             {
-                session.LastError = JObject.FromObject(new
+                logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
+                return TaskResult<bool>.CreateFailure(JObject.FromObject(new
                 {
                     success = false,
                     message = ex.Message
-                });
-                logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
+                }));
             }
+
+            return TaskResult<bool>.CreateSuccess(true);
         }
 
         //TODO: Needs refactoring...
@@ -807,86 +838,59 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// Spend.
         /// </summary>
         /// <returns>The spend.</returns>
-        private async Task Burn(Guid sessionId)
+        private async Task<TaskResult<bool>> Burn(Guid sessionId)
         {
-            var sender = await Util.TriesUntilCompleted<CoinDto>(async () =>
-             {
-                 async Task<CoinDto> CommitCoin()
-                 {
-                     var session = GetSession(sessionId);
-                     session.LastError = null;
+            var session = GetSession(sessionId);
+            session.LastError = null;
 
-                     UpdateMessagePump("Busy committing sender coin ...");
+            UpdateMessagePump("Busy committing sender coin ...");
 
-                     bool TestToAddress() => Util.FormatNetworkAddress(DecodeAddress(session.RecipientAddress).ToArray()) != null;
-                     if (TestToAddress().Equals(false))
-                     {
-                         session.LastError = JObject.FromObject(new
-                         {
-                             success = false,
-                             message = "Failed to read the recipient public key!"
-                         });
-                         return null;
-                     }
+            bool TestToAddress() => Util.FormatNetworkAddress(DecodeAddress(session.RecipientAddress).ToArray()) != null;
+            if (TestToAddress().Equals(false))
+            {
+                return TaskResult<bool>.CreateFailure(JObject.FromObject(new
+                {
+                    success = false,
+                    message = "Failed to read the recipient public key!"
+                }));
+            }
 
-                     CoinDto coin = null;
-                     var purchase = await walletService.SortChange(session.Identifier, session.MasterKey, session.Amount, session.SessionId);
+            var purchase = await walletService.SortChange(session);
+            if (purchase.Success.Equals(false))
+            {
+                return TaskResult<bool>.CreateFailure(JObject.FromObject(new
+                {
+                    success = false,
+                    message = "Not enough coin on a sigle chain for the request!"
+                }));
+            }
 
-                     if (purchase == null)
-                     {
-                         session.LastError = JObject.FromObject(new
-                         {
-                             success = false,
-                             message = "Not enough coin on a sigle chain for the request!"
-                         });
-                         return null;
-                     }
+            var sender = await coinService.Sender(session, purchase.Result);
+            if (sender.Success.Equals(false))
+            {
+                return TaskResult<bool>.CreateFailure(JObject.FromObject(new
+                {
+                    success = false,
+                    message = "Failed to build sender coin!"
+                }));
+            }
 
-                     var senderCoin = await coinService.Sender(session.Identifier, session.MasterKey, purchase);
+            //TODO: Cleanup..
+            sender.Result.Network = walletService.NetworkAddress(sender.Result).ToHex();
+            sender.Result.TransactionId = session.SessionId;
 
-                     if (senderCoin == null)
-                     {
-                         session.LastError = JObject.FromObject(new
-                         {
-                             success = false,
-                             message = "Failed to build sender coin!"
-                         });
-                         return null;
-                     }
+            //TODO: Need steps.. If Success
+            var addSender = await unitOfWork
+                               .GetSenderRepository()
+                               .Put(session, StoreKey.TransactionIdKey, sender.Result.TransactionId.ToString(), sender.Result);
+            //TODO: Need steps.. If Success
+            var addPurchase = await unitOfWork
+                               .GetPurchaseRepository()
+                               .Put(session, StoreKey.TransactionIdKey, purchase.Result.TransactionId.ToString(), purchase.Result);
+            //TODO: Need steps.. If Success
+            var addTxn = await AddWalletTransaction(session.SessionId, sender.Result, purchase.Result.Input, session.Memo, null, TransactionType.Send);
 
-                     //TODO: Cleanup..
-                     senderCoin.Network = walletService.NetworkAddress(senderCoin).ToHex();
-                     senderCoin.TransactionId = session.SessionId;
-
-                     coin = await AddAsync(senderCoin.FormatCoinToBase64(), RestApiMethod.PostCoin);
-
-                     if (coin == null)
-                     {
-                         session.LastError = JObject.FromObject(new
-                         {
-                             success = false,
-                             message = "Failed to send the request!"
-                         });
-                         return null;
-                     }
-
-                     var added = await unitOfWork
-                                        .GetPurchaseRepository()
-                                        .Put(session.Identifier, session.MasterKey, StoreKey.TransactionIdKey, purchase.TransactionId.ToString(), purchase);
-
-                     //TODO: Need to update node side..
-                     coin.Network = walletService.NetworkAddress(coin).ToBase64();
-                     coin.TransactionId = session.SessionId;
-
-                     //TODO: Could possibility fail.. need recovery..
-                     added = await AddWalletTransaction(session.SessionId, coin, purchase.Input, session.Memo, null, TransactionType.Send);
-
-                     return coin;
-                 }
-
-                 return await CommitCoin();
-
-             }, 10, 100);
+            return TaskResult<bool>.CreateSuccess(true);
         }
 
         /// <summary>
@@ -922,9 +926,9 @@ namespace TangramCypher.ApplicationLayer.Actor
             };
 
             var session = GetSession(sessionId);
-            var added = await unitOfWork.GetTransactionRepository().Put(session.Identifier, session.MasterKey, StoreKey.HashKey, txn.Hash, txn);
+            var addTxn = await unitOfWork.GetTransactionRepository().Put(session, StoreKey.HashKey, txn.Hash, txn);
 
-            return added;
+            return addTxn.Success;
         }
 
         /// <summary>
@@ -1004,7 +1008,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
         private async Task<IEnumerable<T>> PostParallel<T>(IEnumerable<T> payload, RestApiMethod apiMethod)
         {
-            var tasks = new List<Task<IEnumerable<T>>>();
+            var tasks = new List<Task<TaskResult<IEnumerable<T>>>>();
             var batchSize = 100;
             int numberOfBatches = (int)System.Math.Ceiling((double)payload.Count() / batchSize);
 
@@ -1014,7 +1018,30 @@ namespace TangramCypher.ApplicationLayer.Actor
                 tasks.Add(AddAsync(payload, apiMethod));
             }
 
-            return (await Task.WhenAll(tasks)).SelectMany(u => u);
+            return (await Task.WhenAll(tasks)).SelectMany(u => u.Result);
         }
+
+        private async Task Test()
+        {
+            var session = new Session("id_ee75d7b59f76b55601d8e8611118aa0d".ToSecureString(), "its pilferer sung will vellum things concoct calmly the futile lover".ToSecureString())
+            {
+                Amount = 70000000000000
+            };
+
+            session = SessionAddOrUpdate(session);
+
+            coinService.Receiver(session.MasterKey, session.Amount, out CoinDto coin, out byte[] blind);
+
+            coin.Hash = coinService.Hash(coin).ToHex();
+            coin.Network = walletService.NetworkAddress(coin).ToHex();
+
+            var c = await Util.TriesUntilCompleted<TaskResult<CoinDto>>(async () =>
+            {
+                return await AddAsync(coin.FormatCoinToBase64(), RestApiMethod.PostCoin);
+            }, 10, 100);
+
+            var added = await AddWalletTransaction(session.SessionId, coin, session.Amount, "Added Test Coin", blind, TransactionType.Receive);
+        }
+
     }
 }

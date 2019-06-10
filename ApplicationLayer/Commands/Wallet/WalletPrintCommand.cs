@@ -66,7 +66,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                         {
                             spinner.Text = "Transferring money";
 
-                          var session = new Session(identifier, password)
+                            var session = new Session(identifier, password)
                             {
                                 Amount = amount.ConvertToUInt64(),
                                 ForwardMessage = true,
@@ -111,7 +111,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                 }
             }
 
-            return coinResult;
+            return coinResult.Result;
         }
 
         private void ActorService_MessagePump(object sender, MessagePumpEventArgs e)

@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
+using TangramCypher.ApplicationLayer.Actor;
 using TangramCypher.ApplicationLayer.Wallet;
 using TangramCypher.Helper;
 using TangramCypher.Model;
@@ -38,10 +39,11 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                 using (var identifier = Prompt.GetPasswordAsSecureString("Identifier:", ConsoleColor.Yellow))
                 using (var password = Prompt.GetPasswordAsSecureString("Password:", ConsoleColor.Yellow))
                 {
+                    var session = new Session(identifier, password);
                     var keySet = walletService.CreateKeySet();
-                    var added = await unitOfWork.GetKeySetRepository().Put(identifier, password, StoreKey.AddressKey, keySet.Address, keySet);
+                    var addKeySet = await unitOfWork.GetKeySetRepository().Put(session, StoreKey.AddressKey, keySet.Address, keySet);
 
-                    if (added)
+                    if (addKeySet.Success)
                     {
                         console.ForegroundColor = ConsoleColor.Magenta;
                         console.WriteLine("\nWallet Key set added!\n");

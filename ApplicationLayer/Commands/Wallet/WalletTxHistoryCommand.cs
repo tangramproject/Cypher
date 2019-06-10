@@ -14,11 +14,12 @@ using Microsoft.Extensions.DependencyInjection;
 using ConsoleTables;
 using System.Linq;
 using TangramCypher.Model;
+using TangramCypher.ApplicationLayer.Actor;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
 {
     [CommandDescriptor(new string[] { "wallet", "transactions" }, "List wallet transactions")]
-    public class WalletTxHistoryCommand: Command
+    public class WalletTxHistoryCommand : Command
     {
         private readonly IConsole console;
         private readonly IUnitOfWork unitOfWork;
@@ -36,8 +37,9 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
             {
                 try
                 {
-                    var txns = await unitOfWork.GetTransactionRepository().All(identifier, password);
-                    var final = txns.Select(tx => new { tx.Amount, tx.Memo, tx.TransactionType, tx.DateTime, tx.Hash }).ToList();
+                    var session = new Session(identifier, password);
+                    var txns = await unitOfWork.GetTransactionRepository().All(session);
+                    var final = txns.Result.Select(tx => new { tx.Amount, tx.Memo, tx.TransactionType, tx.DateTime, tx.Hash }).ToList();
                     var table = ConsoleTable.From(final).ToString();
 
                     console.WriteLine(table);

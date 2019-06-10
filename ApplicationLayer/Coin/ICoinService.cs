@@ -12,14 +12,15 @@ using System.Threading.Tasks;
 using Secp256k1_ZKP.Net;
 using TangramCypher.ApplicationLayer.Actor;
 using TangramCypher.ApplicationLayer.Wallet;
+using TangramCypher.Helper;
 using TangramCypher.Model;
 
 namespace TangramCypher.ApplicationLayer.Coin
 {
     public interface ICoinService
     {
-        (CoinDto, byte[]) Receiver(SecureString secret, ulong input);
-        Task<CoinDto> Sender(SecureString identifier, SecureString secret, PurchaseDto purchase);
+        TaskResult<bool> Receiver(SecureString secret, ulong input, out CoinDto coin, out byte[] blind);
+        Task<TaskResult<CoinDto>> Sender(Session session, PurchaseDto purchase);
         (CoinDto, CoinDto) CoinSwap(SecureString secret, CoinDto coin, RedemptionKeyDto redemptionKey);
         CoinDto DeriveCoin(CoinDto coin, SecureString secret);
         byte[] DeriveKey(ulong amount, string stamp, int version, SecureString secret);

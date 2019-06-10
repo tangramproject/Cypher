@@ -75,24 +75,22 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                             };
 
                             await actorService.Tansfer(session);
+                            session = actorService.GetSession(session.SessionId);
 
                             if (actorService.State != State.Completed)
                             {
-                                session = actorService.GetSession(session.SessionId);
                                 var failedMessage = JsonConvert.SerializeObject(session.LastError.GetValue("message"));
                                 logger.LogCritical(failedMessage);
                                 spinner.Fail(failedMessage);
                                 return;
                             }
 
-                            session = actorService.GetSession(session.SessionId);
-
                             if (session.ForwardMessage.Equals(false))
                             {
                                 var messageStore = await unitOfWork
                                                         .GetRedemptionRepository()
-                                                        .Get(session.Identifier, session.MasterKey, StoreKey.TransactionIdKey, session.SessionId.ToString());
-                                SaveRedemptionKeyLocal(messageStore.Message);
+                                                        .Get(session, StoreKey.TransactionIdKey, session.SessionId.ToString());
+                                SaveRedemptionKeyLocal(messageStore.Result.Message);
                             }
                         }
                         catch (Exception ex)
@@ -103,7 +101,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                         finally
                         {
                             var balance = await walletService.AvailableBalance(identifier, password);
-                            spinner.Text = $"Available Balance: {balance.DivWithNaT().ToString("F9")}";
+                            spinner.Text = $"Available Balance: {balance.Result.DivWithNaT().ToString("F9")}";
                         }
                     });
                 }

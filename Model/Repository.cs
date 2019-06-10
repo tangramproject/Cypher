@@ -49,10 +49,9 @@ namespace TangramCypher.Model
         /// <param name="key"></param>
         /// <param name="value"></param>
         /// <returns></returns>
-        public async Task<bool> AddOrReplace(SecureString identifier, SecureString password, StoreKey name, string key, TEntity value)
+        public async Task<TaskResult<bool>> AddOrReplace(Session session, StoreKey name, string key, TEntity value)
         {
-            Guard.Argument(identifier, nameof(identifier)).NotNull();
-            Guard.Argument(password, nameof(password)).NotNull();
+            Guard.Argument(session, nameof(session)).NotNull();
             Guard.Argument(name, nameof(name)).In(new StoreKey[]
             {
                 StoreKey.AddressKey, StoreKey.HashKey, StoreKey.PublicKey, StoreKey.SecretKey, StoreKey.TransactionIdKey
@@ -60,49 +59,43 @@ namespace TangramCypher.Model
             Guard.Argument(key, nameof(key)).NotNull().NotEmpty();
             Guard.Argument(value, nameof(value)).NotNull();
 
-            bool added = false;
-
-            using (var insecureIdentifier = identifier.Insecure())
+            using (await addOrReplaceMutex.LockAsync())
             {
-                using (await addOrReplaceMutex.LockAsync())
+                try
                 {
-                    try
+                    var vault = await vaultServiceClient.GetDataAsync(session.Identifier, session.MasterKey, $"wallets/{session.Identifier.ToUnSecureString()}/wallet");
+
+                    if (vault.Data.TryGetValue(store.ToString(), out object d))
                     {
-                        var vault = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
+                        var wallet = (JArray)d;
+                        var jToken = wallet.FirstOrDefault(x => x.Value<string>(name.ToString()) == key);
 
-                        if (vault.Data.TryGetValue(store.ToString(), out object d))
+                        switch (jToken)
                         {
-                            var wallet = (JArray)d;
-                            var jToken = wallet.FirstOrDefault(x => x.Value<string>(name.ToString()) == key);
-
-                            switch (jToken)
-                            {
-                                case null:
-                                    wallet.Add(JObject.FromObject(value));
-                                    break;
-                                default:
-                                    wallet.RemoveAt(wallet.IndexOf(jToken));
-                                    wallet.Add(JObject.FromObject(value));
-                                    break;
-                            }
+                            case null:
+                                wallet.Add(JObject.FromObject(value));
+                                break;
+                            default:
+                                wallet.RemoveAt(wallet.IndexOf(jToken));
+                                wallet.Add(JObject.FromObject(value));
+                                break;
                         }
-                        else
-                        {
-                            vault.Data.Add(store.ToString(), new List<TEntity> { value });
-                        }
-
-                        await vaultServiceClient.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", vault.Data);
-
-                        added = true;
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        logger.LogError(ex.Message);
+                        vault.Data.Add(store.ToString(), new List<TEntity> { value });
                     }
+
+                    await vaultServiceClient.SaveDataAsync(session.Identifier, session.MasterKey, $"wallets/{session.Identifier.ToUnSecureString()}/wallet", vault.Data);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex.Message);
+                    return TaskResult<bool>.CreateFailure(ex);
                 }
             }
 
-            return added;
+            return TaskResult<bool>.CreateSuccess(true);
         }
 
         /// <summary>
@@ -112,30 +105,27 @@ namespace TangramCypher.Model
         /// <param name="password"></param>
         /// <param name="store"></param>
         /// <returns></returns>
-        public async Task<IEnumerable<TEntity>> All(SecureString identifier, SecureString password)
+        public async Task<TaskResult<IEnumerable<TEntity>>> All(Session session)
         {
-            Guard.Argument(identifier, nameof(identifier)).NotNull();
-            Guard.Argument(password, nameof(password)).NotNull();
+            Guard.Argument(session, nameof(session)).NotNull();
 
             IEnumerable<TEntity> List = null;
 
-            using (var insecureIdentifier = identifier.Insecure())
+            try
             {
-                try
+                var vault = await vaultServiceClient.GetDataAsync(session.Identifier, session.MasterKey, $"wallets/{session.Identifier.ToUnSecureString()}/wallet");
+                if (vault.Data.TryGetValue(store.ToString(), out object txs))
                 {
-                    var vault = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
-                    if (vault.Data.TryGetValue(store.ToString(), out object txs))
-                    {
-                        List = ((JArray)txs).ToObject<IEnumerable<TEntity>>();
-                    }
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex.Message);
+                    List = ((JArray)txs).ToObject<IEnumerable<TEntity>>();
                 }
             }
+            catch (Exception ex)
+            {
+                logger.LogError(ex.Message);
+                return TaskResult<IEnumerable<TEntity>>.CreateFailure(ex);
+            }
 
-            return List;
+            return TaskResult<IEnumerable<TEntity>>.CreateSuccess(List);
         }
 
         /// <summary>
@@ -147,10 +137,9 @@ namespace TangramCypher.Model
         /// <param name="name"></param>
         /// <param name="key"></param>
         /// <returns></returns>
-        public async Task<TEntity> Get(SecureString identifier, SecureString password, StoreKey name, string key)
+        public async Task<TaskResult<TEntity>> Get(Session session, StoreKey name, string key)
         {
-            Guard.Argument(identifier, nameof(identifier)).NotNull();
-            Guard.Argument(password, nameof(password)).NotNull();
+            Guard.Argument(session, nameof(session)).NotNull();
             Guard.Argument(name, nameof(name)).In(new StoreKey[]
             {
                 StoreKey.AddressKey, StoreKey.HashKey, StoreKey.PublicKey, StoreKey.SecretKey, StoreKey.TransactionIdKey
@@ -159,11 +148,42 @@ namespace TangramCypher.Model
 
             TEntity tEntity = default(TEntity);
 
-            using (var insecureIdentifier = identifier.Insecure())
+            try
+            {
+                var vault = await vaultServiceClient.GetDataAsync(session.Identifier, session.MasterKey, $"wallets/{session.Identifier.ToUnSecureString()}/wallet");
+
+                if (vault.Data.TryGetValue(store.ToString(), out object d))
+                {
+                    var wallet = (JArray)d;
+                    var jToken = wallet.FirstOrDefault(x => x.Value<string>(name.ToString()) == key);
+
+                    if (jToken != null)
+                        tEntity = jToken.ToObject<TEntity>();
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex.Message);
+                return TaskResult<TEntity>.CreateFailure(ex);
+            }
+
+            return TaskResult<TEntity>.CreateSuccess(tEntity);
+        }
+
+        public async Task<TaskResult<bool>> Delete(Session session, StoreKey name, string key)
+        {
+            Guard.Argument(session, nameof(session)).NotNull();
+            Guard.Argument(name, nameof(name)).In(new StoreKey[]
+            {
+                StoreKey.AddressKey, StoreKey.HashKey, StoreKey.PublicKey, StoreKey.SecretKey, StoreKey.TransactionIdKey
+            });
+            Guard.Argument(key, nameof(key)).NotNull().NotEmpty();
+
+            using (await deleteMutex.LockAsync())
             {
                 try
                 {
-                    var vault = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
+                    var vault = await vaultServiceClient.GetDataAsync(session.Identifier, session.MasterKey, $"wallets/{session.Identifier.ToUnSecureString()}/wallet");
 
                     if (vault.Data.TryGetValue(store.ToString(), out object d))
                     {
@@ -171,59 +191,20 @@ namespace TangramCypher.Model
                         var jToken = wallet.FirstOrDefault(x => x.Value<string>(name.ToString()) == key);
 
                         if (jToken != null)
-                            tEntity = jToken.ToObject<TEntity>();
+                        {
+                            wallet.RemoveAt(wallet.IndexOf(jToken));
+                            await vaultServiceClient.SaveDataAsync(session.Identifier, session.MasterKey, $"wallets/{session.Identifier.ToUnSecureString()}/wallet", vault.Data);
+                        }
                     }
                 }
                 catch (Exception ex)
                 {
                     logger.LogError(ex.Message);
+                    return TaskResult<bool>.CreateFailure(ex);
                 }
             }
 
-            return tEntity;
-        }
-
-        public async Task<bool> Delete(SecureString identifier, SecureString password, StoreKey name, string key)
-        {
-            Guard.Argument(identifier, nameof(identifier)).NotNull();
-            Guard.Argument(password, nameof(password)).NotNull();
-            Guard.Argument(name, nameof(name)).In(new StoreKey[]
-            {
-                StoreKey.AddressKey, StoreKey.HashKey, StoreKey.PublicKey, StoreKey.SecretKey, StoreKey.TransactionIdKey
-            });
-            Guard.Argument(key, nameof(key)).NotNull().NotEmpty();
-
-            bool deleted = false;
-
-            using (var insecureIdentifier = identifier.Insecure())
-            {
-                using (await deleteMutex.LockAsync())
-                {
-                    try
-                    {
-                        var vault = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
-
-                        if (vault.Data.TryGetValue(store.ToString(), out object d))
-                        {
-                            var wallet = (JArray)d;
-                            var jToken = wallet.FirstOrDefault(x => x.Value<string>(name.ToString()) == key);
-
-                            if (jToken != null)
-                            {
-                                wallet.RemoveAt(wallet.IndexOf(jToken));
-                                await vaultServiceClient.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", vault.Data);
-                                deleted = true;
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        logger.LogError(ex.Message);
-                    }
-                }
-            }
-
-            return deleted;
+            return TaskResult<bool>.CreateSuccess(true);
         }
 
         /// <summary>
@@ -236,10 +217,9 @@ namespace TangramCypher.Model
         /// <param name="key"></param>
         /// <param name="value"></param>
         /// <returns></returns>
-        public async Task<bool> Put(SecureString identifier, SecureString password, StoreKey name, string key, TEntity value)
+        public async Task<TaskResult<bool>> Put(Session session, StoreKey name, string key, TEntity value)
         {
-            Guard.Argument(identifier, nameof(identifier)).NotNull();
-            Guard.Argument(password, nameof(password)).NotNull();
+            Guard.Argument(session, nameof(session)).NotNull();
             Guard.Argument(name, nameof(name)).In(new StoreKey[]
             {
                 StoreKey.AddressKey, StoreKey.HashKey, StoreKey.PublicKey, StoreKey.SecretKey, StoreKey.TransactionIdKey
@@ -247,42 +227,35 @@ namespace TangramCypher.Model
             Guard.Argument(key, nameof(key)).NotNull().NotEmpty();
             Guard.Argument(value, nameof(value)).NotNull();
 
-            bool added = false;
-
-            using (var insecureIdentifier = identifier.Insecure())
+            using (await putMutex.LockAsync())
             {
-                using (await putMutex.LockAsync())
+                try
                 {
-                    try
+                    var vault = await vaultServiceClient.GetDataAsync(session.Identifier, session.MasterKey, $"wallets/{session.Identifier.ToUnSecureString()}/wallet");
+
+                    if (vault.Data.TryGetValue(store.ToString(), out object d))
                     {
-                        var vault = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
+                        var wallet = (JArray)d;
+                        var jToken = wallet.FirstOrDefault(x => x.Value<string>(name.ToString()) == key);
 
-                        if (vault.Data.TryGetValue(store.ToString(), out object d))
-                        {
-                            var wallet = (JArray)d;
-                            var jToken = wallet.FirstOrDefault(x => x.Value<string>(name.ToString()) == key);
-
-                            if (jToken == null)
-                                wallet.Add(JObject.FromObject(value));
-                        }
-                        else
-                        {
-                            vault.Data.Add(store.ToString(), new List<TEntity> { value });
-                        }
-
-                        await vaultServiceClient.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", vault.Data);
-
-                        added = true;
+                        if (jToken == null)
+                            wallet.Add(JObject.FromObject(value));
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        logger.LogError(ex.Message);
+                        vault.Data.Add(store.ToString(), new List<TEntity> { value });
                     }
+
+                    await vaultServiceClient.SaveDataAsync(session.Identifier, session.MasterKey, $"wallets/{session.Identifier.ToUnSecureString()}/wallet", vault.Data);
                 }
-
+                catch (Exception ex)
+                {
+                    logger.LogError(ex.Message);
+                    return TaskResult<bool>.CreateFailure(ex);
+                }
             }
 
-            return added;
+            return TaskResult<bool>.CreateSuccess(true);
         }
 
         /// <summary>
@@ -292,36 +265,29 @@ namespace TangramCypher.Model
         /// <param name="password"></param>
         /// <param name="store"></param>
         /// <returns></returns>
-        public async Task<bool> Truncate(SecureString identifier, SecureString password)
+        public async Task<TaskResult<bool>> Truncate(Session session)
         {
-            Guard.Argument(identifier, nameof(identifier)).NotNull();
-            Guard.Argument(password, nameof(password)).NotNull();
+            Guard.Argument(session, nameof(session)).NotNull();
 
-            bool cleared = false;
-
-            using (var insecureIdentifier = identifier.Insecure())
+            using (await truncateMutex.LockAsync())
             {
-                using (await truncateMutex.LockAsync())
+                try
                 {
-                    try
-                    {
-                        var vault = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
+                    var vault = await vaultServiceClient.GetDataAsync(session.Identifier, session.MasterKey, $"wallets/{session.Identifier.ToUnSecureString()}/wallet");
 
-                        if (vault.Data.TryGetValue(store.ToString(), out object txs))
-                            vault.Data.Clear();
+                    if (vault.Data.TryGetValue(store.ToString(), out object txs))
+                        vault.Data.Clear();
 
-                        await vaultServiceClient.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", vault.Data);
-
-                        cleared = true;
-                    }
-                    catch (Exception ex)
-                    {
-                        logger.LogError(ex.Message);
-                    }
+                    await vaultServiceClient.SaveDataAsync(session.Identifier, session.MasterKey, $"wallets/{session.Identifier.ToUnSecureString()}/wallet", vault.Data);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex.Message);
+                    return TaskResult<bool>.CreateFailure(true);
                 }
             }
 
-            return cleared;
+            return TaskResult<bool>.CreateSuccess(true);
         }
     }
 }

@@ -10,16 +10,18 @@ using System;
 using System.Collections.Generic;
 using System.Security;
 using System.Threading.Tasks;
+using TangramCypher.ApplicationLayer.Actor;
+using TangramCypher.Helper;
 
 namespace TangramCypher.Model
 {
     public interface IRepository<TEntity> where TEntity : class
     {
-        Task<bool> Put(SecureString identifier, SecureString password, StoreKey name, string key, TEntity value);
-        Task<TEntity> Get(SecureString identifier, SecureString password, StoreKey name, string key);
-        Task<IEnumerable<TEntity>> All(SecureString identifier, SecureString password);
-        Task<bool> Truncate(SecureString identifier, SecureString password);
-        Task<bool> AddOrReplace(SecureString identifier, SecureString password, StoreKey name, string key, TEntity value);
-        Task<bool> Delete(SecureString identifier, SecureString password, StoreKey name, string key);
+        Task<TaskResult<bool>> Put(Session session, StoreKey name, string key, TEntity value);
+        Task<TaskResult<TEntity>> Get(Session session, StoreKey name, string key);
+        Task<TaskResult<IEnumerable<TEntity>>> All(Session session);
+        Task<TaskResult<bool>> Truncate(Session session);
+        Task<TaskResult<bool>> AddOrReplace(Session session, StoreKey name, string key, TEntity value);
+        Task<TaskResult<bool>> Delete(Session session, StoreKey name, string key);
     }
 }

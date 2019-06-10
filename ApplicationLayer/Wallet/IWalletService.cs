@@ -12,13 +12,14 @@ using System.Security;
 using System.Threading.Tasks;
 using TangramCypher.ApplicationLayer.Actor;
 using TangramCypher.ApplicationLayer.Coin;
+using TangramCypher.Helper;
 using TangramCypher.Model;
 
 namespace TangramCypher.ApplicationLayer.Wallet
 {
     public interface IWalletService
     {
-        Task<ulong> AvailableBalance(SecureString identifier, SecureString password);
+        Task<TaskResult<ulong>> AvailableBalance(SecureString identifier, SecureString password);
         KeySetDto CreateKeySet();
         Task<CredentialsDto> CreateWallet();
         SecureString NewID(int bytes = 32);
@@ -26,7 +27,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
         byte[] HashPassword(SecureString passphrase);
         Task<ulong> TotalTransactionAmount(SecureString identifier, SecureString password, string stamp);
         Task<TransactionDto> LastTransaction(SecureString identifier, SecureString password, TransactionType transactionType);
-        Task<PurchaseDto> SortChange(SecureString identifier, SecureString password, ulong amount, Guid sessionId);
+        Task<TaskResult<PurchaseDto>> SortChange(Session session);
         byte[] NetworkAddress(CoinDto coin, NetworkApiMethod networkApi = null);
         byte[] NetworkAddress(byte[] pk, NetworkApiMethod networkApi = null);
         string ProverPassword(SecureString password, int version);

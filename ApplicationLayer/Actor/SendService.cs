@@ -51,13 +51,16 @@ namespace TangramCypher.ApplicationLayer.Actor
                 .SubstateOf(State.New)
                 .OnEntryFromAsync(verifyTrigger, async (Guid sessionId) =>
                 {
-                    await SufficientFunds(sessionId);
-
-                    var session = GetSession(sessionId);
-                    if (session.LastError == null)
-                        await machine.FireAsync(unlockTrigger, sessionId);
+                    var funds = await SufficientFunds(sessionId);
+                    if (funds.Success)
+                        await machine.FireAsync(unlockTrigger, funds.Result.SessionId);
                     else
+                    {
+                        var session = GetSession(sessionId);
+                        session.LastError = funds.NonSuccessMessage;
+                        SessionAddOrUpdate(session);
                         machine.Fire(Trigger.Failed);
+                    }
                 })
                 .PermitReentry(Trigger.Verify)
                 .Permit(Trigger.Unlock, State.Keys)
@@ -65,15 +68,18 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             machine.Configure(State.Keys)
                 .OnEntryFromAsync(unlockTrigger, async (Guid sessionId) =>
-               {
-                   await Unlock(sessionId);
-
-                   var session = GetSession(sessionId);
-                   if (session.LastError == null)
-                       await machine.FireAsync(burnTrigger, sessionId);
-                   else
-                       machine.Fire(Trigger.Failed);
-               })
+                {
+                    var unlocked = await Unlock(sessionId);
+                    if (unlocked.Success)
+                        await machine.FireAsync(burnTrigger, sessionId);
+                    else
+                    {
+                        var session = GetSession(sessionId);
+                        session.LastError = unlocked.NonSuccessMessage;
+                        SessionAddOrUpdate(session);
+                        machine.Fire(Trigger.Failed);
+                    }
+                })
                 .PermitReentry(Trigger.Unlock)
                 .Permit(Trigger.Verify, State.Audited)
                 .Permit(Trigger.Torch, State.Burned)
@@ -82,13 +88,16 @@ namespace TangramCypher.ApplicationLayer.Actor
             machine.Configure(State.Burned)
                 .OnEntryFromAsync(burnTrigger, async (Guid sessionId) =>
                 {
-                    await Burn(sessionId);
-
-                    var session = GetSession(sessionId);
-                    if (session.LastError == null)
+                    var burnt = await Burn(sessionId);
+                    if (burnt.Success)
                         await machine.FireAsync(commitReceiverTrigger, sessionId);
                     else
+                    {
+                        var session = GetSession(sessionId);
+                        session.LastError = burnt.NonSuccessMessage;
+                        SessionAddOrUpdate(session);
                         machine.Fire(Trigger.Failed);
+                    }
                 })
                 .PermitReentry(Trigger.Torch)
                 .Permit(Trigger.Verify, State.Audited)
@@ -98,8 +107,16 @@ namespace TangramCypher.ApplicationLayer.Actor
             machine.Configure(State.Committed)
                 .OnEntryFromAsync(commitReceiverTrigger, async (Guid sessionId) =>
                 {
-                    await CommitReceiver(sessionId);
-                    await machine.FireAsync(publicKeyAgreementTrgger, sessionId);
+                    var committed = await CommitReceiver(sessionId);
+                    if (committed.Success)
+                        await machine.FireAsync(publicKeyAgreementTrgger, sessionId);
+                    else
+                    {
+                        var session = GetSession(sessionId);
+                        session.LastError = committed.NonSuccessMessage;
+                        SessionAddOrUpdate(session);
+                        machine.Fire(Trigger.Failed);
+                    }
                 })
                 .PermitReentry(Trigger.Verify)
                 .Permit(Trigger.PublicKeyAgreement, State.PublicKeyAgree);
@@ -107,8 +124,16 @@ namespace TangramCypher.ApplicationLayer.Actor
             machine.Configure(State.PublicKeyAgree)
                 .OnEntryFromAsync(publicKeyAgreementTrgger, async (Guid sessionId) =>
                 {
-                    await PublicKeyAgreementMessage(sessionId);
-                    await machine.FireAsync(redemptionKeyTrigger, sessionId);
+                    var pubAgreed = await PublicKeyAgreementMessage(sessionId);
+                    if (pubAgreed.Success)
+                        await machine.FireAsync(redemptionKeyTrigger, sessionId);
+                    else
+                    {
+                        var session = GetSession(sessionId);
+                        session.LastError = pubAgreed.NonSuccessMessage;
+                        SessionAddOrUpdate(session);
+                        machine.Fire(Trigger.Failed);
+                    }
                 })
                 .PermitReentry(Trigger.Verify)
                 .Permit(Trigger.PrepareRedemptionKey, State.RedemptionKey);
@@ -116,8 +141,16 @@ namespace TangramCypher.ApplicationLayer.Actor
             machine.Configure(State.RedemptionKey)
                 .OnEntryFromAsync(redemptionKeyTrigger, async (Guid sessionId) =>
                 {
-                    await RedemptionKeyMessage(sessionId);
-                    await machine.FireAsync(paymentTrgger, sessionId);
+                    var redeemed = await RedemptionKeyMessage(sessionId);
+                    if (redeemed.Success)
+                        await machine.FireAsync(paymentTrgger, sessionId);
+                    else
+                    {
+                        var session = GetSession(sessionId);
+                        session.LastError = redeemed.NonSuccessMessage;
+                        SessionAddOrUpdate(session);
+                        machine.Fire(Trigger.Failed);
+                    }
                 })
                 .PermitReentry(Trigger.Verify)
                 .Permit(Trigger.PaymentAgreement, State.Payment);
@@ -130,20 +163,24 @@ namespace TangramCypher.ApplicationLayer.Actor
                     var session = GetSession(sessionId);
 
                     //TODO.. 
+                    var send = await unitOfWork
+                                .GetSenderRepository()
+                                .Get(session, StoreKey.TransactionIdKey, session.Identifier.ToString());
+
                     var rece = await unitOfWork
                                 .GetReceiverRepository()
-                                .Get(session.Identifier, session.MasterKey, StoreKey.TransactionIdKey, session.SessionId.ToString());
+                                .Get(session, StoreKey.TransactionIdKey, session.SessionId.ToString());
 
-                    var pub = await unitOfWork
+                    var publ = await unitOfWork
                                 .GetPublicKeyAgreementRepository()
-                                .Get(session.Identifier, session.MasterKey, StoreKey.TransactionIdKey, session.SessionId.ToString());
+                                .Get(session, StoreKey.TransactionIdKey, session.SessionId.ToString());
 
-                    var redem = await unitOfWork
-                                    .GetRedemptionRepository()
-                                    .Get(session.Identifier, session.MasterKey, StoreKey.TransactionIdKey, session.SessionId.ToString());
+                    var rede = await unitOfWork
+                                .GetRedemptionRepository()
+                                .Get(session, StoreKey.TransactionIdKey, session.SessionId.ToString());
 
-                    var coins = await PostParallel(new List<CoinDto>() { rece }, RestApiMethod.PostCoin);
-                    var msgs = await PostParallel(new List<MessageDto> { pub, redem.Message }, RestApiMethod.PostMessage);
+                    var coins = await PostParallel(new List<CoinDto>() { send.Result, rece.Result }, RestApiMethod.PostCoin);
+                    var msgs = await PostParallel(new List<MessageDto> { publ.Result, rede.Result.Message }, RestApiMethod.PostMessage);
 
                     machine.Fire(Trigger.Complete);
                 })

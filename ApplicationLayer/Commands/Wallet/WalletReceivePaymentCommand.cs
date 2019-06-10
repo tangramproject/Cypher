@@ -70,9 +70,10 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                         finally
                         {
                             var transaction = await walletService.LastTransaction(identifier, password, TransactionType.Receive);
+                            var txnAmount = transaction == null ? 0 : transaction.Amount;
                             var balance = Convert.ToString(await walletService.AvailableBalance(identifier, password));
 
-                            spinner.Text = $"Received:{transaction.Amount}  Available Balance: {balance}";
+                            spinner.Text = $"Received:{txnAmount}  Available Balance: {balance}";
                         }
                     });
                 }

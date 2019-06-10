@@ -38,11 +38,12 @@ namespace TangramCypher.ApplicationLayer.Controllers
         [HttpPost("address", Name = "CreateWalletAddress")]
         public async Task<IActionResult> CreateWalletAddress([FromBody] CredentialsDto credentials)
         {
+            var session = new Session(credentials.Identifier.ToSecureString(), credentials.Password.ToSecureString());
             var keySet = walletService.CreateKeySet();
-            var added = await unitOfWork.GetKeySetRepository().Put(credentials.Identifier.ToSecureString(), credentials.Password.ToSecureString(), StoreKey.AddressKey, keySet.Address, keySet);
+            var addKeySet = await unitOfWork.GetKeySetRepository().Put(session, StoreKey.AddressKey, keySet.Address, keySet);
 
-            if (added)
-                return new CreatedResult("httpWallet", new { success = added });
+            if (addKeySet.Success)
+                return new CreatedResult("httpWallet", new { success = addKeySet.Result });
 
             return new BadRequestResult();
         }
@@ -78,35 +79,40 @@ namespace TangramCypher.ApplicationLayer.Controllers
         [HttpPost("receive", Name = "WalletReceivePayment")]
         public async Task<IActionResult> WalletReceivePayment([FromBody] ReceivePaymentDto receivePaymentDto)
         {
-            double balance = 0d;
+            TaskResult<ulong> availBalance;
+
+            var session = new Session(receivePaymentDto.Credentials.Identifier.ToSecureString(), receivePaymentDto.Credentials.Password.ToSecureString())
+            {
+                SenderAddress = receivePaymentDto.FromAddress
+            };
 
             try
             {
-                // if (receivePaymentDto.RedemptionMessage != null)
-                // {
-                //     await actorService
-                //       .ReceivePaymentRedemptionKey(JsonConvert.SerializeObject(receivePaymentDto.RedemptionMessage));
-                // }
-                // else
-                // {
-                //     await actorService.ReceivePayment();
-                // }
+                if (receivePaymentDto.RedemptionMessage != null)
+                {
+                    await actorService
+                            .ReceivePaymentRedemptionKey(session, JsonConvert.SerializeObject(receivePaymentDto.RedemptionMessage));
+                }
+                else
+                {
+                    await actorService.ReceivePayment(session);
+                }
 
-                balance = await walletService.AvailableBalance(receivePaymentDto.Credentials.Identifier.ToSecureString(), receivePaymentDto.Credentials.Password.ToSecureString());
+                availBalance = await walletService.AvailableBalance(session.Identifier, session.MasterKey);
             }
             catch (Exception ex)
             {
-                balance = await walletService.AvailableBalance(receivePaymentDto.Credentials.Identifier.ToSecureString(), receivePaymentDto.Credentials.Password.ToSecureString());
-                return new ObjectResult(new { error = ex.Message, statusCode = 500, balance = balance });
+                availBalance = await walletService.AvailableBalance(session.Identifier, session.MasterKey);
+                return new ObjectResult(new { error = ex.Message, statusCode = 500, balance = availBalance.Result });
             }
 
-            return new OkObjectResult(new { balance = balance });
+            return new OkObjectResult(new { balance = availBalance.Result });
         }
 
         [HttpPost("send", Name = "WalletTransfer")]
         public async Task<IActionResult> WalletTransfer([FromBody] SendPaymentDto sendPaymentDto)
         {
-            double balance = 0d;
+            TaskResult<ulong> availBalance;
 
             var session = new Session(sendPaymentDto.Credentials.Identifier.ToSecureString(), sendPaymentDto.Credentials.Password.ToSecureString())
             {
@@ -131,26 +137,27 @@ namespace TangramCypher.ApplicationLayer.Controllers
 
                 var messageStore = await unitOfWork
                                             .GetRedemptionRepository()
-                                            .Get(session.Identifier, session.MasterKey, StoreKey.TransactionIdKey, session.SessionId.ToString());
+                                            .Get(session, StoreKey.TransactionIdKey, session.SessionId.ToString());
 
-                balance = await walletService.AvailableBalance(session.Identifier, session.MasterKey);
+                availBalance = await walletService.AvailableBalance(session.Identifier, session.MasterKey);
 
                 if (sendPaymentDto.CreateRedemptionKey)
-                    return new OkObjectResult(new { message = messageStore.Message });
+                    return new OkObjectResult(new { message = messageStore.Result.Message });
             }
             catch (Exception ex)
             {
-                balance = await walletService.AvailableBalance(session.Identifier, session.MasterKey);
-                return new ObjectResult(new { error = ex.Message, statusCode = 500, balance = balance });
+                availBalance = await walletService.AvailableBalance(session.Identifier, session.MasterKey);
+                return new ObjectResult(new { error = ex.Message, statusCode = 500, balance = availBalance.Result });
             }
 
-            return new OkObjectResult(new { balance = balance });
+            return new OkObjectResult(new { balance = availBalance.Result });
         }
 
         [HttpPost("transactions", Name = "WalletTransactions")]
         public async Task<IActionResult> WalletTransactions([FromBody] CredentialsDto credentials)
         {
-            var txns = await unitOfWork.GetTransactionRepository().All(credentials.Identifier.ToSecureString(), credentials.Password.ToSecureString());
+            var session = new Session(credentials.Identifier.ToSecureString(), credentials.Password.ToSecureString());
+            var txns = await unitOfWork.GetTransactionRepository().All(session);
             return new OkObjectResult(txns);
         }
 

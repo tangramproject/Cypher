@@ -55,13 +55,26 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <returns>The balance.</returns>
         /// <param name="identifier">Identifier.</param>
         /// <param name="password">Password.</param>
-        public async Task<ulong> AvailableBalance(SecureString identifier, SecureString password)
+        public async Task<TaskResult<ulong>> AvailableBalance(SecureString identifier, SecureString password)
         {
             Guard.Argument(identifier, nameof(identifier)).NotNull();
             Guard.Argument(password, nameof(password)).NotNull();
 
-            var txns = await unitOfWork.GetTransactionRepository().All(identifier, password);
-            return Balance(identifier, password, txns);
+            TaskResult<IEnumerable<TransactionDto>> txns;
+            var balance = 0UL;
+
+            try
+            {
+                txns = await unitOfWork.GetTransactionRepository().All(new Session(identifier, password));
+                balance = Balance(identifier, password, txns.Result);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex.Message);
+                return TaskResult<ulong>.CreateFailure(ex);
+            }
+
+            return TaskResult<ulong>.CreateSuccess(balance);
         }
 
         /// <summary>
@@ -166,12 +179,12 @@ namespace TangramCypher.ApplicationLayer.Wallet
             Guard.Argument(stamp, nameof(stamp)).NotNull().NotEmpty();
 
             var txnRepo = unitOfWork.GetTransactionRepository();
-            var txns = await txnRepo.All(identifier, password);
+            var txns = await txnRepo.All(new Session(identifier, password));
 
             if (txns == null)
                 return 0;
 
-            var amounts = txns.Where(tx => tx.Stamp.Equals(stamp)).Select(a => a.Amount);
+            var amounts = txns.Result.Where(tx => tx.Stamp.Equals(stamp)).Select(a => a.Amount);
             var total = txnRepo.Sum(amounts);
 
             return total;
@@ -188,12 +201,12 @@ namespace TangramCypher.ApplicationLayer.Wallet
             Guard.Argument(identifier, nameof(identifier)).NotNull();
             Guard.Argument(password, nameof(password)).NotNull();
 
-            var txns = await unitOfWork.GetTransactionRepository().All(identifier, password);
+            var txns = await unitOfWork.GetTransactionRepository().All(new Session(identifier, password));
 
             if (txns == null)
                 return null;
 
-            var transaction = txns.Last(tx => tx.TransactionType.Equals(transactionType));
+            var transaction = txns.Result.Last(tx => tx.TransactionType.Equals(transactionType));
             return transaction;
         }
 
@@ -204,52 +217,61 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <param name="identifier">Identifier.</param>
         /// <param name="password">Password.</param>
         /// <param name="amount">Amount.</param>
-        public async Task<PurchaseDto> SortChange(SecureString identifier, SecureString password, ulong amount, Guid sessionId)
+        public async Task<TaskResult<PurchaseDto>> SortChange(Session session)
         {
-            Guard.Argument(identifier, nameof(identifier)).NotNull();
-            Guard.Argument(password, nameof(password)).NotNull();
+            Guard.Argument(session, nameof(session)).NotNull();
 
-            var txns = await unitOfWork.GetTransactionRepository().All(identifier, password);
+            var txns = await unitOfWork.GetTransactionRepository().All(session);
 
             if (txns == null)
                 return null;
 
             PurchaseDto purchase = null;
-            TransactionDto[] txsIn = txns.Where(tx => tx.TransactionType == TransactionType.Receive).OrderBy(tx => tx.Version).ToArray();
-            TransactionDto[] target = new TransactionDto[txsIn.Length];
 
-            Array.Copy(txsIn, target, txsIn.Length);
-            for (int i = 0, targetLength = target.Length; i < targetLength; i++)
+            try
             {
-                (TransactionDto transaction, double amountFor) = CalculateChange(amount, txsIn);
-                var balance = Balance(identifier, password, txns.Where(tx => tx.Stamp == transaction.Stamp).ToList());
+                TransactionDto[] txsIn = txns.Result.Where(tx => tx.TransactionType == TransactionType.Receive).OrderBy(tx => tx.Version).ToArray();
+                TransactionDto[] target = new TransactionDto[txsIn.Length];
 
-                if (balance >= amountFor)
+                Array.Copy(txsIn, target, txsIn.Length);
+
+                for (int i = 0, targetLength = target.Length; i < targetLength; i++)
                 {
-                    purchase = new PurchaseDto
+                    (TransactionDto transaction, double amountFor) = CalculateChange(session.Amount, txsIn);
+                    var balance = Balance(session.Identifier, session.MasterKey, txns.Result.Where(tx => tx.Stamp == transaction.Stamp).ToList());
+
+                    if (balance >= amountFor)
                     {
-                        Balance = balance,
-                        DateTime = DateTime.Now,
-                        Input = amount,
-                        Output = balance - amount,
-                        Stamp = transaction.Stamp,
-                        TransactionId = sessionId
-                    };
+                        purchase = new PurchaseDto
+                        {
+                            Balance = balance,
+                            DateTime = DateTime.Now,
+                            Input = session.Amount,
+                            Output = balance - session.Amount,
+                            Stamp = transaction.Stamp,
+                            TransactionId = session.SessionId
+                        };
 
-                    purchase.Chain = txns.Where(tx => tx.Stamp.Equals(transaction.Stamp)).Select(tx => Guid.Parse(tx.TransactionId)).ToHashSet();
-                    purchase.Version = txns.Where(tx => tx.Stamp.Equals(transaction.Stamp) && tx.TransactionId.Equals(purchase.Chain.Last().ToString())).Last().Version;
+                        purchase.Chain = txns.Result.Where(tx => tx.Stamp.Equals(transaction.Stamp)).Select(tx => Guid.Parse(tx.TransactionId)).ToHashSet();
+                        purchase.Version = txns.Result.Where(tx => tx.Stamp.Equals(transaction.Stamp) && tx.TransactionId.Equals(purchase.Chain.Last().ToString())).Last().Version;
 
-                    if (purchase.Output.Equals(0))
-                        purchase.Spent = true;
+                        if (purchase.Output.Equals(0))
+                            purchase.Spent = true;
 
-                    break;
+                        break;
+                    }
+
+                    var idx = Array.FindIndex(txsIn, t => t.Stamp.Equals(transaction.Stamp));
+                    txsIn = txsIn.Where((source, index) => index != idx).ToArray();
                 }
-
-                var idx = Array.FindIndex(txsIn, t => t.Stamp.Equals(transaction.Stamp));
-                txsIn = txsIn.Where((source, index) => index != idx).ToArray();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex.Message);
+                return TaskResult<PurchaseDto>.CreateFailure(ex);
             }
 
-            return purchase;
+            return TaskResult<PurchaseDto>.CreateSuccess(purchase);
         }
 
         /// <summary>
@@ -316,6 +338,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
                 catch (Exception ex)
                 {
                     logger.LogError(ex.Message);
+                    throw ex;
                 }
                 finally
                 {

@@ -13,6 +13,7 @@ using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 using TangramCypher.ApplicationLayer.Coin;
 using TangramCypher.ApplicationLayer.Wallet;
+using TangramCypher.Helper;
 using TangramCypher.Model;
 
 namespace TangramCypher.ApplicationLayer.Actor
@@ -20,14 +21,14 @@ namespace TangramCypher.ApplicationLayer.Actor
     public interface IActorService
     {
         event MessagePumpEventHandler MessagePump;
-        Task<T> AddAsync<T>(T payload, RestApiMethod apiMethod);
+        Task<TaskResult<T>> AddAsync<T>(T payload, RestApiMethod apiMethod);
         Task<T> GetAsync<T>(string address, RestApiMethod apiMethod);
         Session GetSession(Guid sessionId);
         Task<IEnumerable<T>> GetRangeAsync<T>(string address, int skip, int take, RestApiMethod apiMethod);
         State State { get; }
         Task Tansfer(Session Session);
         Task ReceivePayment(Session session);
-        Task<JObject> ReceivePaymentRedemptionKey(Session session, string cypher);
+        Task<string> ReceivePaymentRedemptionKey(Session session, string cypher);
 
     }
 }

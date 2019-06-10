@@ -39,9 +39,9 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// Builds the receiver.
         /// </summary>
         /// <returns>The receiver.</returns>
-        public (CoinDto, byte[]) Receiver(SecureString secret, ulong input)
+        public TaskResult<bool> Receiver(SecureString secret, ulong input, out CoinDto coin, out byte[] blind)
         {
-            CoinDto coin = null;
+
             byte[] blindSum = new byte[32];
             byte[] commitPos = new byte[33];
             byte[] commitSum = new byte[33];
@@ -51,8 +51,7 @@ namespace TangramCypher.ApplicationLayer.Coin
             using (var rangeProof = new RangeProof())
             {
                 coin = MakeSingleCoin(secret, NewStamp(), -1);
-
-                var blind = DeriveKey(input, coin.Stamp, coin.Version, secret);
+                blind = DeriveKey(input, coin.Stamp, coin.Version, secret);
 
                 try
                 {
@@ -60,24 +59,24 @@ namespace TangramCypher.ApplicationLayer.Coin
                     commitPos = pedersen.Commit(input, blind);
                     commitSum = pedersen.CommitSum(new List<byte[]> { commitPos }, new List<byte[]> { });
 
+                    AttachEnvelope(blindSum, commitSum, input, secret, ref coin);
+
                 }
                 catch (Exception ex)
                 {
                     logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
-                    throw ex;
+                    return TaskResult<bool>.CreateFailure(ex);
                 }
-
-                AttachEnvelope(blindSum, commitSum, input, secret, ref coin);
             }
 
-            return (coin, blindSum);
+            return TaskResult<bool>.CreateSuccess(true);
         }
 
         /// <summary>
         /// Builds the sender.
         /// </summary>
         /// <returns>The sender.</returns>
-        public async Task<CoinDto> Sender(SecureString identifier, SecureString secret, PurchaseDto purchase)
+        public async Task<TaskResult<CoinDto>> Sender(Session session, PurchaseDto purchase)
         {
             CoinDto coin = null;
             byte[] blindSum = new byte[32];
@@ -87,44 +86,44 @@ namespace TangramCypher.ApplicationLayer.Coin
             using (var pedersen = new Pedersen())
             using (var rangeProof = new RangeProof())
             {
-                coin = MakeSingleCoin(secret, purchase.Stamp, purchase.Version);
+                coin = MakeSingleCoin(session.MasterKey, purchase.Stamp, purchase.Version);
 
                 try
                 {
                     //TODO: Refactor signature to handle lambda expressions..
-                    var txnsAll = await unitOfWork.GetTransactionRepository().All(identifier, secret);
-                    var txns = txnsAll.Where(tx => purchase.Chain.Any(id => id == Guid.Parse(tx.TransactionId)));
+                    var txnsAll = await unitOfWork.GetTransactionRepository().All(session);
+                    var txns = txnsAll.Result.Where(tx => purchase.Chain.Any(id => id == Guid.Parse(tx.TransactionId)));
 
                     var received = txns.FirstOrDefault(tx => tx.TransactionType == TransactionType.Receive);
 
-                    var blindNeg = DeriveKey(purchase.Input, received.Stamp, coin.Version, secret);
+                    var blindNeg = DeriveKey(purchase.Input, received.Stamp, coin.Version, session.MasterKey);
                     var commitNeg = pedersen.Commit(purchase.Input, blindNeg);
 
                     var commitNegs = txns
                                       .Where(tx => tx.TransactionType == TransactionType.Send)
-                                      .Select(c => pedersen.Commit(c.Amount, DeriveKey(c.Amount, c.Stamp, c.Version, secret))).ToList();
+                                      .Select(c => pedersen.Commit(c.Amount, DeriveKey(c.Amount, c.Stamp, c.Version, session.MasterKey))).ToList();
 
                     commitNegs.Add(commitNeg);
 
                     var blindNegSums = txns
                                         .Where(tx => tx.TransactionType == TransactionType.Send)
-                                        .Select(c => DeriveKey(c.Amount, c.Stamp, c.Version, secret)).ToList();
+                                        .Select(c => DeriveKey(c.Amount, c.Stamp, c.Version, session.MasterKey)).ToList();
 
                     blindNegSums.Add(blindNeg);
 
                     blindSum = pedersen.BlindSum(new List<byte[]> { received.Blind.FromHex() }, blindNegSums);
                     commitSum = pedersen.CommitSum(new List<byte[]> { received.Commitment.FromHex() }, commitNegs);
+
+                    AttachEnvelope(blindSum, commitSum, purchase.Output, session.MasterKey, ref coin);
                 }
                 catch (Exception ex)
                 {
                     logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
-                    throw ex;
+                    return TaskResult<CoinDto>.CreateFailure(ex);
                 }
-
-                AttachEnvelope(blindSum, commitSum, purchase.Output, secret, ref coin);
             }
 
-            return coin;
+            return TaskResult<CoinDto>.CreateSuccess(coin);
         }
 
         /// <summary>
