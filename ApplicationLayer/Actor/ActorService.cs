@@ -122,7 +122,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
                 if (jObject == null)
                 {
-                    TaskResult<T>.CreateFailure(JObject.FromObject(new
+                    return TaskResult<T>.CreateFailure(JObject.FromObject(new
                     {
                         success = false,
                         message = "Please check the logs for any details."
@@ -130,6 +130,11 @@ namespace TangramCypher.ApplicationLayer.Actor
                 }
             }
             catch (OperationCanceledException ex)
+            {
+                logger.LogWarning(ex.Message);
+                return TaskResult<T>.CreateFailure(ex);
+            }
+            catch (Exception ex)
             {
                 logger.LogWarning(ex.Message);
                 return TaskResult<T>.CreateFailure(ex);
@@ -1006,19 +1011,10 @@ namespace TangramCypher.ApplicationLayer.Actor
             return mSession;
         }
 
-        private async Task<IEnumerable<T>> PostParallel<T>(IEnumerable<T> payload, RestApiMethod apiMethod)
+        private async Task<IEnumerable<TaskResult<T>>> PostParallel<T>(IEnumerable<T> payload, RestApiMethod apiMethod)
         {
-            var tasks = new List<Task<TaskResult<IEnumerable<T>>>>();
-            var batchSize = 100;
-            int numberOfBatches = (int)System.Math.Ceiling((double)payload.Count() / batchSize);
-
-            for (int i = 0; i < numberOfBatches; i++)
-            {
-                var current = payload.Skip(i * batchSize).Take(batchSize);
-                tasks.Add(AddAsync(payload, apiMethod));
-            }
-
-            return (await Task.WhenAll(tasks)).SelectMany(u => u.Result);
+            var tasks = payload.Select(async p => await Util.TriesUntilCompleted<TaskResult<T>>(async () => { return await AddAsync(p, apiMethod); }, 10, 100));
+            return await Task.WhenAll(tasks);
         }
 
         private async Task Test()

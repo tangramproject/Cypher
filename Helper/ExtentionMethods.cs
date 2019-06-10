@@ -133,7 +133,8 @@ namespace TangramCypher.Helper
                     Commitment = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Envelope.Commitment)),
                     Proof = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Envelope.Proof)),
                     PublicKey = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Envelope.PublicKey)),
-                    Signature = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Envelope.Signature))
+                    Signature = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Envelope.Signature)),
+                    RangeProof = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Envelope.RangeProof)),
                 }
             };
             formattedCoin.Hash = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Hash));

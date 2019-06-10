@@ -47,6 +47,31 @@ namespace TangramCypher.ApplicationLayer.Actor
             machine.Configure(State.New)
                    .Permit(Trigger.Verify, State.Audited);
 
+            ConfigureStateAudited();
+            ConfigureStateKeys();
+            ConfigureStateBurned();
+            ConfigureStateCommitted();
+            ConfigureStatePublicKeyAgree();
+            ConfigureStatRedeptionKey();
+            ConfigureStatePayment();
+
+            machine.Configure(State.Completed)
+                .Permit(Trigger.Verify, State.Audited);
+
+            machine.Configure(State.Failure)
+                .Permit(Trigger.Verify, State.Audited);
+        }
+
+        private void Configure(string stateString)
+        {
+            var state = (State)Enum.Parse(typeof(State), stateString);
+            machine = new StateMachine<State, Trigger>(State);
+
+            Configure();
+        }
+
+        private void ConfigureStateAudited()
+        {
             machine.Configure(State.Audited)
                 .SubstateOf(State.New)
                 .OnEntryFromAsync(verifyTrigger, async (Guid sessionId) =>
@@ -65,7 +90,10 @@ namespace TangramCypher.ApplicationLayer.Actor
                 .PermitReentry(Trigger.Verify)
                 .Permit(Trigger.Unlock, State.Keys)
                 .Permit(Trigger.Failed, State.Failure);
+        }
 
+        private void ConfigureStateKeys()
+        {
             machine.Configure(State.Keys)
                 .OnEntryFromAsync(unlockTrigger, async (Guid sessionId) =>
                 {
@@ -84,7 +112,10 @@ namespace TangramCypher.ApplicationLayer.Actor
                 .Permit(Trigger.Verify, State.Audited)
                 .Permit(Trigger.Torch, State.Burned)
                 .Permit(Trigger.Failed, State.Failure);
+        }
 
+        private void ConfigureStateBurned()
+        {
             machine.Configure(State.Burned)
                 .OnEntryFromAsync(burnTrigger, async (Guid sessionId) =>
                 {
@@ -103,24 +134,31 @@ namespace TangramCypher.ApplicationLayer.Actor
                 .Permit(Trigger.Verify, State.Audited)
                 .Permit(Trigger.Commit, State.Committed)
                 .Permit(Trigger.Failed, State.Failure);
+        }
 
+        private void ConfigureStateCommitted()
+        {
             machine.Configure(State.Committed)
-                .OnEntryFromAsync(commitReceiverTrigger, async (Guid sessionId) =>
-                {
-                    var committed = await CommitReceiver(sessionId);
-                    if (committed.Success)
-                        await machine.FireAsync(publicKeyAgreementTrgger, sessionId);
-                    else
-                    {
-                        var session = GetSession(sessionId);
-                        session.LastError = committed.NonSuccessMessage;
-                        SessionAddOrUpdate(session);
-                        machine.Fire(Trigger.Failed);
-                    }
-                })
-                .PermitReentry(Trigger.Verify)
-                .Permit(Trigger.PublicKeyAgreement, State.PublicKeyAgree);
+                  .OnEntryFromAsync(commitReceiverTrigger, async (Guid sessionId) =>
+                  {
+                      var committed = await CommitReceiver(sessionId);
+                      if (committed.Success)
+                          await machine.FireAsync(publicKeyAgreementTrgger, sessionId);
+                      else
+                      {
+                          var session = GetSession(sessionId);
+                          session.LastError = committed.NonSuccessMessage;
+                          SessionAddOrUpdate(session);
+                          machine.Fire(Trigger.Failed);
+                      }
+                  })
+                  .PermitReentry(Trigger.Verify)
+                  .Permit(Trigger.PublicKeyAgreement, State.PublicKeyAgree)
+                  .Permit(Trigger.Failed, State.Failure);
+        }
 
+        private void ConfigureStatePublicKeyAgree()
+        {
             machine.Configure(State.PublicKeyAgree)
                 .OnEntryFromAsync(publicKeyAgreementTrgger, async (Guid sessionId) =>
                 {
@@ -136,8 +174,12 @@ namespace TangramCypher.ApplicationLayer.Actor
                     }
                 })
                 .PermitReentry(Trigger.Verify)
-                .Permit(Trigger.PrepareRedemptionKey, State.RedemptionKey);
+                .Permit(Trigger.PrepareRedemptionKey, State.RedemptionKey)
+                .Permit(Trigger.Failed, State.Failure);
+        }
 
+        private void ConfigureStatRedeptionKey()
+        {
             machine.Configure(State.RedemptionKey)
                 .OnEntryFromAsync(redemptionKeyTrigger, async (Guid sessionId) =>
                 {
@@ -153,8 +195,12 @@ namespace TangramCypher.ApplicationLayer.Actor
                     }
                 })
                 .PermitReentry(Trigger.Verify)
-                .Permit(Trigger.PaymentAgreement, State.Payment);
+                .Permit(Trigger.PaymentAgreement, State.Payment)
+                .Permit(Trigger.Failed, State.Failure);
+        }
 
+        private void ConfigureStatePayment()
+        {
             machine.Configure(State.Payment)
                 .OnEntryFromAsync(paymentTrgger, async (Guid sessionId) =>
                 {
@@ -165,7 +211,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                     //TODO.. 
                     var send = await unitOfWork
                                 .GetSenderRepository()
-                                .Get(session, StoreKey.TransactionIdKey, session.Identifier.ToString());
+                                .Get(session, StoreKey.TransactionIdKey, session.SessionId.ToString());
 
                     var rece = await unitOfWork
                                 .GetReceiverRepository()
@@ -179,27 +225,14 @@ namespace TangramCypher.ApplicationLayer.Actor
                                 .GetRedemptionRepository()
                                 .Get(session, StoreKey.TransactionIdKey, session.SessionId.ToString());
 
-                    var coins = await PostParallel(new List<CoinDto>() { send.Result, rece.Result }, RestApiMethod.PostCoin);
+                    var coins = await PostParallel(new List<CoinDto>() { send.Result.FormatCoinToBase64(), rece.Result.FormatCoinToBase64() }, RestApiMethod.PostCoin);
                     var msgs = await PostParallel(new List<MessageDto> { publ.Result, rede.Result.Message }, RestApiMethod.PostMessage);
 
                     machine.Fire(Trigger.Complete);
                 })
                 .PermitReentry(Trigger.Verify)
-                .Permit(Trigger.Complete, State.Completed);
-
-            machine.Configure(State.Completed)
-                .Permit(Trigger.Verify, State.Audited);
-
-            machine.Configure(State.Failure)
-                .Permit(Trigger.Verify, State.Audited);
-        }
-
-        private void Configure(string stateString)
-        {
-            var state = (State)Enum.Parse(typeof(State), stateString);
-            machine = new StateMachine<State, Trigger>(State);
-
-            Configure();
+                .Permit(Trigger.Complete, State.Completed)
+                .Permit(Trigger.Failed, State.Failure);
         }
     }
 }
