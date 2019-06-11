@@ -790,7 +790,6 @@ namespace TangramCypher.ApplicationLayer.Actor
                                    .Put(session, StoreKey.TransactionIdKey, purchase.Result.TransactionId.ToString(), purchase.Result);
                 //TODO: Need steps.. If Success
                 var addTxn = await AddWalletTransaction(session.SessionId, sender.Result, purchase.Result.Input, session.Memo, null, TransactionType.Send);
-
             }
             catch (Exception ex)
             {

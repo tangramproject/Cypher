@@ -22,6 +22,7 @@ namespace TangramCypher.Model
         private IPublicKeyAgreementRepository publicKeyAgreementRepository;
         private IPurchaseRepository purchaseRepository;
         private ISenderRepository senderRepository;
+        private IQueueRepository queueRepository;
 
         public UnitOfWork(IVaultServiceClient vaultServiceClient, ILogger logger)
         {
@@ -32,7 +33,8 @@ namespace TangramCypher.Model
             SetReceiverRepository(new ReceiverRepository(vaultServiceClient, logger));
             SetPublicKeyAgreementRepository(new PublicKeyAgreementRepository(vaultServiceClient, logger));
             SetPurchaseRepository(new PurchaseRepository(vaultServiceClient, logger));
-            SetSenderRepository(new SenderRepository(vaultServiceClient,logger));
+            SetSenderRepository(new SenderRepository(vaultServiceClient, logger));
+            SetQueueRepository(new QueueRepository(vaultServiceClient, logger));
         }
 
         public ITransactionRepository GetTransactionRepository()
@@ -104,13 +106,24 @@ namespace TangramCypher.Model
             return purchaseRepository;
         }
 
-        private void SetSenderRepository(ISenderRepository value) {
+        private void SetSenderRepository(ISenderRepository value)
+        {
             senderRepository = value;
         }
 
         public ISenderRepository GetSenderRepository()
         {
             return senderRepository;
+        }
+
+        private void SetQueueRepository(IQueueRepository value)
+        {
+            queueRepository = value;
+        }
+
+        public IQueueRepository GetQueueRepository()
+        {
+            return queueRepository;
         }
 
         public void Dispose()

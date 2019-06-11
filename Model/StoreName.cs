@@ -24,6 +24,8 @@ namespace TangramCypher.Model
         public static readonly StoreName PublicKeyAgreement = new StoreName(6, "publickeyagreement");
         public static readonly StoreName Purchase = new StoreName(7, "purchase");
         public static readonly StoreName Sender = new StoreName(8, "sender");
+        public static readonly StoreName Queue = new StoreName(9, "queue");
+
         private StoreName(int value, string name)
         {
             this.value = value;
