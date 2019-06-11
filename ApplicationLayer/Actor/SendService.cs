@@ -7,6 +7,7 @@
 // work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
 
 using System;
+using System.Linq;
 using System.Collections.Generic;
 using System.Security;
 using System.Threading.Tasks;
@@ -190,6 +191,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                     UpdateMessagePump("Busy committing payment agreement ...");
 
                     var session = GetSession(sessionId);
+                    var que = new QueueDto() { DateTime = DateTime.Now, TransactionId = session.SessionId };
 
                     try
                     {
@@ -209,9 +211,51 @@ namespace TangramCypher.ApplicationLayer.Actor
                                     .GetRedemptionRepository()
                                     .Get(session, StoreKey.TransactionIdKey, session.SessionId.ToString());
 
-                        //TODO: Could fail silently.. need to iterate.. 
-                        var coins = await PostParallel(new List<CoinDto>() { send.Result.FormatCoinToBase64(), rece.Result.FormatCoinToBase64() }, RestApiMethod.PostCoin);
-                        var msgs = await PostParallel(new List<MessageDto> { publ.Result, rede.Result.Message }, RestApiMethod.PostMessage);
+                        //TODO:.. simplify....
+                        var sendResult = await Util.TriesUntilCompleted<TaskResult<CoinDto>>(async () =>
+                        { return await client.AddAsync(send.Result.FormatCoinToBase64(), RestApiMethod.PostCoin); }, 10, 100);
+
+                        if (sendResult.Success.Equals(false))
+                        {
+                            throw new Exception("Sender coin failed to send..");
+                        }
+
+                        var receResult = await Util.TriesUntilCompleted<TaskResult<CoinDto>>(async () =>
+                        { return await client.AddAsync(rece.Result.FormatCoinToBase64(), RestApiMethod.PostCoin); }, 10, 100);
+
+                        if (receResult.Success.Equals(false))
+                        {
+                            que.ReceiverFailed = true;
+                        }
+
+                        var publResult = await Util.TriesUntilCompleted<TaskResult<MessageDto>>(async () =>
+                        { return await client.AddAsync(publ.Result, RestApiMethod.PostCoin); }, 10, 100);
+
+                        if (publ.Success.Equals(false))
+                        {
+                            que.PublicAgreementFailed = true;
+                        }
+
+                        var redeResult = await Util.TriesUntilCompleted<TaskResult<MessageDto>>(async () =>
+                        { return await client.AddAsync(rede.Result.Message, RestApiMethod.PostCoin); }, 10, 100);
+
+                        if (redeResult.Success.Equals(false))
+                        {
+                            que.PaymentFailed = true;
+                        }
+
+                        var checkList = new List<bool> { que.PaymentFailed, que.PublicAgreementFailed, que.ReceiverFailed };
+                        if (checkList.Any(l => l.Equals(true)))
+                        {
+                            var addQueue = await unitOfWork
+                                                .GetQueueRepository()
+                                                .Put(session, StoreKey.TransactionIdKey, que.TransactionId.ToString(), que);
+
+                            if (addQueue.Success.Equals(false))
+                            {
+                                throw new Exception("Queue failed to save..");
+                            }
+                        }
 
                         machine.Fire(Trigger.Complete);
                     }
@@ -232,7 +276,6 @@ namespace TangramCypher.ApplicationLayer.Actor
                 .Permit(Trigger.Verify, State.Audited)
                 .Permit(Trigger.Failed, State.Failure)
                 .Permit(Trigger.RollBack, State.Reversed);
-
 
         private void ConfigureStateReversed() => machine.Configure(State.Reversed)
                 .OnEntryFromAsync(reversedTrgger, async (Guid sessionId) =>
