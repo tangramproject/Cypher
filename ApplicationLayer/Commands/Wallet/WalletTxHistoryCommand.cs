@@ -7,6 +7,7 @@
 // work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
 
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using McMaster.Extensions.CommandLineUtils;
 using TangramCypher.ApplicationLayer.Wallet;
@@ -15,6 +16,7 @@ using ConsoleTables;
 using System.Linq;
 using TangramCypher.Model;
 using TangramCypher.ApplicationLayer.Actor;
+using TangramCypher.Helper;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
 {
@@ -23,11 +25,13 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
     {
         private readonly IConsole console;
         private readonly IUnitOfWork unitOfWork;
+        private readonly IWalletService walletService;
 
         public WalletTxHistoryCommand(IServiceProvider serviceProvider)
         {
             console = serviceProvider.GetService<IConsole>();
             unitOfWork = serviceProvider.GetService<IUnitOfWork>();
+            walletService = serviceProvider.GetService<IWalletService>();
         }
 
         public async override Task Execute()
@@ -37,9 +41,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
             {
                 try
                 {
-                    var session = new Session(identifier, password);
-                    var txns = await unitOfWork.GetTransactionRepository().All(session);
-                    var final = txns.Result.Select(tx => new { tx.Amount, tx.Memo, tx.TransactionType, tx.DateTime, tx.Hash }).ToList();
+                    var final = (await walletService.TransactionHistory(identifier, password)).ToList();
                     var table = ConsoleTable.From(final).ToString();
 
                     console.WriteLine(table);

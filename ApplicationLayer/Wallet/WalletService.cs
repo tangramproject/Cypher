@@ -467,5 +467,22 @@ namespace TangramCypher.ApplicationLayer.Wallet
                 return Prover.GetHashStringNumber(hash).ToByteArray().ToHex();
             }
         }
+
+        public async Task<IEnumerable<BlanceSheetDto>> TransactionHistory(SecureString identifier, SecureString password)
+        {
+            ulong credit = 0;
+            var session = new Session(identifier, password);
+            var txns = await unitOfWork.GetTransactionRepository().All(session);
+            var final = txns.Result.Select(tx => new BlanceSheetDto()
+            {
+                DateTime = tx.DateTime.ToUniversalTime(),
+                Memo = tx.Memo,
+                Debit = tx.TransactionType == TransactionType.Send ? tx.Amount.DivWithNaT().ToString("F9") : "",
+                Credit = tx.TransactionType == TransactionType.Receive ? tx.Amount.DivWithNaT().ToString("F9") : "",
+                Balance = tx.TransactionType == TransactionType.Send ? (credit -= tx.Amount).DivWithNaT().ToString("F9") : (credit += tx.Amount).DivWithNaT().ToString("F9")
+            });
+
+            return final;
+        }
     }
 }

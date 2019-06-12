@@ -33,5 +33,6 @@ namespace TangramCypher.ApplicationLayer.Wallet
         string ProverPassword(SecureString password, int version);
         Task<string> Profile(SecureString identifier, SecureString password);
         Task<IEnumerable<string>> WalletList();
+        Task<IEnumerable<BlanceSheetDto>> TransactionHistory(SecureString identifier, SecureString password);
     }
 }
