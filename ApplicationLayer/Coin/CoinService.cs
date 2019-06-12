@@ -16,7 +16,6 @@ using Secp256k1_ZKP.Net;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using TangramCypher.ApplicationLayer.Wallet;
 using Dawn;
 using Microsoft.Extensions.Logging;
 using TangramCypher.Model;

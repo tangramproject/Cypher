@@ -6,12 +6,9 @@
 // You should have received a copy of the license along with this
 // work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
 
-using System.Collections.Generic;
 using System.Security;
 using System.Threading.Tasks;
-using Secp256k1_ZKP.Net;
 using TangramCypher.ApplicationLayer.Actor;
-using TangramCypher.ApplicationLayer.Wallet;
 using TangramCypher.Helper;
 using TangramCypher.Model;
 

@@ -10,7 +10,6 @@ using System;
 using System.Collections.Generic;
 using System.Security;
 using Newtonsoft.Json.Linq;
-using TangramCypher.Model;
 
 namespace TangramCypher.ApplicationLayer.Actor
 {

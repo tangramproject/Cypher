@@ -7,15 +7,8 @@
 // work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
 
 using System;
-using System.Collections.Generic;
-using System.Security;
 using System.Threading.Tasks;
-using Newtonsoft.Json.Linq;
-using TangramCypher.ApplicationLayer.Coin;
-using TangramCypher.ApplicationLayer.Wallet;
-using TangramCypher.Helper;
 using TangramCypher.Helper.Http;
-using TangramCypher.Model;
 
 namespace TangramCypher.ApplicationLayer.Actor
 {

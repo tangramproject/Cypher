@@ -19,7 +19,6 @@ using System.Threading.Tasks;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using TangramCypher.ApplicationLayer;
 using TangramCypher.Helper;
 
 namespace TangramCypher.ApplicationLayer.Onion

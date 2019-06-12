@@ -9,16 +9,12 @@
 using System;
 using System.Linq;
 using System.Collections.Generic;
-using System.Security;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Stateless;
 using Stateless.Graph;
-using TangramCypher.Helper;
 using TangramCypher.Model;
-using State = TangramCypher.ApplicationLayer.Actor.State;
 
 namespace TangramCypher.ApplicationLayer.Actor
 {

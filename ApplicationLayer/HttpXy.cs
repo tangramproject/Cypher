@@ -6,7 +6,6 @@
 // You should have received a copy of the license along with this
 // work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
 
-using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;

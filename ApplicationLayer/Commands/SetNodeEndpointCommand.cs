@@ -14,9 +14,6 @@ namespace TangramCypher.ApplicationLayer.Commands.Vault
     [CommandDescriptor(new string[] { "setnodeendpoint" }, "Set contact endpoint")]
     public class SetNodeEndpointCommand : Command
     {
-        public override async Task Execute()
-        {
-            throw new NotImplementedException();
-        }
+        public override Task Execute() => throw new NotImplementedException();
     }
 }
