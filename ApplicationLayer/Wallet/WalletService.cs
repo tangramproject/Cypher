@@ -203,7 +203,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
 
             var txns = await unitOfWork.GetTransactionRepository().All(new Session(identifier, password));
 
-            if (txns == null)
+            if (txns.Result == null)
                 return null;
 
             var transaction = txns.Result.Last(tx => tx.TransactionType.Equals(transactionType));

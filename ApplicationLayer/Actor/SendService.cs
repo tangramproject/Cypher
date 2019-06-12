@@ -192,57 +192,30 @@ namespace TangramCypher.ApplicationLayer.Actor
 
                     var session = GetSession(sessionId);
                     var que = new QueueDto() { DateTime = DateTime.Now, TransactionId = session.SessionId };
+                    var storeKey = StoreKey.TransactionIdKey;
+                    var txnId = session.SessionId.ToString();
 
                     try
                     {
-                        var send = await unitOfWork
-                                    .GetSenderRepository()
-                                    .Get(session, StoreKey.TransactionIdKey, session.SessionId.ToString());
+                        var send = await unitOfWork.GetSenderRepository().Get(session, storeKey, txnId);
+                        var sendResult = await PostArticle(send.Result, RestApiMethod.PostCoin);
+                        if (sendResult.Result == null)
+                            throw new NullReferenceException("Sender failed to post the request!");
 
-                        var rece = await unitOfWork
-                                    .GetReceiverRepository()
-                                    .Get(session, StoreKey.TransactionIdKey, session.SessionId.ToString());
-
-                        var publ = await unitOfWork
-                                    .GetPublicKeyAgreementRepository()
-                                    .Get(session, StoreKey.TransactionIdKey, session.SessionId.ToString());
-
-                        var rede = await unitOfWork
-                                    .GetRedemptionRepository()
-                                    .Get(session, StoreKey.TransactionIdKey, session.SessionId.ToString());
-
-                        //TODO:.. simplify....
-                        var sendResult = await Util.TriesUntilCompleted<TaskResult<CoinDto>>(async () =>
-                        { return await client.AddAsync(send.Result.FormatCoinToBase64(), RestApiMethod.PostCoin); }, 10, 100);
-
-                        if (sendResult.Success.Equals(false))
-                        {
-                            throw new Exception("Sender coin failed to send..");
-                        }
-
-                        var receResult = await Util.TriesUntilCompleted<TaskResult<CoinDto>>(async () =>
-                        { return await client.AddAsync(rece.Result.FormatCoinToBase64(), RestApiMethod.PostCoin); }, 10, 100);
-
-                        if (receResult.Success.Equals(false))
-                        {
+                        var rece = await unitOfWork.GetReceiverRepository().Get(session, storeKey, txnId);
+                        var receResult = await PostArticle(rece, RestApiMethod.PostCoin);
+                        if (receResult.Result == null)
                             que.ReceiverFailed = true;
-                        }
 
-                        var publResult = await Util.TriesUntilCompleted<TaskResult<MessageDto>>(async () =>
-                        { return await client.AddAsync(publ.Result, RestApiMethod.PostCoin); }, 10, 100);
-
-                        if (publ.Success.Equals(false))
-                        {
+                        var publ = await unitOfWork.GetPublicKeyAgreementRepository().Get(session, storeKey, txnId);
+                        var publResult = await PostArticle(publ, RestApiMethod.PostMessage);
+                        if (publ.Result == null)
                             que.PublicAgreementFailed = true;
-                        }
 
-                        var redeResult = await Util.TriesUntilCompleted<TaskResult<MessageDto>>(async () =>
-                        { return await client.AddAsync(rede.Result.Message, RestApiMethod.PostCoin); }, 10, 100);
-
-                        if (redeResult.Success.Equals(false))
-                        {
+                        var rede = await unitOfWork.GetRedemptionRepository().Get(session, storeKey, txnId);
+                        var redeResult = await PostArticle(rede, RestApiMethod.PostMessage);
+                        if (redeResult.Result == null)
                             que.PaymentFailed = true;
-                        }
 
                         var checkList = new List<bool> { que.PaymentFailed, que.PublicAgreementFailed, que.ReceiverFailed };
                         if (checkList.Any(l => l.Equals(true)))

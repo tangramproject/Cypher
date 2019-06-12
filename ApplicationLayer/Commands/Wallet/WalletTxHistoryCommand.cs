@@ -13,7 +13,6 @@ using McMaster.Extensions.CommandLineUtils;
 using TangramCypher.ApplicationLayer.Wallet;
 using Microsoft.Extensions.DependencyInjection;
 using ConsoleTables;
-using System.Linq;
 using TangramCypher.Model;
 using TangramCypher.ApplicationLayer.Actor;
 using TangramCypher.Helper;

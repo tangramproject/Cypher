@@ -37,7 +37,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                     var total = await walletService.AvailableBalance(identifier, password);
 
                     console.ForegroundColor = ConsoleColor.Magenta;
-                    console.WriteLine($"\nWallet balance: {total}\n");
+                    console.WriteLine($"\nWallet balance: {total.Result.DivWithNaT().ToString("F9")}\n");
                     console.ForegroundColor = ConsoleColor.White;
                 }
             }
