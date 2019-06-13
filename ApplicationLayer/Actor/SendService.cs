@@ -15,6 +15,7 @@ using Newtonsoft.Json.Linq;
 using Stateless;
 using Stateless.Graph;
 using TangramCypher.Model;
+using TangramCypher.Helper;
 
 namespace TangramCypher.ApplicationLayer.Actor
 {
@@ -51,6 +52,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             ConfigureStatePublicKeyAgree();
             ConfigureStatRedeptionKey();
             ConfigureStatePayment();
+            ConfigureStateReversed();
 
             machine.Configure(State.Completed)
                 .Permit(Trigger.Verify, State.Audited);
@@ -194,28 +196,28 @@ namespace TangramCypher.ApplicationLayer.Actor
                     try
                     {
                         var send = await unitOfWork.GetSenderRepository().Get(session, storeKey, txnId);
-                        var sendResult = await PostArticle(send.Result, RestApiMethod.PostCoin);
+                        var sendResult = await PostArticle(send.Result.FormatCoinToBase64(), RestApiMethod.PostCoin);
                         if (sendResult.Result == null)
                         {
                             throw new NullReferenceException("Sender failed to post the request!");
                         }
 
                         var rece = await unitOfWork.GetReceiverRepository().Get(session, storeKey, txnId);
-                        var receResult = await PostArticle(rece, RestApiMethod.PostCoin);
+                        var receResult = await PostArticle(rece.Result.FormatCoinToBase64(), RestApiMethod.PostCoin);
                         if (receResult.Result == null)
                         {
                             que.ReceiverFailed = true;
                         }
 
                         var publ = await unitOfWork.GetPublicKeyAgreementRepository().Get(session, storeKey, txnId);
-                        var publResult = await PostArticle(publ, RestApiMethod.PostMessage);
+                        var publResult = await PostArticle(publ.Result, RestApiMethod.PostMessage);
                         if (publ.Result == null)
                         {
                             que.PublicAgreementFailed = true;
                         }
 
                         var rede = await unitOfWork.GetRedemptionRepository().Get(session, storeKey, txnId);
-                        var redeResult = await PostArticle(rede, RestApiMethod.PostMessage);
+                        var redeResult = await PostArticle(rede.Result, RestApiMethod.PostMessage);
                         if (redeResult.Result == null)
                         {
                             que.PaymentFailed = true;
@@ -232,6 +234,8 @@ namespace TangramCypher.ApplicationLayer.Actor
                             {
                                 throw new Exception("Queue failed to save..");
                             }
+
+                            logger.LogInformation("Added queue.. you might have to do some manual work ;(.. WIP");
                         }
 
                         machine.Fire(Trigger.Complete);
@@ -245,7 +249,8 @@ namespace TangramCypher.ApplicationLayer.Actor
                             message = ex.Message
                         });
                         SessionAddOrUpdate(session);
-                        await machine.FireAsync(Trigger.RollBack);
+                        logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
+                        await machine.FireAsync(reversedTrgger, session.SessionId);
                     }
                 })
                 .PermitReentry(Trigger.PaymentAgreement)

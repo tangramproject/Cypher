@@ -91,8 +91,6 @@ namespace TangramCypher.ApplicationLayer.Actor
             reversedTrgger = machine.SetTriggerParameters<Guid>(Trigger.RollBack);
 
             Configure();
-
-            //Test().GetAwaiter().GetResult();
         }
 
         /// <summary>
@@ -972,35 +970,8 @@ namespace TangramCypher.ApplicationLayer.Actor
 
         private async Task<TaskResult<T>> PostArticle<T>(T payload, RestApiMethod api) where T : class
         {
-            var result = default(T);
-
-            var addResult = await Util.TriesUntilCompleted(async () =>
-            { return await Client.AddAsync(payload, api); }, 10, 100);
-
-            return addResult.Result == null
-                ? TaskResult<T>.CreateFailure(JObject.FromObject(new
-                {
-                    success = false,
-                    message = addResult.NonSuccessMessage
-                }))
-                : TaskResult<T>.CreateSuccess(result);
-        }
-
-        private async Task Test()
-        {
-            var session = new Session("id_ee75d7b59f76b55601d8e8611118aa0d".ToSecureString(), "its pilferer sung will vellum things concoct calmly the futile lover".ToSecureString())
-            {
-                Amount = 20000000000000
-            };
-
-            session = SessionAddOrUpdate(session);
-
-            coinService.Receiver(session.MasterKey, session.Amount, out CoinDto coin, out byte[] blind);
-
-            coin.Hash = coinService.Hash(coin).ToHex();
-            coin.Network = walletService.NetworkAddress(coin).ToHex();
-            _ = await PostArticle(coin, RestApiMethod.PostCoin);
-            _ = await AddWalletTransaction(session.SessionId, coin, session.Amount, "Check running total..", blind, TransactionType.Receive);
+            var result = await Util.TriesUntilCompleted(async () => { return await Client.AddAsync(payload, api); }, 10, 100);
+            return result;
         }
     }
 }
