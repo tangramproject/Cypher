@@ -40,11 +40,6 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// <returns>The receiver.</returns>
         public TaskResult<bool> Receiver(SecureString secret, ulong input, out CoinDto coin, out byte[] blind)
         {
-
-            byte[] blindSum = new byte[32];
-            byte[] commitPos = new byte[33];
-            byte[] commitSum = new byte[33];
-
             using (var secp256k1 = new Secp256k1())
             using (var pedersen = new Pedersen())
             using (var rangeProof = new RangeProof())
@@ -54,9 +49,9 @@ namespace TangramCypher.ApplicationLayer.Coin
 
                 try
                 {
-                    blindSum = pedersen.BlindSum(new List<byte[]> { blind }, new List<byte[]> { });
-                    commitPos = pedersen.Commit(input, blind);
-                    commitSum = pedersen.CommitSum(new List<byte[]> { commitPos }, new List<byte[]> { });
+                    var blindSum = pedersen.BlindSum(new List<byte[]> { blind }, new List<byte[]> { });
+                    var commitPos = pedersen.Commit(input, blind);
+                    var commitSum = pedersen.CommitSum(new List<byte[]> { commitPos }, new List<byte[]> { });
 
                     AttachEnvelope(blindSum, commitSum, input, secret, ref coin);
 
@@ -78,8 +73,6 @@ namespace TangramCypher.ApplicationLayer.Coin
         public async Task<TaskResult<CoinDto>> Sender(Session session, PurchaseDto purchase)
         {
             CoinDto coin = null;
-            byte[] blindSum = new byte[32];
-            byte[] commitSum = new byte[33];
 
             using (var secp256k1 = new Secp256k1())
             using (var pedersen = new Pedersen())
@@ -91,6 +84,12 @@ namespace TangramCypher.ApplicationLayer.Coin
                 {
                     //TODO: Refactor signature to handle lambda expressions..
                     var txnsAll = await unitOfWork.GetTransactionRepository().All(session);
+
+                    if (txnsAll.Result?.Any() != true)
+                    {
+                        throw new Exception("No transactions found!");
+                    }
+
                     var txns = txnsAll.Result.Where(tx => purchase.Chain.Any(id => id == Guid.Parse(tx.TransactionId)));
 
                     var received = txns.FirstOrDefault(tx => tx.TransactionType == TransactionType.Receive);
@@ -110,8 +109,8 @@ namespace TangramCypher.ApplicationLayer.Coin
 
                     blindNegSums.Add(blindNeg);
 
-                    blindSum = pedersen.BlindSum(new List<byte[]> { received.Blind.FromHex() }, blindNegSums);
-                    commitSum = pedersen.CommitSum(new List<byte[]> { received.Commitment.FromHex() }, commitNegs);
+                    var blindSum = pedersen.BlindSum(new List<byte[]> { received.Blind.FromHex() }, blindNegSums);
+                    var commitSum = pedersen.CommitSum(new List<byte[]> { received.Commitment.FromHex() }, commitNegs);
 
                     AttachEnvelope(blindSum, commitSum, purchase.Output, session.MasterKey, ref coin);
                 }
@@ -432,14 +431,13 @@ namespace TangramCypher.ApplicationLayer.Coin
         }
 
         /// <summary>
-        /// Attaches the envelope.
+        /// Attachs the envelope.
         /// </summary>
-        /// <param name="secp256k1">Secp256k1.</param>
-        /// <param name="pedersen">Pedersen.</param>
-        /// <param name="rangeProof">Range proof.</param>
         /// <param name="blindSum">Blind sum.</param>
         /// <param name="commitSum">Commit sum.</param>
+        /// <param name="balance">Balance.</param>
         /// <param name="secret">Secret.</param>
+        /// <param name="coin">Coin.</param>
         private void AttachEnvelope(byte[] blindSum, byte[] commitSum, ulong balance, SecureString secret, ref CoinDto coin)
         {
             var (k1, k2) = Split(blindSum, secret, coin.Stamp, coin.Version);

@@ -9,8 +9,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Security;
-using System.Threading;
 using System.Threading.Tasks;
 using Dawn;
 using Microsoft.Extensions.Logging;
@@ -41,14 +39,13 @@ namespace TangramCypher.Model
         }
 
         /// <summary>
-        /// Adds or replaces entity.
+        /// Adds the or replace.
         /// </summary>
-        /// <param name="identifier"></param>
-        /// <param name="password"></param>
-        /// <param name="name"></param>
-        /// <param name="key"></param>
-        /// <param name="value"></param>
-        /// <returns></returns>
+        /// <returns>The or replace.</returns>
+        /// <param name="session">Session.</param>
+        /// <param name="name">Name.</param>
+        /// <param name="key">Key.</param>
+        /// <param name="value">Value.</param>
         public async Task<TaskResult<bool>> AddOrReplace(Session session, StoreKey name, string key, TEntity value)
         {
             Guard.Argument(session, nameof(session)).NotNull();
@@ -101,15 +98,13 @@ namespace TangramCypher.Model
         /// <summary>
         /// Returns a list of all entities.
         /// </summary>
-        /// <param name="identifier"></param>
-        /// <param name="password"></param>
-        /// <param name="store"></param>
-        /// <returns></returns>
+        /// <returns>The all.</returns>
+        /// <param name="session">Session.</param>
         public async Task<TaskResult<IEnumerable<TEntity>>> All(Session session)
         {
             Guard.Argument(session, nameof(session)).NotNull();
 
-            IEnumerable<TEntity> List = null;
+            IEnumerable<TEntity> List = Enumerable.Empty<TEntity>();
 
             try
             {
@@ -131,12 +126,10 @@ namespace TangramCypher.Model
         /// <summary>
         /// Get a single entity.
         /// </summary>
-        /// <param name="identifier"></param>
-        /// <param name="password"></param>
-        /// <param name="store"></param>
-        /// <param name="name"></param>
-        /// <param name="key"></param>
-        /// <returns></returns>
+        /// <returns>The get.</returns>
+        /// <param name="session">Session.</param>
+        /// <param name="name">Name.</param>
+        /// <param name="key">Key.</param>
         public async Task<TaskResult<TEntity>> Get(Session session, StoreKey name, string key)
         {
             Guard.Argument(session, nameof(session)).NotNull();
@@ -146,7 +139,7 @@ namespace TangramCypher.Model
             });
             Guard.Argument(key, nameof(key)).NotNull().NotEmpty();
 
-            TEntity tEntity = default(TEntity);
+            TEntity tEntity = default;
 
             try
             {
@@ -210,13 +203,11 @@ namespace TangramCypher.Model
         /// <summary>
         /// Adds a new entity.
         /// </summary>
-        /// <param name="identifier"></param>
-        /// <param name="password"></param>
-        /// <param name="store"></param>
-        /// <param name="name"></param>
-        /// <param name="key"></param>
-        /// <param name="value"></param>
-        /// <returns></returns>
+        /// <returns>The put.</returns>
+        /// <param name="session">Session.</param>
+        /// <param name="name">Name.</param>
+        /// <param name="key">Key.</param>
+        /// <param name="value">Value.</param>
         public async Task<TaskResult<bool>> Put(Session session, StoreKey name, string key, TEntity value)
         {
             Guard.Argument(session, nameof(session)).NotNull();
@@ -258,13 +249,12 @@ namespace TangramCypher.Model
             return TaskResult<bool>.CreateSuccess(true);
         }
 
+
         /// <summary>
         /// Removes the stored data.
         /// </summary>
-        /// <param name="identifier"></param>
-        /// <param name="password"></param>
-        /// <param name="store"></param>
-        /// <returns></returns>
+        /// <returns>The truncate.</returns>
+        /// <param name="session">Session.</param>
         public async Task<TaskResult<bool>> Truncate(Session session)
         {
             Guard.Argument(session, nameof(session)).NotNull();

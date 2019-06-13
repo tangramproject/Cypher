@@ -7,14 +7,11 @@
 // work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
 
 using System;
-using System.Collections.Generic;
-using System.Text;
 using System.Threading.Tasks;
-using TangramCypher.ApplicationLayer.Vault;
 using Microsoft.Extensions.DependencyInjection;
 using McMaster.Extensions.CommandLineUtils;
-using Newtonsoft.Json;
 using TangramCypher.ApplicationLayer.Wallet;
+using System.Linq;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
 {
@@ -34,7 +31,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
         {
             var keys = await walletService.WalletList();
 
-            if (keys != null)
+            if (keys?.Any() == true)
             {
                 foreach (var key in keys)
                 {

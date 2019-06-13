@@ -87,10 +87,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
 
                             if (session.ForwardMessage.Equals(false))
                             {
-                                var messageStore = await unitOfWork
-                                                        .GetRedemptionRepository()
-                                                        .Get(session, StoreKey.TransactionIdKey, session.SessionId.ToString());
-                                SaveRedemptionKeyLocal(messageStore.Result.Message);
+                                await SaveRedemptionKeyLocal(session.SessionId);
                             }
                         }
                         catch (Exception ex)
@@ -108,10 +105,21 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
             }
         }
 
-        private void SaveRedemptionKeyLocal(MessageDto message)
+        private async Task SaveRedemptionKeyLocal(Guid sessionId)
         {
             spinner.Text = string.Empty;
             spinner.Stop();
+
+            var session = actorService.GetSession(sessionId);
+            var getMessageStore = await unitOfWork
+                        .GetRedemptionRepository()
+                        .Get(session, StoreKey.TransactionIdKey, session.SessionId.ToString());
+
+            if (getMessageStore.Success.Equals(false))
+            {
+                console.WriteLine($"Error: {getMessageStore.Exception.Message}");
+                return;
+            }
 
             console.ForegroundColor = ConsoleColor.Magenta;
             console.WriteLine("\nOptions:");
@@ -122,21 +130,30 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
 
             console.ForegroundColor = ConsoleColor.White;
 
-            var content =
-                "--------------Begin Redemption Key--------------" +
-                Environment.NewLine +
-                JsonConvert.SerializeObject(message) +
-                Environment.NewLine +
-                "--------------End Redemption Key----------------";
-
-            if (option.Equals(1))
+            try
             {
-                var path = $"{tangramDirectory}redem{DateTime.Now.GetHashCode()}.rdkey";
-                File.WriteAllText(path, content);
-                console.WriteLine($"\nSaved path: {path}\n");
+                var content =
+                    "--------------Begin Redemption Key--------------" +
+                    Environment.NewLine +
+                    JsonConvert.SerializeObject(getMessageStore.Result.Message) +
+                    Environment.NewLine +
+                    "--------------End Redemption Key----------------";
+
+                if (option.Equals(1))
+                {
+                    var path = $"{tangramDirectory}redem{DateTime.Now.GetHashCode()}.rdkey";
+                    File.WriteAllText(path, content);
+                    console.WriteLine($"\nSaved path: {path}\n");
+                }
+                else
+                    console.WriteLine($"\n{content}\n");
             }
-            else
-                console.WriteLine($"\n{content}\n");
+            catch (Exception ex)
+            {
+                logger.LogError(ex.StackTrace);
+                throw ex;
+            }
+
         }
 
         private void ActorService_MessagePump(object sender, MessagePumpEventArgs e)

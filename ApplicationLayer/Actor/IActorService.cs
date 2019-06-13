@@ -8,6 +8,7 @@
 
 using System;
 using System.Threading.Tasks;
+using TangramCypher.Helper;
 using TangramCypher.Helper.Http;
 
 namespace TangramCypher.ApplicationLayer.Actor
@@ -20,7 +21,6 @@ namespace TangramCypher.ApplicationLayer.Actor
         State State { get; }
         Task Tansfer(Session Session);
         Task ReceivePayment(Session session);
-        Task<string> ReceivePaymentRedemptionKey(Session session, string cypher);
-
+        Task<TaskResult<bool>> ReceivePaymentRedemptionKey(Session session, string cypher);
     }
 }

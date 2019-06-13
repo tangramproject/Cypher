@@ -60,12 +60,17 @@ namespace TangramCypher.ApplicationLayer.Wallet
             Guard.Argument(identifier, nameof(identifier)).NotNull();
             Guard.Argument(password, nameof(password)).NotNull();
 
-            TaskResult<IEnumerable<TransactionDto>> txns;
-            var balance = 0UL;
+            ulong balance;
 
             try
             {
-                txns = await unitOfWork.GetTransactionRepository().All(new Session(identifier, password));
+                var txns = await unitOfWork.GetTransactionRepository().All(new Session(identifier, password));
+
+                if (txns.Result?.Any() != true)
+                {
+                    return TaskResult<ulong>.CreateSuccess(0);
+                }
+
                 balance = Balance(identifier, password, txns.Result);
             }
             catch (Exception ex)
@@ -181,8 +186,10 @@ namespace TangramCypher.ApplicationLayer.Wallet
             var txnRepo = unitOfWork.GetTransactionRepository();
             var txns = await txnRepo.All(new Session(identifier, password));
 
-            if (txns == null)
+            if (txns.Result?.Any() != true)
+            {
                 return 0;
+            }
 
             var amounts = txns.Result.Where(tx => tx.Stamp.Equals(stamp)).Select(a => a.Amount);
             var total = txnRepo.Sum(amounts);
@@ -203,8 +210,10 @@ namespace TangramCypher.ApplicationLayer.Wallet
 
             var txns = await unitOfWork.GetTransactionRepository().All(new Session(identifier, password));
 
-            if (txns.Result == null)
+            if (txns.Result?.Any() != true)
+            {
                 return null;
+            }
 
             var transaction = txns.Result.Last(tx => tx.TransactionType.Equals(transactionType));
             return transaction;
@@ -223,8 +232,10 @@ namespace TangramCypher.ApplicationLayer.Wallet
 
             var txns = await unitOfWork.GetTransactionRepository().All(session);
 
-            if (txns == null)
+            if (txns.Result?.Any() != true)
+            {
                 return null;
+            }
 
             PurchaseDto purchase = null;
 
@@ -473,6 +484,12 @@ namespace TangramCypher.ApplicationLayer.Wallet
             ulong credit = 0;
             var session = new Session(identifier, password);
             var txns = await unitOfWork.GetTransactionRepository().All(session);
+
+            if (txns.Result?.Any() != true)
+            {
+                return Enumerable.Empty<BlanceSheetDto>();
+            }
+
             var final = txns.Result.Select(tx => new BlanceSheetDto()
             {
                 DateTime = tx.DateTime.ToUniversalTime(),

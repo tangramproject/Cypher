@@ -52,7 +52,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                     var session = new Session(identifier, password) { SenderAddress = address };
                     var message = await actorService.ReceivePaymentRedemptionKey(session, line);
 
-                    console.WriteLine(JsonConvert.SerializeObject(message));
+                    console.WriteLine(JsonConvert.SerializeObject(message.Result));
                 }
             }
             catch (Exception ex)

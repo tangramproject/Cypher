@@ -24,12 +24,17 @@ namespace TangramCypher.Helper
 
         public static TaskResult<T> CreateSuccess(T result)
         {
-            return new TaskResult<T> { Success = true, Result = result };
+            return new TaskResult<T> { Success = result != default, Result = result };
+        }
+
+        public static TaskResult<T> CreateSuccess(dynamic successMessage)
+        {
+            return new TaskResult<T> { Success = successMessage != null, Result = successMessage };
         }
 
         public static TaskResult<T> CreateFailure(dynamic nonSuccessMessage)
         {
-            return new TaskResult<T> { Success = false, NonSuccessMessage = nonSuccessMessage };
+            return new TaskResult<T> { Success = false, Result = default, NonSuccessMessage = nonSuccessMessage };
         }
 
         public static TaskResult<T> CreateFailure(Exception ex)
@@ -38,7 +43,8 @@ namespace TangramCypher.Helper
             {
                 Success = false,
                 NonSuccessMessage = $"{ex.Message}{Environment.NewLine}{ex.StackTrace}",
-                Exception = ex
+                Exception = ex,
+                Result = default,
             };
         }
     }

@@ -13,9 +13,6 @@ using McMaster.Extensions.CommandLineUtils;
 using TangramCypher.ApplicationLayer.Wallet;
 using Microsoft.Extensions.DependencyInjection;
 using ConsoleTables;
-using TangramCypher.Model;
-using TangramCypher.ApplicationLayer.Actor;
-using TangramCypher.Helper;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
 {
@@ -23,13 +20,11 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
     public class WalletTxHistoryCommand : Command
     {
         private readonly IConsole console;
-        private readonly IUnitOfWork unitOfWork;
         private readonly IWalletService walletService;
 
         public WalletTxHistoryCommand(IServiceProvider serviceProvider)
         {
             console = serviceProvider.GetService<IConsole>();
-            unitOfWork = serviceProvider.GetService<IUnitOfWork>();
             walletService = serviceProvider.GetService<IWalletService>();
         }
 
@@ -41,17 +36,28 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                 try
                 {
                     var final = (await walletService.TransactionHistory(identifier, password)).ToList();
-                    var table = ConsoleTable.From(final).ToString();
 
-                    console.WriteLine(table);
+                    if (final?.Any() == true)
+                    {
+                        var table = ConsoleTable.From(final).ToString();
+                        console.WriteLine(table);
+                        return;
+                    }
+
+                    NoTxn();
                 }
                 catch (Exception)
                 {
-                    console.ForegroundColor = ConsoleColor.Red;
-                    console.WriteLine($"\nWallet has no transactions.\n");
-                    console.ForegroundColor = ConsoleColor.White;
+                    NoTxn();
                 }
             }
+        }
+
+        private void NoTxn()
+        {
+            console.ForegroundColor = ConsoleColor.Red;
+            console.WriteLine($"\nWallet has no transactions.\n");
+            console.ForegroundColor = ConsoleColor.White;
         }
     }
 }

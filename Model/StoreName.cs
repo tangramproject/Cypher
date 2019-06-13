@@ -14,7 +14,7 @@ namespace TangramCypher.Model
     public class StoreName
     {
         private readonly string name;
-        private readonly int value;
+        protected readonly int value;
 
         public static readonly StoreName Transactions = new StoreName(1, "transactions");
         public static readonly StoreName Track = new StoreName(2, "track");

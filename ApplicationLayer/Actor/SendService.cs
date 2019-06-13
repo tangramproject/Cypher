@@ -196,22 +196,30 @@ namespace TangramCypher.ApplicationLayer.Actor
                         var send = await unitOfWork.GetSenderRepository().Get(session, storeKey, txnId);
                         var sendResult = await PostArticle(send.Result, RestApiMethod.PostCoin);
                         if (sendResult.Result == null)
+                        {
                             throw new NullReferenceException("Sender failed to post the request!");
+                        }
 
                         var rece = await unitOfWork.GetReceiverRepository().Get(session, storeKey, txnId);
                         var receResult = await PostArticle(rece, RestApiMethod.PostCoin);
                         if (receResult.Result == null)
+                        {
                             que.ReceiverFailed = true;
+                        }
 
                         var publ = await unitOfWork.GetPublicKeyAgreementRepository().Get(session, storeKey, txnId);
                         var publResult = await PostArticle(publ, RestApiMethod.PostMessage);
                         if (publ.Result == null)
+                        {
                             que.PublicAgreementFailed = true;
+                        }
 
                         var rede = await unitOfWork.GetRedemptionRepository().Get(session, storeKey, txnId);
                         var redeResult = await PostArticle(rede, RestApiMethod.PostMessage);
                         if (redeResult.Result == null)
+                        {
                             que.PaymentFailed = true;
+                        }
 
                         var checkList = new List<bool> { que.PaymentFailed, que.PublicAgreementFailed, que.ReceiverFailed };
                         if (checkList.Any(l => l.Equals(true)))
@@ -250,15 +258,23 @@ namespace TangramCypher.ApplicationLayer.Actor
                 .OnEntryFromAsync(reversedTrgger, async (Guid sessionId) =>
                 {
                     var session = GetSession(sessionId);
-                    var send = await unitOfWork
-                                .GetSenderRepository()
-                                .Get(session, StoreKey.TransactionIdKey, session.SessionId.ToString());
+                    var getSender = await unitOfWork
+                                    .GetSenderRepository()
+                                    .Get(session, StoreKey.TransactionIdKey, session.SessionId.ToString());
 
-                    if (send.Success)
+                    if (getSender.Result != null)
                     {
-                        var deleted = await unitOfWork
-                                        .GetTransactionRepository()
-                                        .Delete(session, StoreKey.HashKey, send.Result.Hash);
+                        var delTransaction = await unitOfWork
+                                            .GetTransactionRepository()
+                                            .Delete(session, StoreKey.HashKey, getSender.Result.Hash);
+
+                        if (delTransaction.Result.Equals(false))
+                        {
+                            var message = $"Please check logs for any details. Could not delete transaction {getSender.Result.Hash}";
+
+                            logger.LogError(message);
+                            throw new Exception(message);
+                        }
                     }
 
                     machine.Fire(Trigger.Failed);
