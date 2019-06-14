@@ -100,7 +100,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                             var balance = await walletService.AvailableBalance(identifier, password);
                             spinner.Text = $"Available Balance: {balance.Result.DivWithNaT().ToString("F9")}";
                         }
-                    }, Patterns.Toggle);
+                    }, Patterns.Toggle3);
                 }
             }
         }

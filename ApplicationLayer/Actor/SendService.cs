@@ -209,18 +209,21 @@ namespace TangramCypher.ApplicationLayer.Actor
                             que.ReceiverFailed = true;
                         }
 
-                        var publ = await unitOfWork.GetPublicKeyAgreementRepository().Get(session, storeKey, txnId);
-                        var publResult = await PostArticle(publ.Result, RestApiMethod.PostMessage);
-                        if (publ.Result == null)
+                        if (session.ForwardMessage)
                         {
-                            que.PublicAgreementFailed = true;
-                        }
+                            var publ = await unitOfWork.GetPublicKeyAgreementRepository().Get(session, storeKey, txnId);
+                            var publResult = await PostArticle(publ.Result, RestApiMethod.PostMessage);
+                            if (publResult.Result == null)
+                            {
+                                que.PublicAgreementFailed = true;
+                            }
 
-                        var rede = await unitOfWork.GetRedemptionRepository().Get(session, storeKey, txnId);
-                        var redeResult = await PostArticle(rede.Result, RestApiMethod.PostMessage);
-                        if (redeResult.Result == null)
-                        {
-                            que.PaymentFailed = true;
+                            var rede = await unitOfWork.GetRedemptionRepository().Get(session, storeKey, txnId);
+                            var redeResult = await PostArticle(rede.Result.Message, RestApiMethod.PostMessage);
+                            if (redeResult.Result == null)
+                            {
+                                que.PaymentFailed = true;
+                            }
                         }
 
                         var checkList = new List<bool> { que.PaymentFailed, que.PublicAgreementFailed, que.ReceiverFailed };

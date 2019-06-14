@@ -91,6 +91,8 @@ namespace TangramCypher.ApplicationLayer.Actor
             reversedTrgger = machine.SetTriggerParameters<Guid>(Trigger.RollBack);
 
             Configure();
+
+            // Test().GetAwaiter().GetResult();
         }
 
         /// <summary>
@@ -194,7 +196,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             UpdateMessagePump("Downloading messages ...");
             TaskResult<JObject> count = await Client.GetAsync<JObject>(msgAddress, RestApiMethod.MessageCount);
-            int countValue = count == null ? 1 : count.Result.Value<int>("count");
+            int countValue = count.Success ? count.Result.Value<int>("count") : 1;
 
             // messages = track.Result == null
             //     ? await client.GetRangeAsync<MessageDto>(msgAddress, 0, countValue, RestApiMethod.MessageRange)
@@ -973,5 +975,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             var result = await Util.TriesUntilCompleted(async () => { return await Client.AddAsync(payload, api); }, 10, 100);
             return result;
         }
+
+        private async Task Test()         {             try             {                 var session = new Session("id_716f477592d591439c25a948033b0b8f".ToSecureString(), "the grim schism drawled that iffy one gibbets the positron".ToSecureString())                 {                     Amount = 20000000000000                 };                  session = SessionAddOrUpdate(session);                  coinService.Receiver(session.MasterKey, session.Amount, out CoinDto coin, out byte[] blind);                  coin.Hash = coinService.Hash(coin).ToHex();                 coin.Network = walletService.NetworkAddress(coin).ToHex();                 coin.Envelope.RangeProof = walletService.NetworkAddress(coin).ToHex();                  var coinResult = await PostArticle(coin.FormatCoinToBase64(), RestApiMethod.PostCoin);                  if (coinResult.Success.Equals(false))                 {                     throw new Exception(JsonConvert.SerializeObject(coinResult.NonSuccessMessage));                 }                  var added = await AddWalletTransaction(session.SessionId, coinResult.Result, session.Amount, "Check running total..", blind, TransactionType.Receive);                  if (added.Equals(false))                 {                     throw new Exception("Transaction wallet failed to add!");                 }              }             catch (Exception ex)             {                 throw ex;             }          }
     }
 }
