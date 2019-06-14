@@ -13,5 +13,7 @@ namespace TangramCypher.ApplicationLayer.Onion
         int OnionEnabled { get; }
         string SocksHost { get; }
         int SocksPort { get; }
+
+        bool IsTorRunning();
     }
 }

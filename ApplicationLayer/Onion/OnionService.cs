@@ -326,6 +326,15 @@ namespace TangramCypher.ApplicationLayer.Onion
                         if (e.Data.Contains("Bootstrapped 100%: Done"))
                         {
                             OnionStarted = true;
+
+                            try
+                            {
+                                File.Create($"{tangramDirectory.FullName}/tor{torId}.started", 1, FileOptions.None);
+                            }
+                            catch (Exception ex)
+                            {
+                                logger.LogError(ex.Message);
+                            }
                             console.ResetColor();
                             logger.LogInformation("tor Started!");
                         }
@@ -351,6 +360,15 @@ namespace TangramCypher.ApplicationLayer.Onion
                 {
                     if (tor.Id == torId)
                     {
+                        try
+                        {
+                            File.Delete($"{tangramDirectory.FullName}/tor{torId}.started");
+                        }
+                        catch (Exception ex)
+                        {
+                            logger.LogError(ex.Message);
+                        }
+
                         tor.Kill();
                         break;
                     }
