@@ -172,8 +172,8 @@ namespace TangramCypher.ApplicationLayer.Actor
             session = SessionAddOrUpdate(session);
             session.LastError = null;
 
-            await Unlock(session.SessionId);
-            await Util.TriesUntilCompleted<bool>(async () => { return await ReceivePayment(session.SessionId, session.SenderAddress); }, 10, 100, true);
+            _ = await Unlock(session.SessionId);
+            _ = await Util.TriesUntilCompleted(async () => { return await ReceivePayment(session.SessionId, session.SenderAddress); }, 10, 100, true);
         }
 
         /// <summary>

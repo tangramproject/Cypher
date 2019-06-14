@@ -14,7 +14,7 @@ namespace TangramCypher.Model
     public class StoreKey
     {
         private readonly string name;
-        protected readonly int value;
+        private readonly int value;
 
         public static readonly StoreKey AddressKey = new StoreKey(1, Constant.AddressKey);
         public static readonly StoreKey PublicKey = new StoreKey(2, Constant.PublicKey);

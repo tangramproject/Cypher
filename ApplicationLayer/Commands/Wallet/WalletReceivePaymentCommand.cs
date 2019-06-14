@@ -76,7 +76,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
 
                             spinner.Text = $"Memo:{txnMemo}  Received:{txnAmount}  Available Balance: {balance.Result.DivWithNaT().ToString("F9")}";
                         }
-                    }, Patterns.Toggle);
+                    }, Patterns.Toggle3);
                 }
             }
         }

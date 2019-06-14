@@ -19,6 +19,7 @@ using TangramCypher.Helper;
 
 namespace TangramCypher.ApplicationLayer.Actor
 {
+    //TODO: Move away from partail class as we have introduced repositories.
     public partial class ActorService
     {
         public State State => machine.State;
@@ -31,7 +32,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             try
             {
-                await machine.FireAsync<Guid>(verifyTrigger, session.SessionId);
+                await machine.FireAsync(verifyTrigger, session.SessionId);
             }
             catch (Exception ex)
             {
@@ -63,7 +64,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
         private void Configure(string stateString)
         {
-            var state = (State)Enum.Parse(typeof(State), stateString);
+            _ = (State)Enum.Parse(typeof(State), stateString);
             machine = new StateMachine<State, Trigger>(State);
 
             Configure();
@@ -189,7 +190,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                     UpdateMessagePump("Busy committing payment agreement ...");
 
                     var session = GetSession(sessionId);
-                    var que = new QueueDto() { DateTime = DateTime.Now, TransactionId = session.SessionId };
+                    var que = new QueueDto { DateTime = DateTime.Now, TransactionId = session.SessionId };
                     var storeKey = StoreKey.TransactionIdKey;
                     var txnId = session.SessionId.ToString();
 

@@ -12,9 +12,9 @@ using Microsoft.Extensions.DependencyInjection;
 using McMaster.Extensions.CommandLineUtils;
 using TangramCypher.ApplicationLayer.Onion;
 
-namespace TangramCypher.ApplicationLayer.Commands.Wallet
+namespace TangramCypher.ApplicationLayer.Commands.Tor
 {
-    [CommandDescriptor(new string[] { "tor", "running" }, "Checks to see if tor is running")]
+    [CommandDescriptor(new string[] { "tor", "running" }, "Check tor running state")]
     public class TorRunningCommand : Command
     {
         readonly IOnionServiceClient onionServiceClient;
