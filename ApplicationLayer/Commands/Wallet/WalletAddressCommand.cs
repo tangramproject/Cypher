@@ -41,7 +41,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                 {
                     var session = new Session(identifier, password);
                     var keySet = walletService.CreateKeySet();
-                    var addKeySet = await unitOfWork.GetKeySetRepository().Put(session, StoreKey.AddressKey, keySet.Address, keySet);
+                    var addKeySet = await unitOfWork.GetKeySetRepository().Put(session, keySet);
 
                     if (addKeySet.Success)
                     {

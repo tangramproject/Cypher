@@ -230,9 +230,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                         var checkList = new List<bool> { que.PaymentFailed, que.PublicAgreementFailed, que.ReceiverFailed };
                         if (checkList.Any(l => l.Equals(true)))
                         {
-                            var addQueue = await unitOfWork
-                                                .GetQueueRepository()
-                                                .Put(session, StoreKey.TransactionIdKey, que.TransactionId.ToString(), que);
+                            var addQueue = await unitOfWork.GetQueueRepository().Put(session, que);
 
                             if (addQueue.Success.Equals(false))
                             {

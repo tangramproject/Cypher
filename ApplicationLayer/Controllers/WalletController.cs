@@ -40,7 +40,7 @@ namespace TangramCypher.ApplicationLayer.Controllers
         {
             var session = new Session(credentials.Identifier.ToSecureString(), credentials.Password.ToSecureString());
             var keySet = walletService.CreateKeySet();
-            var addKeySet = await unitOfWork.GetKeySetRepository().Put(session, StoreKey.AddressKey, keySet.Address, keySet);
+            var addKeySet = await unitOfWork.GetKeySetRepository().Put(session, keySet);
 
             if (addKeySet.Success)
                 return new CreatedResult("httpWallet", new { success = addKeySet.Result });

@@ -24,6 +24,7 @@ using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Logging;
 using Sodium;
 using TangramCypher.Model;
+using System.Reflection;
 
 namespace TangramCypher.Helper
 {
@@ -234,6 +235,39 @@ namespace TangramCypher.Helper
             }
 
             return result;
+        }
+
+        public static string GetPrimaryKeyName(object obj)
+        {
+            string pkName = null;
+            var props = obj.GetType().GetProperties();
+
+            foreach (PropertyInfo prop in props)
+            {
+                object[] attrs = prop.GetCustomAttributes(true);
+                foreach (object attr in attrs)
+                {
+                    if (attr is PrimaryKey primaryKey)
+                        pkName = prop.Name;
+                }
+            }
+
+            return pkName;
+        }
+
+        public static T GetPropertyValue<T>(object obj, string propName)
+        {
+            return (T)obj.GetType().GetProperty(propName).GetValue(obj, null);
+        }
+
+        public static string GetPropertyValue(object obj, string propName)
+        {
+            return obj.GetType().GetProperty(propName).GetValue(obj, null).ToString();
+        }
+
+        public static void SetPropertyValue(object obj, string propName, ulong value)
+        {
+            obj.GetType().GetProperty(propName).SetValue(obj, value);
         }
     }
 }

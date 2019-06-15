@@ -465,10 +465,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                     TransactionId = session.SessionId
                 };
 
-                var addPubKeyAgreement = await unitOfWork
-                                    .GetPublicKeyAgreementRepository()
-                                    .Put(session, StoreKey.TransactionIdKey, payload.TransactionId.ToString(), payload);
-
+                var addPubKeyAgreement = await unitOfWork.GetPublicKeyAgreementRepository().Put(session, payload);
                 if (addPubKeyAgreement.Success.Equals(false))
                     throw addPubKeyAgreement.Exception;
             }
@@ -551,10 +548,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                 receiverCoin.Network = walletService.NetworkAddress(receiverCoin).ToHex();
                 receiverCoin.TransactionId = session.SessionId;
 
-                var putReceiver = await unitOfWork
-                                    .GetReceiverRepository()
-                                    .Put(session, StoreKey.TransactionIdKey, receiverCoin.TransactionId.ToString(), receiverCoin);
-
+                var putReceiver = await unitOfWork.GetReceiverRepository().Put(session, receiverCoin);
                 if (putReceiver.Success.Equals(false))
                 {
                     throw putReceiver.Exception;
@@ -562,12 +556,11 @@ namespace TangramCypher.ApplicationLayer.Actor
 
                 var purchaseRepo = unitOfWork.GetPurchaseRepository();
                 var getPurchase = await purchaseRepo.Get(session, StoreKey.TransactionIdKey, session.SessionId.ToString());
-
                 if (getPurchase.Success)
                 {
                     getPurchase.Result.Blind = blind.ToHex();
 
-                    var addPurchase = await purchaseRepo.AddOrReplace(session, StoreKey.TransactionIdKey, session.SessionId.ToString(), getPurchase.Result);
+                    var addPurchase = await purchaseRepo.AddOrReplace(session, getPurchase.Result);
 
                     if (addPurchase.Success.Equals(false))
                     {
@@ -744,10 +737,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                     TransactionId = session.SessionId
                 };
 
-                var putRedemption = await unitOfWork
-                                    .GetRedemptionRepository()
-                                    .Put(session, StoreKey.TransactionIdKey, session.SessionId.ToString(), messageStore);
-
+                var putRedemption = await unitOfWork.GetRedemptionRepository().Put(session, messageStore);
                 if (putRedemption.Success.Equals(false))
                 {
                     throw putRedemption.Exception;
@@ -824,19 +814,13 @@ namespace TangramCypher.ApplicationLayer.Actor
                 sender.Result.Network = walletService.NetworkAddress(sender.Result).ToHex();
                 sender.Result.TransactionId = session.SessionId;
 
-                var putSender = await unitOfWork
-                                   .GetSenderRepository()
-                                   .Put(session, StoreKey.TransactionIdKey, sender.Result.TransactionId.ToString(), sender.Result);
-
+                var putSender = await unitOfWork.GetSenderRepository().Put(session, sender.Result);
                 if (putSender.Success.Equals(false))
                 {
                     throw putSender.Exception;
                 }
 
-                var putPurchase = await unitOfWork
-                                   .GetPurchaseRepository()
-                                   .Put(session, StoreKey.TransactionIdKey, purchase.Result.TransactionId.ToString(), purchase.Result);
-
+                var putPurchase = await unitOfWork.GetPurchaseRepository().Put(session, purchase.Result);
                 if (putPurchase.Success.Equals(false))
                 {
                     throw putPurchase.Exception;
@@ -893,7 +877,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             };
 
             var session = GetSession(sessionId);
-            var addTxn = await unitOfWork.GetTransactionRepository().Put(session, StoreKey.HashKey, txn.Hash, txn);
+            var addTxn = await unitOfWork.GetTransactionRepository().Put(session, txn);
 
             return addTxn.Success;
         }
