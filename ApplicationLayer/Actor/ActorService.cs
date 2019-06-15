@@ -191,22 +191,22 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             string msgAddress = sharedKey ? pk.ToHex() : Cryptography.GenericHashWithKey(pk.ToHex(), pk).ToHex();
 
-            //TODO.. implement better track system..
-            //var track = await unitOfWork.GetTrackRepository().Get(session, StoreKey.PublicKey, pk.ToHex());
+            if (sharedKey)
+            {
+                pk = Util.FormatNetworkAddress(receiverPk);
+            }
+
+            var track = await unitOfWork.GetTrackRepository().Get(session, StoreKey.PublicKey, pk.ToHex());
 
             UpdateMessagePump("Downloading messages ...");
+
             TaskResult<JObject> count = await Client.GetAsync<JObject>(msgAddress, RestApiMethod.MessageCount);
             int countValue = count.Success ? count.Result.Value<int>("count") : 1;
 
-            // messages = track.Result == null
-            //     ? await client.GetRangeAsync<MessageDto>(msgAddress, 0, countValue, RestApiMethod.MessageRange)
-            //     : await client.GetRangeAsync<MessageDto>(msgAddress, track.Result.Skip, countValue, RestApiMethod.MessageRange);
-
-            messages = await Client.GetRangeAsync<MessageDto>(msgAddress, 0, countValue, RestApiMethod.MessageRange);
-
-            if (sharedKey)
-                pk = Util.FormatNetworkAddress(receiverPk);
-
+            messages = track.Result == null
+                ? await Client.GetRangeAsync<MessageDto>(msgAddress, 0, countValue, RestApiMethod.MessageRange)
+                : await Client.GetRangeAsync<MessageDto>(msgAddress, track.Result.Skip, countValue, RestApiMethod.MessageRange);
+               
             switch (messages)
             {
                 case null:
@@ -331,14 +331,23 @@ namespace TangramCypher.ApplicationLayer.Actor
 
                 if (payment)
                 {
-                    var track = new TrackDto
+                    var track = await unitOfWork.GetTrackRepository().Get(session, StoreKey.PublicKey, pk.ToHex());
+                    if (track.Success)
                     {
-                        PublicKey = pk.ToHex(),
-                        Skip = skip,
-                        Take = take
-                    };
+                        track.Result.Skip += skip;
+                        track.Result.Take += take;
+                    }
+                    else
+                    {
+                        track = TaskResult<TrackDto>.CreateSuccess(new TrackDto
+                        {
+                            PublicKey = pk.ToHex(),
+                            Skip = skip,
+                            Take = take
+                        });
+                    }
 
-                    var addTrack = await unitOfWork.GetTrackRepository().AddOrReplace(session, StoreKey.PublicKey, track.PublicKey, track);
+                    var addTrack = await unitOfWork.GetTrackRepository().AddOrReplace(session, track.Result);
                 }
 
                 skip++;
