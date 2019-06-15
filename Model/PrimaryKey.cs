@@ -1,4 +1,4 @@
-// Cypher (c) by Tangram Inc
+﻿// Cypher (c) by Tangram Inc
 // 
 // Cypher is licensed under a
 // Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International License.
@@ -10,11 +10,7 @@ using System;
 
 namespace TangramCypher.Model
 {
-    public class MessageDto
-    {
-        public string Address { get; set; }
-        public string Body { get; set; }
-        [PrimaryKey]
-        public Guid TransactionId { get; set; }
-    }
+    /// Represents the base class for custom attributes.
+    [AttributeUsage(AttributeTargets.Property, Inherited = false)]
+    public class PrimaryKey : Attribute { }
 }

@@ -6,10 +6,12 @@
 // You should have received a copy of the license along with this
 // work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
 
-using System.Security;
+namespace TangramCypher.Model
+{
+    public class TrackDto
+    {
 
-namespace TangramCypher.Model {
-    public class TrackDto {
+        [PrimaryKey]
         public string PublicKey { get; set; }
         public int Skip { get; set; }
         public int Take { get; set; }

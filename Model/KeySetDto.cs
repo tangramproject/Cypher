@@ -10,8 +10,9 @@ namespace TangramCypher.Model
 {
     public class KeySetDto
     {
-        public string PublicKey;
-        public string SecretKey;
-        public string Address;
+        public string PublicKey { get; set; }
+        public string SecretKey { get; set; }
+        [PrimaryKey]
+        public string Address { get; set; }
     }
 }

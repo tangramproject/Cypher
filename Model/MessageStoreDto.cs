@@ -17,6 +17,7 @@ namespace TangramCypher.Model
         public string Memo { get; set; }
         public MessageDto Message { get; set; }
         public string PublicKey { get; set; }
+        [PrimaryKey]
         public Guid TransactionId { get; set; }
     }
 }

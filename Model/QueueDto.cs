@@ -17,6 +17,7 @@ namespace TangramCypher.Model
         public bool PaymentFailed { get; set; }
         public bool PublicAgreementFailed { get; set; }
         public bool ReceiverFailed { get; set; }
+        [PrimaryKey]
         public Guid TransactionId { get; set; }
     }
 }

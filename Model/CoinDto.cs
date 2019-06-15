@@ -19,6 +19,7 @@ namespace TangramCypher.Model
         public string Principle { get; set; }
         public string Stamp { get; set; }
         public string Network { get; set; }
+        [PrimaryKey]
         public Guid TransactionId { get; set; }
         public int Version { get; set; }
     }
