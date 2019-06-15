@@ -24,7 +24,7 @@ using TangramCypher.Model;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
 {
-    [CommandDescriptor(new string[] { "wallet", "transfer" }, "Transfer funds")]
+    [CommandDescriptor(new string[] { "wallet", "send" }, "Send funds")]
     public class WalletTransferCommand : Command
     {
         readonly IActorService actorService;
