@@ -444,7 +444,7 @@ namespace TangramCypher.ApplicationLayer.Coin
 
             using (var secp256k1 = new Secp256k1())
             using (var pedersen = new Pedersen())
-            using (var rangeProof = new RangeProof())
+            using (var bulletProof = new BulletProof())
             {
                 coin.Envelope.Commitment = commitSum.ToHex();
                 coin.Envelope.Proof = k2.ToHex();
@@ -452,13 +452,13 @@ namespace TangramCypher.ApplicationLayer.Coin
                 coin.Hash = Hash(coin).ToHex();
                 coin.Envelope.Signature = secp256k1.Sign(coin.Hash.FromHex(), k1).ToHex();
 
-                var proofStruct = rangeProof.Proof(0, balance, blindSum, commitSum, coin.Hash.FromHex());
-                var isVerified = rangeProof.Verify(commitSum, proofStruct);
+                var @struct = bulletProof.ProofSingle(balance, blindSum, Cryptography.RandomBytes(), null, null, null);
+                var success = bulletProof.Verify(commitSum, @struct.proof, null);
 
-                if (!isVerified)
-                    throw new ArgumentOutOfRangeException(nameof(isVerified), "Range proof failed.");
+                if (!success)
+                    throw new ArgumentOutOfRangeException(nameof(success), "Bullet proof failed.");
 
-                coin.Envelope.RangeProof = proofStruct.proof.ToHex();
+                coin.Envelope.RangeProof = @struct.proof.ToHex();
             }
         }
 

@@ -803,7 +803,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                 return TaskResult<bool>.CreateFailure(JObject.FromObject(new
                 {
                     success = false,
-                    message = "Not enough coin on a sigle chain for the request!"
+                    message = "Not enough coin on a single chain for the request!"
                 }));
             }
 
