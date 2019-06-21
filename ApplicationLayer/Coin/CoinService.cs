@@ -40,9 +40,7 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// <returns>The receiver.</returns>
         public TaskResult<bool> Receiver(SecureString secret, ulong input, out CoinDto coin, out byte[] blind, out byte[] salt)
         {
-            using (var secp256k1 = new Secp256k1())
             using (var pedersen = new Pedersen())
-            using (var rangeProof = new RangeProof())
             {
                 salt = Cryptography.RandomBytes(16);
                 coin = MakeSingleCoin(secret, salt.ToSecureString(), NewStamp(), -1);
@@ -75,9 +73,7 @@ namespace TangramCypher.ApplicationLayer.Coin
         {
             CoinDto coin = null;
 
-            using (var secp256k1 = new Secp256k1())
             using (var pedersen = new Pedersen())
-            using (var rangeProof = new RangeProof())
             {
                 try
                 {
