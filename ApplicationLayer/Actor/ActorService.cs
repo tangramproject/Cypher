@@ -206,7 +206,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             messages = track.Result == null
                 ? await Client.GetRangeAsync<MessageDto>(msgAddress, 0, countValue, RestApiMethod.MessageRange)
                 : await Client.GetRangeAsync<MessageDto>(msgAddress, track.Result.Skip, countValue, RestApiMethod.MessageRange);
-               
+
             switch (messages)
             {
                 case null:
@@ -367,21 +367,26 @@ namespace TangramCypher.ApplicationLayer.Actor
                     return false;
 
                 var session = GetSession(sessionId);
-                var (swap1, swap2) = coinService.CoinSwap(session.SecretKey, coinResult.Result, redemptionKey);
+                var (swap1, swap2) = coinService.CoinSwap(session.SecretKey, redemptionKey.Salt.ToSecureString(), coinResult.Result, redemptionKey);
 
-                var keeperPass = await CoinPass(session.SecretKey, swap1, 3);
+                var keeperPass = await CoinPass(session.SecretKey, redemptionKey.Salt.ToSecureString(), swap1, 3);
                 if (keeperPass.Equals(false))
                     return false;
 
                 //TODO: Above coin swap passes which writes to the ledger.. full pass could fail.. need recovery..
-                var fullPass = await CoinPass(session.SecretKey, swap2, 1);
+                var fullPass = await CoinPass(session.SecretKey, redemptionKey.Salt.ToSecureString(), swap2, 1);
                 if (fullPass.Equals(false))
                     return false;
 
                 //TODO: Could possibility fail.. need recovery..
-                var added = await AddWalletTransaction(session.SessionId, coinResult.Result, redemptionKey.Amount, redemptionKey.Memo, redemptionKey.Blind.FromHex(), TransactionType.Receive);
+                var added = await AddWalletTransaction(session.SessionId, coinResult.Result, redemptionKey.Amount, redemptionKey.Memo, redemptionKey.Blind.FromHex(), redemptionKey.Salt.FromHex(), TransactionType.Receive);
                 if (added.Equals(false))
                     return false;
+
+                redemptionKey.Blind.ZeroString();
+                redemptionKey.Key1.ZeroString();
+                redemptionKey.Key2.ZeroString();
+                redemptionKey.Salt.ZeroString();
 
                 return true;
             }
@@ -398,13 +403,13 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <returns>The pass.</returns>
         /// <param name="swap">Swap.</param>
         /// <param name="mode">Mode.</param>
-        private async Task<bool> CoinPass(SecureString secret, CoinDto swap, int mode)
+        private async Task<bool> CoinPass(SecureString secret, SecureString salt, CoinDto swap, int mode)
         {
             Guard.Argument(swap, nameof(swap)).NotNull();
             Guard.Argument(mode, nameof(mode)).NotNegative();
 
             var canPass = false;
-            var coin = coinService.DeriveCoin(swap, secret);
+            var coin = coinService.DeriveCoin(swap, secret, salt);
             var status = coinService.VerifyCoin(swap, coin);
 
             coin.Hash = coinService.Hash(coin).ToHex();
@@ -547,7 +552,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             try
             {
-                var receiverResult = coinService.Receiver(session.MasterKey, session.Amount, out CoinDto receiverCoin, out byte[] blind);
+                var receiverResult = coinService.Receiver(session.MasterKey, session.Amount, out CoinDto receiverCoin, out byte[] blind, out byte[] salt);
                 if (receiverResult.Success.Equals(false))
                 {
                     throw receiverResult.Exception;
@@ -568,6 +573,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                 if (getPurchase.Success)
                 {
                     getPurchase.Result.Blind = blind.ToHex();
+                    getPurchase.Result.Salt = salt.ToHex();
 
                     var addPurchase = await purchaseRepo.AddOrReplace(session, getPurchase.Result);
 
@@ -577,6 +583,8 @@ namespace TangramCypher.ApplicationLayer.Actor
                     }
 
                     getPurchase.Result.Blind.ZeroString();
+                    getPurchase.Result.Salt.ZeroString();
+
                     Array.Clear(blind, 0, blind.Length);
                 }
                 else
@@ -711,7 +719,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                     throw getReceiver.Exception;
                 }
 
-                var (key1, key2) = coinService.HotRelease(getReceiver.Result.Version, getReceiver.Result.Stamp, session.MasterKey);
+                var (key1, key2) = coinService.HotRelease(getReceiver.Result.Version, getReceiver.Result.Stamp, session.MasterKey, getPurchase.Result.Salt.ToSecureString());
                 var redemption = new RedemptionKeyDto
                 {
                     Amount = session.Amount,
@@ -720,6 +728,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                     Key1 = key1,
                     Key2 = key2,
                     Memo = session.Memo,
+                    Salt = getPurchase.Result.Salt,
                     Stamp = getReceiver.Result.Stamp
                 };
                 var innerMessage = JObject.FromObject(new
@@ -756,6 +765,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                 key2.ZeroString();
                 redemption.Key1.ZeroString();
                 redemption.Key2.ZeroString();
+                redemption.Salt.ZeroString();
 
                 Array.Clear(paddedBuf, 0, paddedBuf.Length);
                 Array.Clear(sharedKey, 0, sharedKey.Length);
@@ -835,7 +845,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                     throw putPurchase.Exception;
                 }
 
-                var addTxn = await AddWalletTransaction(session.SessionId, sender.Result, purchase.Result.Input, session.Memo, null, TransactionType.Send);
+                var addTxn = await AddWalletTransaction(session.SessionId, sender.Result, purchase.Result.Input, session.Memo, null, null, TransactionType.Send);
 
                 if (addTxn.Equals(false))
                 {
@@ -861,7 +871,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <returns>The Wallet transaction.</returns>
         /// <param name="coin">Coin.</param>
         /// <param name="transactionType">Transaction type.</param>
-        private async Task<bool> AddWalletTransaction(Guid sessionId, CoinDto coin, ulong total, string memoText, byte[] blind, TransactionType transactionType)
+        private async Task<bool> AddWalletTransaction(Guid sessionId, CoinDto coin, ulong total, string memoText, byte[] blind, byte[] salt, TransactionType transactionType)
         {
             Guard.Argument(coin, nameof(coin)).NotNull();
             Guard.Argument(total, nameof(total)).NotNegative();
@@ -878,6 +888,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                 Blind = blind == null ? string.Empty : blind.ToHex(),
                 Commitment = formattedCoin.Envelope.Commitment,
                 Hash = formattedCoin.Hash,
+                Salt = salt == null ? string.Empty : salt.ToHex(),
                 Stamp = formattedCoin.Stamp,
                 Version = formattedCoin.Version,
                 TransactionType = transactionType,
@@ -969,6 +980,6 @@ namespace TangramCypher.ApplicationLayer.Actor
             return result;
         }
 
-        private async Task Test()         {             try             {                 var session = new Session("id_716f477592d591439c25a948033b0b8f".ToSecureString(), "the grim schism drawled that iffy one gibbets the positron".ToSecureString())                 {                     Amount = 20000000000000                 };                  session = SessionAddOrUpdate(session);                  coinService.Receiver(session.MasterKey, session.Amount, out CoinDto coin, out byte[] blind);                  coin.Hash = coinService.Hash(coin).ToHex();                 coin.Network = walletService.NetworkAddress(coin).ToHex();                 coin.Envelope.RangeProof = walletService.NetworkAddress(coin).ToHex();                  var coinResult = await PostArticle(coin.FormatCoinToBase64(), RestApiMethod.PostCoin);                  if (coinResult.Success.Equals(false))                 {                     throw new Exception(JsonConvert.SerializeObject(coinResult.NonSuccessMessage));                 }                  var added = await AddWalletTransaction(session.SessionId, coinResult.Result, session.Amount, "Check running total..", blind, TransactionType.Receive);                  if (added.Equals(false))                 {                     throw new Exception("Transaction wallet failed to add!");                 }              }             catch (Exception ex)             {                 throw ex;             }          }
+        private async Task Test()         {             try             {                 var session = new Session("id_891ba05cbdf78880a0d1ba7780e26c49".ToSecureString(), "Dixieland whined your unsold one is bethinking under the odd submarine".ToSecureString())                 {                     Amount = 20000000000000                 };                  session = SessionAddOrUpdate(session);                  coinService.Receiver(session.MasterKey, session.Amount, out CoinDto coin, out byte[] blind, out byte[] salt);                  coin.Hash = coinService.Hash(coin).ToHex();                 coin.Network = walletService.NetworkAddress(coin).ToHex();                 coin.Envelope.RangeProof = walletService.NetworkAddress(coin).ToHex();                  var coinResult = await PostArticle(coin.FormatCoinToBase64(), RestApiMethod.PostCoin);                  if (coinResult.Success.Equals(false))                 {                     throw new Exception(JsonConvert.SerializeObject(coinResult.NonSuccessMessage));                 }                  var added = await AddWalletTransaction(session.SessionId, coinResult.Result, session.Amount, "Check running total..", blind, salt, TransactionType.Receive);                  if (added.Equals(false))                 {                     throw new Exception("Transaction wallet failed to add!");                 }              }             catch (Exception ex)             {                 throw ex;             }          }
     }
 }

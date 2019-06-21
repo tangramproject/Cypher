@@ -23,6 +23,7 @@ namespace TangramCypher.Model {
         public string Commitment { get; set; }
         [PrimaryKey]
         public string Hash { get; set; }
+        public string Salt { get; set; }
         public string Stamp { get; set; }
         public int Version { get; set; }
         public TransactionType TransactionType { get; set; }

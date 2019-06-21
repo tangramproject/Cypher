@@ -11,6 +11,7 @@ using System.Security;
 using System.Text;
 using Dawn;
 using Sodium;
+using TangramCypher.Helper;
 
 namespace TangramCypher.Helper.LibSodium
 {
@@ -69,26 +70,36 @@ namespace TangramCypher.Helper.LibSodium
             return GenericHash.Hash(Encoding.UTF8.GetBytes(message), key, bytes);
         }
 
-        /// <summary>
-        /// Argons hash password.
-        /// </summary>
-        /// <returns>The hash password.</returns>
-        /// <param name="password">Password.</param>
-        public static byte[] ArgonHashPassword(SecureString password)
+        public static byte[] ArgonHashString(SecureString password)
         {
             Guard.Argument(password, nameof(password)).NotNull();
 
-            const long OPS_LIMIT = 4;
-            const int MEM_LIMIT = 33554432;
-            string hash;
+            byte[] hash;
 
             using (var insecurePassword = password.Insecure())
             {
-                hash = PasswordHash.ArgonHashString(insecurePassword.Value, OPS_LIMIT, MEM_LIMIT);
+                hash = PasswordHash.ArgonHashString(insecurePassword.Value, 4, 64000000).FromHex();
             }
 
-            return Encoding.UTF8.GetBytes(hash);
+            return hash;
         }
+
+        public static byte[] ArgonHashBinary(SecureString password, SecureString salt)
+        {
+            Guard.Argument(password, nameof(password)).NotNull();
+            Guard.Argument(salt, nameof(salt)).NotNull();
+
+            byte[] hash;
+
+            using (var insecurePassword = password.Insecure())
+            using (var insecureSalt = salt.Insecure())
+            {
+                hash = PasswordHash.ArgonHashBinary(insecurePassword.Value.FromHex(), insecureSalt.Value.FromHex(), PasswordHash.StrengthArgon.Moderate, 32);
+            }
+
+            return hash;
+        }
+
 
         /// <summary>
         /// Create public static key box.

@@ -189,8 +189,8 @@ namespace TangramCypher.Helper
                     amount = part1.MulWithNaT();
                 else
                 {
-                    var part2 = (ulong)((value - part1) * UInt64.Parse("1".PadRight(parts[1].Length + 1, '0')) + 0.5);
-                    amount = part1.MulWithNaT() + UInt64.Parse(part2.ToString());
+                    var part2 = (ulong)((value - part1) * ulong.Parse("1".PadRight(parts[1].Length + 1, '0')) + 0.5);
+                    amount = part1.MulWithNaT() + ulong.Parse(part2.ToString());
                 }
             }
             catch (Exception ex)

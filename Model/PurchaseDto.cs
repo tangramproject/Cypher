@@ -21,6 +21,7 @@ namespace TangramCypher.Model
         public ulong Input { get; set; }
         public ulong Output { get; set; }
         public bool Spent { get; set; }
+        public string Salt { get; set; }
         public string Stamp { get; set; }
         [PrimaryKey]
         public Guid TransactionId { get; set; }

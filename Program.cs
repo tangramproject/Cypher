@@ -11,7 +11,6 @@ using TangramCypher.ApplicationLayer.Actor;
 using TangramCypher.ApplicationLayer.Commands;
 using TangramCypher.ApplicationLayer.Vault;
 using TangramCypher.ApplicationLayer.Wallet;
-using TangramCypher.Helper.LibSodium;
 using Microsoft.Extensions.Logging;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;

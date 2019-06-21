@@ -12,12 +12,10 @@ using System.Collections.Generic;
 using System.Security;
 using System.Threading.Tasks;
 using MurrayGrant.ReadablePassphrase;
-using Newtonsoft.Json.Linq;
 using SimpleBase;
 using TangramCypher.ApplicationLayer.Vault;
 using TangramCypher.Helper;
 using TangramCypher.Helper.LibSodium;
-using TangramCypher.ApplicationLayer.Coin;
 using TangramCypher.ApplicationLayer.Actor;
 using System.Text;
 using TangramCypher.ApplicationLayer.Helper.ZeroKP;
@@ -71,7 +69,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
                     return TaskResult<ulong>.CreateSuccess(0);
                 }
 
-                balance = Balance(identifier, password, txns.Result);
+                balance = Balance(txns.Result);
             }
             catch (Exception ex)
             {
@@ -90,7 +88,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
         {
             var kp = Cryptography.KeyPair();
 
-            return new KeySetDto()
+            return new KeySetDto
             {
                 PublicKey = kp.PublicKey.ToHex(),
                 SecretKey = kp.SecretKey.ToHex(),
@@ -158,7 +156,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <returns>The passphrase.</returns>
         public SecureString Passphrase()
         {
-            var defaultDict = MurrayGrant.ReadablePassphrase.Dictionaries.Default.Load();
+            _ = MurrayGrant.ReadablePassphrase.Dictionaries.Default.Load();
             var easyCreatedGenerator = Generator.Create();
             return easyCreatedGenerator.GenerateAsSecure(PhraseStrength.RandomForever);
         }
@@ -168,7 +166,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// </summary>
         /// <returns>The password.</returns>
         /// <param name="passphrase">Passphrase.</param>
-        public byte[] HashPassword(SecureString passphrase) => Cryptography.ArgonHashPassword(passphrase);
+        public byte[] HashPassword(SecureString passphrase) => Cryptography.ArgonHashString(passphrase);
 
         /// <summary>
         /// Gets the total transaction amount.
@@ -222,10 +220,8 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <summary>
         /// Sorts the change.
         /// </summary>
-        /// <returns>The change.</returns>
-        /// <param name="identifier">Identifier.</param>
-        /// <param name="password">Password.</param>
-        /// <param name="amount">Amount.</param>
+        /// <param name="session"></param>
+        /// <returns></returns>
         public async Task<TaskResult<PurchaseDto>> SortChange(Session session)
         {
             Guard.Argument(session, nameof(session)).NotNull();
@@ -249,7 +245,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
                 for (int i = 0, targetLength = target.Length; i < targetLength; i++)
                 {
                     (TransactionDto transaction, double amountFor) = CalculateChange(session.Amount, txsIn);
-                    var balance = Balance(session.Identifier, session.MasterKey, txns.Result.Where(tx => tx.Stamp == transaction.Stamp).ToList());
+                    var balance = Balance(txns.Result.Where(tx => tx.Stamp == transaction.Stamp).ToList());
 
                     if (balance >= amountFor)
                     {
@@ -264,7 +260,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
                         };
 
                         purchase.Chain = txns.Result.Where(tx => tx.Stamp.Equals(transaction.Stamp)).Select(tx => Guid.Parse(tx.TransactionId)).ToHashSet();
-                        purchase.Version = txns.Result.Where(tx => tx.Stamp.Equals(transaction.Stamp) && tx.TransactionId.Equals(purchase.Chain.Last().ToString())).Last().Version;
+                        purchase.Version = txns.Result.Last(tx => tx.Stamp.Equals(transaction.Stamp) && tx.TransactionId.Equals(purchase.Chain.Last().ToString())).Version;
 
                         if (purchase.Output.Equals(0))
                             purchase.Spent = true;
@@ -326,11 +322,9 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <summary>
         /// Calculate balance from transactions.
         /// </summary>
-        /// <returns>The balance.</returns>
-        /// <param name="identifier">Identifier.</param>
-        /// <param name="password">Password.</param>
-        /// <param name="transactions">Transactions.</param>
-        private ulong Balance(SecureString identifier, SecureString password, IEnumerable<TransactionDto> source)
+        /// <param name="source"></param>
+        /// <returns></returns>
+        private ulong Balance(IEnumerable<TransactionDto> source)
         {
             var total = 0UL;
 
@@ -416,10 +410,9 @@ namespace TangramCypher.ApplicationLayer.Wallet
             { coin = coin.FormatCoinFromBase64(); }
             catch (FormatException) { }
 
-            string env = string.Empty;
             byte[] address = new byte[33];
 
-            env = networkApi == null ? environment : networkApi.ToString();
+            string env = networkApi == null ? environment : networkApi.ToString();
             address[0] = env == Constant.Mainnet ? (byte)0x1 : (byte)74;
 
             var hash = Cryptography.GenericHashWithKey(
@@ -449,11 +442,9 @@ namespace TangramCypher.ApplicationLayer.Wallet
         public byte[] NetworkAddress(byte[] pk, NetworkApiMethod networkApi = null)
         {
             Guard.Argument(pk, nameof(pk)).NotNull().MaxCount(32);
-
-            string env = string.Empty;
             byte[] address = new byte[33];
 
-            env = networkApi == null ? environment : networkApi.ToString();
+            string env = networkApi == null ? environment : networkApi.ToString();
             address[0] = env == Constant.Mainnet ? (byte)0x1 : (byte)74;
 
             Array.Copy(pk, 0, address, 1, 32);
@@ -490,7 +481,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
                 return Enumerable.Empty<BlanceSheetDto>();
             }
 
-            var final = txns.Result.Select(tx => new BlanceSheetDto()
+            var final = txns.Result.Select(tx => new BlanceSheetDto
             {
                 DateTime = tx.DateTime.ToUniversalTime(),
                 Memo = tx.Memo,

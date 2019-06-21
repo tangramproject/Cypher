@@ -16,6 +16,7 @@ namespace TangramCypher.Model
         public string Key1;
         public string Key2;
         public string Memo;
+        public string Salt;
         public string Stamp;
     }
 }

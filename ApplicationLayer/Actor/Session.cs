@@ -23,6 +23,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         public string Memo { get; set; }
         public SecureString PublicKey { get; set; }
         public string RecipientAddress { get; set; }
+        public SecureString Salt { get; set; }
         public SecureString SecretKey { get; set; }
         public string SenderAddress { get; set; }
         public bool SufficientFunds { get; set; }

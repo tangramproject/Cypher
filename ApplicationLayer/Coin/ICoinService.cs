@@ -16,19 +16,19 @@ namespace TangramCypher.ApplicationLayer.Coin
 {
     public interface ICoinService
     {
-        TaskResult<bool> Receiver(SecureString secret, ulong input, out CoinDto coin, out byte[] blind);
+        TaskResult<bool> Receiver(SecureString secret, ulong input, out CoinDto coin, out byte[] blind, out byte[] salt);
         Task<TaskResult<CoinDto>> Sender(Session session, PurchaseDto purchase);
-        (CoinDto, CoinDto) CoinSwap(SecureString secret, CoinDto coin, RedemptionKeyDto redemptionKey);
-        CoinDto DeriveCoin(CoinDto coin, SecureString secret);
-        byte[] DeriveKey(ulong amount, string stamp, int version, SecureString secret);
-        string DeriveKey(int version, string stamp, SecureString secret, int bytes = 32);
+        (CoinDto, CoinDto) CoinSwap(SecureString secret, SecureString salt, CoinDto coin, RedemptionKeyDto redemptionKey);
+        CoinDto DeriveCoin(CoinDto coin, SecureString secret, SecureString salt);
+        byte[] DeriveKey(ulong amount, string stamp, int version, SecureString secret, SecureString salt);
+        string DeriveKey(int version, string stamp, SecureString secret, SecureString salt, int bytes = 32);
         byte[] Hash(CoinDto coin);
-        (string, string) HotRelease(int version, string stamp, SecureString secret);
-        CoinDto MakeSingleCoin(SecureString secret, string stamp, int version);
-        string PartialRelease(int version, string stamp, string memo, SecureString secret);
-        byte[] Sign(ulong amount, int version, string stamp, SecureString secret, byte[] msg);
+        (string, string) HotRelease(int version, string stamp, SecureString secret, SecureString salt);
+        CoinDto MakeSingleCoin(SecureString secret, SecureString salt, string stamp, int version);
+        string PartialRelease(int version, string stamp, string memo, SecureString secret, SecureString salt);
+        byte[] Sign(ulong amount, int version, string stamp, SecureString secret, SecureString salt, byte[] msg);
         byte[] SignWithBlinding(byte[] msg, byte[] blinding);
-        CoinDto SwapPartialOne(SecureString secret, CoinDto coin, RedemptionKeyDto redemptionKey);
+        CoinDto SwapPartialOne(SecureString secret, SecureString salt, CoinDto coin, RedemptionKeyDto redemptionKey);
         int VerifyCoin(CoinDto terminal, CoinDto current);
     }
 }
