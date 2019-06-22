@@ -43,8 +43,8 @@ namespace TangramCypher.ApplicationLayer.Coin
             using (var pedersen = new Pedersen())
             {
                 salt = Cryptography.RandomBytes(16);
-                coin = MakeSingleCoin(secret, salt.ToSecureString(), NewStamp(), -1);
-                blind = DeriveKey(input, coin.Stamp, coin.Version, secret, salt.ToSecureString());
+                coin = MakeSingleCoin(secret, salt.ToHex().ToSecureString(), NewStamp(), -1);
+                blind = DeriveKey(input, coin.Stamp, coin.Version, secret, salt.ToHex().ToSecureString());
 
                 try
                 {
@@ -52,7 +52,7 @@ namespace TangramCypher.ApplicationLayer.Coin
                     var commitPos = pedersen.Commit(input, blind);
                     var commitSum = pedersen.CommitSum(new List<byte[]> { commitPos }, new List<byte[]> { });
 
-                    AttachEnvelope(blindSum, commitSum, input, secret, salt.ToSecureString(), ref coin);
+                    AttachEnvelope(blindSum, commitSum, input, secret, salt.ToHex().ToSecureString(), ref coin);
 
                 }
                 catch (Exception ex)
@@ -94,14 +94,12 @@ namespace TangramCypher.ApplicationLayer.Coin
                     var blindNeg = DeriveKey(purchase.Input, received.Stamp, coin.Version, session.MasterKey, received.Salt.ToSecureString());
                     var commitNeg = pedersen.Commit(purchase.Input, blindNeg);
 
-                    var commitNegs = txns
-                                      .Where(tx => tx.TransactionType == TransactionType.Send)
+                    var commitNegs = txns.Where(tx => tx.TransactionType == TransactionType.Send)
                                       .Select(c => pedersen.Commit(c.Amount, DeriveKey(c.Amount, c.Stamp, c.Version, session.MasterKey, received.Salt.ToSecureString()))).ToList();
 
                     commitNegs.Add(commitNeg);
 
-                    var blindNegSums = txns
-                                        .Where(tx => tx.TransactionType == TransactionType.Send)
+                    var blindNegSums = txns.Where(tx => tx.TransactionType == TransactionType.Send)
                                         .Select(c => DeriveKey(c.Amount, c.Stamp, c.Version, session.MasterKey, received.Salt.ToSecureString())).ToList();
 
                     blindNegSums.Add(blindNeg);
@@ -135,7 +133,7 @@ namespace TangramCypher.ApplicationLayer.Coin
             var v1 = +coin.Version + 1;
             var v2 = +coin.Version + 2;
 
-            var c = new CoinDto()
+            var c = new CoinDto
             {
                 Keeper = DeriveKey(v1, coin.Stamp, DeriveKey(v2, coin.Stamp, DeriveKey(v2, coin.Stamp, secret, salt).ToSecureString(), salt).ToSecureString(), salt),
                 Version = v0,
@@ -220,7 +218,7 @@ namespace TangramCypher.ApplicationLayer.Coin
             var subKey1 = DeriveKey(version + 1, stamp, secret, salt);
             var subKey2 = DeriveKey(version + 2, stamp, secret, salt).ToSecureString();
             var mix = DeriveKey(version + 2, stamp, subKey2, salt);
-            var redemption = new RedemptionKeyDto() { Key1 = subKey1, Key2 = mix, Memo = memo, Stamp = stamp };
+            var redemption = new RedemptionKeyDto { Key1 = subKey1, Key2 = mix, Memo = memo, Stamp = stamp };
 
             return JsonConvert.SerializeObject(redemption);
         }
@@ -250,7 +248,7 @@ namespace TangramCypher.ApplicationLayer.Coin
             var v3 = coin.Version + 3;
             var v4 = coin.Version + 4;
 
-            var c1 = new CoinDto()
+            var c1 = new CoinDto
             {
                 Keeper = DeriveKey(v2, redemptionKey.Stamp, DeriveKey(v3, redemptionKey.Stamp, DeriveKey(v3, redemptionKey.Stamp, secret, salt).ToSecureString(), salt).ToSecureString(), salt),
                 Version = v1,
@@ -262,7 +260,7 @@ namespace TangramCypher.ApplicationLayer.Coin
 
             c1.Hash = Hash(c1).ToHex();
 
-            var c2 = new CoinDto()
+            var c2 = new CoinDto
             {
                 Keeper = DeriveKey(v3, redemptionKey.Stamp, DeriveKey(v4, redemptionKey.Stamp, DeriveKey(v4, redemptionKey.Stamp, secret, salt).ToSecureString(), salt).ToSecureString(), salt),
                 Version = v2,
@@ -442,7 +440,7 @@ namespace TangramCypher.ApplicationLayer.Coin
         private void AttachEnvelope(byte[] blindSum, byte[] commitSum, ulong balance, SecureString secret, SecureString salt, ref CoinDto coin)
         {
             var (k1, k2) = Split(blindSum, secret, salt, coin.Stamp, coin.Version);
-
+            
             using (var secp256k1 = new Secp256k1())
             using (var pedersen = new Pedersen())
             using (var bulletProof = new BulletProof())

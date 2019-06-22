@@ -43,7 +43,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
         public int GetHashCode(Session session)
         {
-            Session s = (Session)session;
+            Session s = session;
             return s.SenderAddress.GetHashCode();
         }
     }
