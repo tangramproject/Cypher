@@ -8,7 +8,7 @@
 
 using System;
 using System.Collections.Generic;
-using TangramCypher.Model;
+using LiteDB;
 
 namespace TangramCypher.Model
 {
@@ -23,7 +23,7 @@ namespace TangramCypher.Model
         public bool Spent { get; set; }
         public string Salt { get; set; }
         public string Stamp { get; set; }
-        [PrimaryKey]
+        [BsonId]
         public Guid TransactionId { get; set; }
         public int Version { get; set; }
     }

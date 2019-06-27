@@ -7,6 +7,7 @@
 // work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
 
 using System;
+using LiteDB;
 
 namespace TangramCypher.Model
 {
@@ -17,7 +18,7 @@ namespace TangramCypher.Model
         public bool PaymentFailed { get; set; }
         public bool PublicAgreementFailed { get; set; }
         public bool ReceiverFailed { get; set; }
-        [PrimaryKey]
+        [BsonId]
         public Guid TransactionId { get; set; }
     }
 }

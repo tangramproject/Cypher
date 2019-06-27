@@ -14,7 +14,7 @@ using TangramCypher.ApplicationLayer.Wallet;
 
 namespace TangramCypher.Model
 {
-    public class ReceiverRepository : Repository<CoinDto>, IReceiverRepository
+    public class ReceiverRepository : Repository<ReceiverCoinDto>, IReceiverRepository
     {
         public ReceiverRepository(IVaultServiceClient vaultServiceClient, ILogger logger)
             : base(StoreName.Receiver, vaultServiceClient, logger)

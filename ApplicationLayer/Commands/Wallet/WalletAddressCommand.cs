@@ -10,11 +10,8 @@ using System;
 using System.Threading.Tasks;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.DependencyInjection;
-using Newtonsoft.Json;
-using TangramCypher.ApplicationLayer.Actor;
-using TangramCypher.ApplicationLayer.Wallet;
 using TangramCypher.Helper;
-using TangramCypher.Model;
+using TangramCypher.ApplicationLayer.Wallet;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
 {
@@ -23,39 +20,38 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
     {
         readonly IConsole console;
         readonly IWalletService walletService;
-        readonly IUnitOfWork unitOfWork;
 
         public WalletAddressCommand(IServiceProvider serviceProvider)
         {
             console = serviceProvider.GetService<IConsole>();
             walletService = serviceProvider.GetService<IWalletService>();
-            unitOfWork = serviceProvider.GetService<IUnitOfWork>();
         }
 
-        public async override Task Execute()
+        public override Task Execute()
         {
             try
             {
                 using (var identifier = Prompt.GetPasswordAsSecureString("Identifier:", ConsoleColor.Yellow))
                 using (var password = Prompt.GetPasswordAsSecureString("Password:", ConsoleColor.Yellow))
                 {
-                    var session = new Session(identifier, password);
-                    var keySet = walletService.CreateKeySet();
-                    var addKeySet = await unitOfWork.GetKeySetRepository().Put(session, keySet);
 
-                    if (addKeySet.Success)
+                    try
                     {
+                        walletService.AddKeySet(password, identifier.ToUnSecureString());
+
                         console.ForegroundColor = ConsoleColor.Magenta;
                         console.WriteLine("\nWallet Key set added!\n");
                         console.ForegroundColor = ConsoleColor.White;
-
-                        return;
                     }
-
-                    console.ForegroundColor = ConsoleColor.Red;
-                    console.WriteLine("Something went wrong!");
-                    console.ForegroundColor = ConsoleColor.White;
+                    catch (Exception ex)
+                    {
+                        console.ForegroundColor = ConsoleColor.Red;
+                        console.WriteLine($"{ex.Message}");
+                        console.ForegroundColor = ConsoleColor.White;
+                    }
                 }
+
+                return Task.CompletedTask;
             }
             catch (Exception ex)
             {

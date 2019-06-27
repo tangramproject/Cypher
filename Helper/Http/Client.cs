@@ -21,6 +21,7 @@ using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using TangramCypher.ApplicationLayer.Actor;
+using System.Net.Http.Formatting;
 
 namespace TangramCypher.Helper.Http
 {
@@ -31,7 +32,7 @@ namespace TangramCypher.Helper.Http
         private readonly IConfigurationSection apiRestSection;
         public Client(IConfiguration apiRestSection, ILogger logger)
         {
-             this.apiRestSection = apiRestSection.GetSection(Constant.ApiGateway);
+            this.apiRestSection = apiRestSection.GetSection(Constant.ApiGateway);
             this.logger = logger;
         }
 
@@ -52,9 +53,8 @@ namespace TangramCypher.Helper.Http
         public async Task<TaskResult<T>> AddAsync<T>(T payload, RestApiMethod apiMethod)
         {
             Guard.Argument(payload, nameof(payload)).Equals(null);
-
-            JObject jObject = null;
             var cts = new CancellationTokenSource();
+            T result;
 
             try
             {
@@ -62,9 +62,9 @@ namespace TangramCypher.Helper.Http
                 var path = apiRestSection.GetSection(Constant.Routing).GetValue<string>(apiMethod.ToString());
 
                 cts.CancelAfter(60000);
-                jObject = await PostAsync(payload, baseAddress, path, cts.Token);
+                result = await PostAsync(payload, baseAddress, path, cts.Token);
 
-                if (jObject == null)
+                if (result == null)
                 {
                     return TaskResult<T>.CreateFailure(JObject.FromObject(new
                     {
@@ -84,7 +84,7 @@ namespace TangramCypher.Helper.Http
                 return TaskResult<T>.CreateFailure(ex);
             }
 
-            return TaskResult<T>.CreateSuccess(jObject.ToObject<T>());
+            return TaskResult<T>.CreateSuccess(result);
         }
 
         /// <summary>
@@ -273,21 +273,17 @@ namespace TangramCypher.Helper.Http
         }
 
         /// <summary>
-        /// Post async.
+        /// Sends a POST request.
         /// </summary>
-        /// <returns>The async.</returns>
-        /// <param name="payload">Payload.</param>
-        /// <param name="baseAddress">Base address.</param>
-        /// <param name="path">Path.</param>
-        /// <param name="cancellationToken">Cancellation token.</param>
-        /// <typeparam name="T">The 1st type parameter.</typeparam>
-        private async Task<JObject> PostAsync<T>(T payload, Uri baseAddress, string path, CancellationToken cancellationToken)
+        /// <typeparam name="T"></typeparam>
+        /// <param name="payload"></param>
+        /// <param name="baseAddress"></param>
+        /// <param name="path"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        private async Task<T> PostAsync<T>(T payload, Uri baseAddress, string path, CancellationToken cancellationToken)
         {
-            Guard.Argument<T>(payload, nameof(payload)).Equals(null);
-            Guard.Argument(baseAddress, nameof(baseAddress)).NotNull();
-            Guard.Argument(path, nameof(path)).NotNull().NotEmpty();
-
-            JObject result = null;
+            var result = default(T);
 
             using (var client = socksPortHandler == null ? new HttpClient() : new HttpClient(socksPortHandler))
             {
@@ -295,36 +291,21 @@ namespace TangramCypher.Helper.Http
                 client.DefaultRequestHeaders.Accept.Clear();
                 client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
-                using (var request = new HttpRequestMessage(HttpMethod.Post, path))
+                var proto = Util.SerializeProto(payload);
+
+                using (var response = await client.PostAsJsonAsync(path, proto, cancellationToken))
                 {
-                    var content = JsonConvert.SerializeObject(payload, Formatting.Indented);
-                    var buffer = Encoding.UTF8.GetBytes(content);
+                    var byteArray = await response.Content.ReadAsByteArrayAsync();
 
-                    request.Content = new StringContent(content, Encoding.UTF8, "application/json");
-
-                    try
+                    if (response.IsSuccessStatusCode)
                     {
-                        using (var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
-                        {
-                            var stream = await response.Content.ReadAsStreamAsync();
-
-                            if (response.IsSuccessStatusCode)
-                                result = Util.DeserializeJsonFromStream<JObject>(stream);
-                            else
-                            {
-                                var contentResult = await Util.StreamToStringAsync(stream);
-                                logger.LogError($"Result: {contentResult}\n Content: {content}\n StatusCode: {(int)response.StatusCode}");
-                                throw new ApiException
-                                {
-                                    StatusCode = (int)response.StatusCode,
-                                    Content = contentResult
-                                };
-                            }
-                        }
+                        result = Util.DeserializeProto<T>(byteArray);
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
+                        var content = await response.Content.ReadAsStringAsync();
+                        logger.LogError($"Result: {content}\n StatusCode: {(int)response.StatusCode}");
+                        throw new Exception(content);
                     }
                 }
             }

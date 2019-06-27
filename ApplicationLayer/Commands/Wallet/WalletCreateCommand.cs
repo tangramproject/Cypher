@@ -17,8 +17,8 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
     [CommandDescriptor(new string[] { "wallet", "create" }, "Creates a new wallet")]
     class WalletCreateCommand : Command
     {
-        readonly IConsole console;
-        readonly IWalletService walletService;
+        private readonly IConsole console;
+        private readonly IWalletService walletService;
 
         public WalletCreateCommand(IServiceProvider serviceProvider)
         {
@@ -26,10 +26,12 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
             walletService = serviceProvider.GetService<IWalletService>();
         }
 
-        public override async Task Execute()
+        public override Task Execute()
         {
-            var creds = await walletService.CreateWallet();
+            var creds = walletService.CreateWallet();
             console.WriteLine($"Created Wallet {creds.Identifier} with password: {creds.Password}");
+
+            return Task.CompletedTask;
         }
     }
 }

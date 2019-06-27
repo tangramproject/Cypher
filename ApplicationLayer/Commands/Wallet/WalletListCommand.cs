@@ -12,6 +12,7 @@ using Microsoft.Extensions.DependencyInjection;
 using McMaster.Extensions.CommandLineUtils;
 using TangramCypher.ApplicationLayer.Wallet;
 using System.Linq;
+using ConsoleTables;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
 {
@@ -27,19 +28,27 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
             console = serviceProvider.GetService<IConsole>();
         }
 
-        public override async Task Execute()
+        public override Task Execute()
         {
-            var keys = await walletService.WalletList();
+            var keys = walletService.WalletList();
 
             if (keys?.Any() == true)
             {
-                foreach (var key in keys)
-                {
-                    var k = key.TrimEnd('/');
+                var table = new ConsoleTable("Path");
 
-                    console.WriteLine(k);
-                }
+                foreach (var key in keys)
+                    table.AddRow(key);
+
+                console.WriteLine(table);
             }
+            else
+            {
+                console.ForegroundColor = ConsoleColor.Red;
+                console.WriteLine("No wallets have been created.");
+                console.ForegroundColor = ConsoleColor.White;
+            }
+
+            return Task.CompletedTask;
         }
     }
 }

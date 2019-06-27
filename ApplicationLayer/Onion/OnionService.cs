@@ -266,7 +266,7 @@ namespace TangramCypher.ApplicationLayer.Onion
                 "CircuitBuildTimeout 2",
                 "KeepalivePeriod 2",
                 "NewCircuitPeriod 15",
-                "NumEntryGuards 8",
+                "NumEntryGuards 3",
                 $"ControlPort {ControlPort}",
                 "Log notice stdout",
                 "SafeSocks 1",

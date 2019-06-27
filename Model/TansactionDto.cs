@@ -7,6 +7,7 @@
 // work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
 
 using System;
+using LiteDB;
 
 namespace TangramCypher.Model {
        public enum TransactionType
@@ -21,7 +22,7 @@ namespace TangramCypher.Model {
         public ulong Amount { get; set; }
         public string Blind { get; set; }
         public string Commitment { get; set; }
-        [PrimaryKey]
+        [BsonId]
         public string Hash { get; set; }
         public string Salt { get; set; }
         public string Stamp { get; set; }

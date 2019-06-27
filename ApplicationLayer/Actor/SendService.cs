@@ -72,11 +72,11 @@ namespace TangramCypher.ApplicationLayer.Actor
 
         private void ConfigureStateAudited() => machine.Configure(State.Audited)
                 .SubstateOf(State.New)
-                .OnEntryFromAsync(verifyTrigger, async (Guid sessionId) =>
+                .OnEntryFrom(verifyTrigger, (Guid sessionId) =>
                 {
-                    var funds = await SufficientFunds(sessionId);
+                    var funds = SufficientFunds(sessionId);
                     if (funds.Success)
-                        await machine.FireAsync(unlockTrigger, funds.Result.SessionId);
+                        machine.Fire(unlockTrigger, funds.Result.SessionId);
                     else
                     {
                         var session = GetSession(sessionId);
@@ -90,11 +90,11 @@ namespace TangramCypher.ApplicationLayer.Actor
                 .Permit(Trigger.Failed, State.Failure);
 
         private void ConfigureStateKeys() => machine.Configure(State.Keys)
-                .OnEntryFromAsync(unlockTrigger, async (Guid sessionId) =>
+                .OnEntryFrom(unlockTrigger, (Guid sessionId) =>
                 {
-                    var unlocked = await Unlock(sessionId);
+                    var unlocked = Unlock(sessionId);
                     if (unlocked.Success)
-                        await machine.FireAsync(burnTrigger, sessionId);
+                        machine.Fire(burnTrigger, sessionId);
                     else
                     {
                         var session = GetSession(sessionId);
@@ -109,11 +109,11 @@ namespace TangramCypher.ApplicationLayer.Actor
                 .Permit(Trigger.Failed, State.Failure);
 
         private void ConfigureStateBurned() => machine.Configure(State.Burned)
-                .OnEntryFromAsync(burnTrigger, async (Guid sessionId) =>
+                .OnEntryFrom(burnTrigger, (Guid sessionId) =>
                 {
-                    var burnt = await Burn(sessionId);
+                    var burnt = Burn(sessionId);
                     if (burnt.Success)
-                        await machine.FireAsync(commitReceiverTrigger, sessionId);
+                        machine.Fire(commitReceiverTrigger, sessionId);
                     else
                     {
                         var session = GetSession(sessionId);
@@ -128,11 +128,11 @@ namespace TangramCypher.ApplicationLayer.Actor
                 .Permit(Trigger.Failed, State.Failure);
 
         private void ConfigureStateCommitted() => machine.Configure(State.Committed)
-                  .OnEntryFromAsync(commitReceiverTrigger, async (Guid sessionId) =>
+                  .OnEntryFrom(commitReceiverTrigger, (Guid sessionId) =>
                   {
-                      var committed = await CommitReceiver(sessionId);
+                      var committed = CommitReceiver(sessionId);
                       if (committed.Success)
-                          await machine.FireAsync(publicKeyAgreementTrgger, sessionId);
+                          machine.Fire(publicKeyAgreementTrgger, sessionId);
                       else
                       {
                           var session = GetSession(sessionId);
@@ -147,11 +147,11 @@ namespace TangramCypher.ApplicationLayer.Actor
                   .Permit(Trigger.Failed, State.Failure);
 
         private void ConfigureStatePublicKeyAgree() => machine.Configure(State.PublicKeyAgree)
-                .OnEntryFromAsync(publicKeyAgreementTrgger, async (Guid sessionId) =>
+                .OnEntryFrom(publicKeyAgreementTrgger, (Guid sessionId) =>
                 {
-                    var pubAgreed = await PublicKeyAgreementMessage(sessionId);
+                    var pubAgreed = PublicKeyAgreementMessage(sessionId);
                     if (pubAgreed.Success)
-                        await machine.FireAsync(redemptionKeyTrigger, sessionId);
+                        machine.Fire(redemptionKeyTrigger, sessionId);
                     else
                     {
                         var session = GetSession(sessionId);
@@ -166,11 +166,11 @@ namespace TangramCypher.ApplicationLayer.Actor
                 .Permit(Trigger.Failed, State.Failure);
 
         private void ConfigureStatRedeptionKey() => machine.Configure(State.RedemptionKey)
-                .OnEntryFromAsync(redemptionKeyTrigger, async (Guid sessionId) =>
+                .OnEntryFrom(redemptionKeyTrigger, (Guid sessionId) =>
                 {
-                    var redeemed = await RedemptionKeyMessage(sessionId);
+                    var redeemed = RedemptionKeyMessage(sessionId);
                     if (redeemed.Success)
-                        await machine.FireAsync(paymentTrgger, sessionId);
+                        machine.Fire(paymentTrgger, sessionId);
                     else
                     {
                         var session = GetSession(sessionId);
@@ -196,51 +196,55 @@ namespace TangramCypher.ApplicationLayer.Actor
 
                     try
                     {
-                        var send = await unitOfWork.GetSenderRepository().Get(session, storeKey, txnId);
-                        var sendResult = await PostArticle(send.Result.FormatCoinToBase64(), RestApiMethod.PostCoin);
-                        if (sendResult.Result == null)
+                        using (var db = Util.LiteRepositoryFactory(session.MasterKey, session.Identifier.ToUnSecureString()))
                         {
-                            throw new NullReferenceException("Sender failed to post the request!");
-                        }
-
-                        var rece = await unitOfWork.GetReceiverRepository().Get(session, storeKey, txnId);
-                        var receResult = await PostArticle(rece.Result.FormatCoinToBase64(), RestApiMethod.PostCoin);
-                        if (receResult.Result == null)
-                        {
-                            que.ReceiverFailed = true;
-                        }
-
-                        if (session.ForwardMessage)
-                        {
-                            var publ = await unitOfWork.GetPublicKeyAgreementRepository().Get(session, storeKey, txnId);
-                            var publResult = await PostArticle(publ.Result, RestApiMethod.PostMessage);
-                            if (publResult.Result == null)
+                            var sender = db.Query<SenderCoinDto>().Where(s => s.TransactionId.Equals(session.SessionId)).FirstOrDefault();
+                            var sendResult = await PostArticle(sender.Cast<BaseCoinDto>(), RestApiMethod.PostCoin);
+                            if (sendResult.Result == null)
                             {
-                                que.PublicAgreementFailed = true;
+                                throw new NullReferenceException("Sender failed to post the request!");
                             }
 
-                            var rede = await unitOfWork.GetRedemptionRepository().Get(session, storeKey, txnId);
-                            var redeResult = await PostArticle(rede.Result.Message, RestApiMethod.PostMessage);
-                            if (redeResult.Result == null)
+                            var receiver = db.Query<ReceiverCoinDto>().Where(s => s.TransactionId.Equals(session.SessionId)).FirstOrDefault();
+                            var receResult = await PostArticle(receiver, RestApiMethod.PostCoin);
+                            if (receResult.Result == null)
                             {
-                                que.PaymentFailed = true;
-                            }
-                        }
-
-                        var checkList = new List<bool> { que.PaymentFailed, que.PublicAgreementFailed, que.ReceiverFailed };
-                        if (checkList.Any(l => l.Equals(true)))
-                        {
-                            var addQueue = await unitOfWork.GetQueueRepository().Put(session, que);
-
-                            if (addQueue.Success.Equals(false))
-                            {
-                                throw new Exception("Queue failed to save..");
+                                que.ReceiverFailed = true;
                             }
 
-                            logger.LogInformation("Added queue.. you might have to do some manual work ;(.. WIP");
-                        }
+                            if (session.ForwardMessage)
+                            {
+                                var publicKeyAgreement = db.Query<MessageDto>().Where(s => s.TransactionId.Equals(session.SessionId)).FirstOrDefault();
+                                var publResult = await PostArticle(publicKeyAgreement, RestApiMethod.PostMessage);
+                                if (publResult.Result == null)
+                                {
+                                    que.PublicAgreementFailed = true;
+                                }
 
-                        machine.Fire(Trigger.Complete);
+                                var redemptionKey = db.Query<MessageStoreDto>().Where(s => s.TransactionId.Equals(session.SessionId)).FirstOrDefault();
+                                var redeResult = await PostArticle(redemptionKey.Message, RestApiMethod.PostMessage);
+                                if (redeResult.Result == null)
+                                {
+                                    que.PaymentFailed = true;
+                                }
+                            }
+
+                            var checkList = new List<bool> { que.PaymentFailed, que.PublicAgreementFailed, que.ReceiverFailed };
+                            if (checkList.Any(l => l.Equals(true)))
+                            {
+                                db.Insert(que);
+                                logger.LogInformation("Added queue.. you might have to do some manual work ;(.. WIP");
+                            }
+                            else
+                            {
+                                db.Delete<SenderCoinDto>(session.SessionId);
+                                db.Delete<ReceiverCoinDto>(session.SessionId);
+                                db.Delete<MessageDto>(session.SessionId);
+                                db.Delete<MessageStoreDto>(session.SessionId);
+                            }
+
+                            machine.Fire(Trigger.Complete);
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -262,25 +266,23 @@ namespace TangramCypher.ApplicationLayer.Actor
                 .Permit(Trigger.RollBack, State.Reversed);
 
         private void ConfigureStateReversed() => machine.Configure(State.Reversed)
-                .OnEntryFromAsync(reversedTrgger, async (Guid sessionId) =>
+                .OnEntryFrom(reversedTrgger, (Guid sessionId) =>
                 {
                     var session = GetSession(sessionId);
-                    var getSender = await unitOfWork
-                                    .GetSenderRepository()
-                                    .Get(session, StoreKey.TransactionIdKey, session.SessionId.ToString());
-
-                    if (getSender.Result != null)
+                    using (var db = Util.LiteRepositoryFactory(session.MasterKey, session.Identifier.ToUnSecureString()))
                     {
-                        var delTransaction = await unitOfWork
-                                            .GetTransactionRepository()
-                                            .Delete(session, StoreKey.HashKey, getSender.Result.Hash);
-
-                        if (delTransaction.Result.Equals(false))
+                        var senderExists = db.Query<SenderCoinDto>().Where(s => s.TransactionId.Equals(session.SessionId)).Exists();
+                        if (senderExists.Equals(true))
                         {
-                            var message = $"Please check logs for any details. Could not delete transaction {getSender.Result.Hash}";
+                            var sender = db.Query<SenderCoinDto>().Where(s => s.TransactionId.Equals(session.SessionId)).FirstOrDefault();
+                            var success = db.Delete<SenderCoinDto>(sender.TransactionId);
+                            if (success.Equals(false))
+                            {
+                                var message = $"Please check logs for any details. Could not delete sender transaction {sender.Hash}";
 
-                            logger.LogError(message);
-                            throw new Exception(message);
+                                logger.LogError(message);
+                                throw new Exception(message);
+                            }
                         }
                     }
 

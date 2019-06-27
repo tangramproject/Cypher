@@ -28,20 +28,20 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
             walletService = serviceProvider.GetService<IWalletService>();
         }
 
-        public async override Task Execute()
+        public override Task Execute()
         {
             using (var identifier = Prompt.GetPasswordAsSecureString("Identifier:", ConsoleColor.Yellow))
             using (var password = Prompt.GetPasswordAsSecureString("Password:", ConsoleColor.Yellow))
             {
                 try
                 {
-                    var final = (await walletService.TransactionHistory(identifier, password)).ToList();
+                    var final = walletService.TransactionHistory(identifier, password).ToList();
 
                     if (final?.Any() == true)
                     {
                         var table = ConsoleTable.From(final).ToString();
                         console.WriteLine(table);
-                        return;
+                        return Task.CompletedTask;
                     }
 
                     NoTxn();
@@ -51,6 +51,8 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                     NoTxn();
                 }
             }
+
+            return Task.CompletedTask;
         }
 
         private void NoTxn()

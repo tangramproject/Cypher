@@ -7,14 +7,19 @@
 // work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
 
 using System;
+using LiteDB;
+using ProtoBuf;
 
 namespace TangramCypher.Model
 {
+    [ProtoContract]
     public class MessageDto
     {
+        [ProtoMember(1)]
         public string Address { get; set; }
+        [ProtoMember(2)]
         public string Body { get; set; }
-        [PrimaryKey]
+        [BsonId]
         public Guid TransactionId { get; set; }
     }
 }

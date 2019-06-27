@@ -48,11 +48,9 @@ namespace TangramCypher
                         .AddSingleton<IActorService, ActorService>()
                         .AddSingleton<IWalletService, WalletService>()
                         .AddSingleton<IOnionServiceClient, OnionServiceClient>()
-                        .AddSingleton<IVaultServiceClient, VaultServiceClient>()
                         .AddSingleton<ICommandService, CommandService>()
                         .AddSingleton<ICoinService, CoinService>()
                         .AddSingleton<IHostedService, OnionService>()
-                        .AddSingleton<IHostedService, VaultService>()
                         .AddSingleton<IUnitOfWork, UnitOfWork>()
                         .AddSingleton<IHostedService, CommandService>(sp =>
                         {

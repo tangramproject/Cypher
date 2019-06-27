@@ -11,7 +11,7 @@ using System.Collections.Generic;
 
 namespace TangramCypher.Model
 {
-    public interface ISenderRepository : IRepository<CoinDto>
+    public interface ISenderRepository : IRepository<SenderCoinDto>
     {
 
     }

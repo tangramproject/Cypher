@@ -12,10 +12,8 @@ using Microsoft.Extensions.DependencyInjection;
 using McMaster.Extensions.CommandLineUtils;
 using TangramCypher.Helper;
 using TangramCypher.ApplicationLayer.Wallet;
-using Newtonsoft.Json.Linq;
-using System.Collections.Generic;
 using ConsoleTables;
-using TangramCypher.Model;
+using System.Linq;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
 {
@@ -31,32 +29,33 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
             console = serviceProvider.GetService<IConsole>();
         }
 
-        public override async Task Execute()
+        public override Task Execute()
         {
             using (var identifier = Prompt.GetPasswordAsSecureString("Identifier:", ConsoleColor.Yellow))
             using (var password = Prompt.GetPasswordAsSecureString("Password:", ConsoleColor.Yellow))
             {
                 using (var id = identifier.Insecure())
                 {
-                    var profile = await walletService.Profile(identifier, password);
+                    var addresses = walletService.ListAddresses(password, identifier.ToUnSecureString());
 
-                    var data = JObject
-                                .Parse(profile)
-                                .ToObject<Dictionary<string, object>>();
+                    if (addresses?.Any() == true)
+                    {
+                        var table = new ConsoleTable("Address");
 
-                    var storeKeys = JObject
-                                    .FromObject(data["data"])
-                                    .GetValue("storeKeys")
-                                    .ToObject<List<KeySetDto>>();
+                        foreach (var address in addresses)
+                            table.AddRow(address);
 
-                    var table = new ConsoleTable("Address");
-
-                    foreach (var key in storeKeys)
-                        table.AddRow(key.Address);
-
-                    console.WriteLine(table);
-
+                        console.WriteLine(table);
+                    }
+                    else
+                    {
+                        console.ForegroundColor = ConsoleColor.Red;
+                        console.WriteLine("No addresses have been created.");
+                        console.ForegroundColor = ConsoleColor.White;
+                    }
                 }
+
+                return Task.CompletedTask;
             }
         }
     }

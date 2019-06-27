@@ -49,30 +49,32 @@ namespace TangramCypher.ApplicationLayer.Controllers
         }
 
         [HttpPost("balance", Name = "WalletBalance")]
-        public async Task<IActionResult> WalletBalance([FromBody] CredentialsDto credentials)
+        public IActionResult WalletBalance([FromBody] CredentialsDto credentials)
         {
-            var total = await walletService.AvailableBalance(credentials.Identifier.ToSecureString(), credentials.Password.ToSecureString());
+            var total = walletService.AvailableBalance(credentials.Identifier.ToSecureString(), credentials.Password.ToSecureString());
             return new OkObjectResult(new { balance = total });
         }
 
         [HttpGet("create", Name = "CreateWallet")]
-        public async Task<IActionResult> CreateWallet()
+        public IActionResult CreateWallet()
         {
-            var creds = await walletService.CreateWallet();
+            var creds = walletService.CreateWallet();
             return new OkObjectResult(creds);
         }
 
         [HttpPost("profile", Name = "WalletProfile")]
-        public async Task<IActionResult> WalletProfile([FromBody] CredentialsDto credentials)
+        public IActionResult WalletProfile([FromBody] CredentialsDto credentials)
         {
-            var profile = await walletService.Profile(credentials.Identifier.ToSecureString(), credentials.Password.ToSecureString());
-            return new OkObjectResult(JsonConvert.DeserializeObject(profile));
+            //var profile = await walletService.Profile(credentials.Identifier.ToSecureString(), credentials.Password.ToSecureString());
+            //return new OkObjectResult(JsonConvert.DeserializeObject(profile));
+
+            return new OkResult();
         }
 
         [HttpGet("list", Name = "WalletList")]
-        public async Task<IActionResult> WalletList()
+        public IActionResult WalletList()
         {
-            var list = await walletService.WalletList();
+            var list = walletService.WalletList();
             return new OkObjectResult(list);
         }
 
@@ -98,11 +100,11 @@ namespace TangramCypher.ApplicationLayer.Controllers
                     await actorService.ReceivePayment(session);
                 }
 
-                availBalance = await walletService.AvailableBalance(session.Identifier, session.MasterKey);
+                availBalance = walletService.AvailableBalance(session.Identifier, session.MasterKey);
             }
             catch (Exception ex)
             {
-                availBalance = await walletService.AvailableBalance(session.Identifier, session.MasterKey);
+                availBalance = walletService.AvailableBalance(session.Identifier, session.MasterKey);
                 return new ObjectResult(new { error = ex.Message, statusCode = 500, balance = availBalance.Result });
             }
 
@@ -139,14 +141,14 @@ namespace TangramCypher.ApplicationLayer.Controllers
                                             .GetRedemptionRepository()
                                             .Get(session, StoreKey.TransactionIdKey, session.SessionId.ToString());
 
-                availBalance = await walletService.AvailableBalance(session.Identifier, session.MasterKey);
+                availBalance = walletService.AvailableBalance(session.Identifier, session.MasterKey);
 
                 if (sendPaymentDto.CreateRedemptionKey)
                     return new OkObjectResult(new { message = messageStore.Result.Message });
             }
             catch (Exception ex)
             {
-                availBalance = await walletService.AvailableBalance(session.Identifier, session.MasterKey);
+                availBalance = walletService.AvailableBalance(session.Identifier, session.MasterKey);
                 return new ObjectResult(new { error = ex.Message, statusCode = 500, balance = availBalance.Result });
             }
 
