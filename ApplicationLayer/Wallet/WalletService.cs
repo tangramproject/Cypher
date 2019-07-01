@@ -417,31 +417,9 @@ namespace TangramCypher.ApplicationLayer.Wallet
 
 			var hash = coinService.HashWithKey(coin);
 
-            //? Recommended solution is to not call "GetBytes" and for callers to directly use the returned string.
             string address = AddressBuilderFactory.Global.EncodeFromSharedData(hash, CurrentAddressVersion.Get(environment, networkApi));
+
             return Encoding.UTF8.GetBytes(address);
-
-            //byte[] address = new byte[33];
-
-            //string env = networkApi == null ? environment : networkApi.ToString();
-            //address[0] = env == Constant.Mainnet ? (byte)0x1 : (byte)74;
-
-            //var hash = Cryptography.GenericHashWithKey(
-            //    $"{coin.Envelope.Commitment}" +
-            //    $" {coin.Envelope.Proof}" +
-            //    $" {coin.Envelope.PublicKey}" +
-            //    $" {coin.Envelope.Signature}" +
-            //    $" {coin.Hash}" +
-            //    $" {coin.Hint}" +
-            //    $" {coin.Keeper}" +
-            //    $" {coin.Principle}" +
-            //    $" {coin.Stamp}" +
-            //    $" {coin.Version}",
-            //    coin.Principle.FromHex());
-
-            //Array.Copy(hash, 0, address, 1, 32);
-
-            //return Encoding.UTF8.GetBytes(Base58.Bitcoin.Encode(address));
         }
 
         /// <summary>
@@ -452,19 +430,9 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <param name="networkApi">Network API.</param>
         public byte[] NetworkAddress(byte[] pk, NetworkApiMethod networkApi = null)
         {
-            //? Recommended solution is to not call "GetBytes" and for callers to directly use the returned string.
             string address = AddressBuilderFactory.Global.EncodeFromSharedData(pk, CurrentAddressVersion.Get(environment, networkApi));
+
             return Encoding.UTF8.GetBytes(address);
-
-            //Guard.Argument(pk, nameof(pk)).NotNull().MaxCount(32);
-            //byte[] address = new byte[33];
-
-            //string env = networkApi == null ? environment : networkApi.ToString();
-            //address[0] = env == Constant.Mainnet ? (byte)0x1 : (byte)74;
-
-            //Array.Copy(pk, 0, address, 1, 32);
-
-            //return Encoding.UTF8.GetBytes(Base58.Bitcoin.Encode(address));
         }
 
         /// <summary>

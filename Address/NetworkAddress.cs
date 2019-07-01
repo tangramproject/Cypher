@@ -3,31 +3,31 @@ using System.Linq;
 
 namespace Tangram.Address
 {
-	public class NetworkAddress : WalletAddress
-	{
-		public byte[] Version { get; } // Mandatory.
+    public class NetworkAddress : WalletAddress
+    {
+        public byte[] BinaryVersion { get; } // Mandatory.
 
-		public NetworkAddress(byte[] version, byte[] body)
-			: base(body)
-		{
-			Guard.Argument(version, nameof(version)).NotEmpty();
+        public NetworkAddress(byte[] binaryVersion, byte[] body)
+            : base(body)
+        {
+            Guard.Argument(binaryVersion, nameof(binaryVersion)).NotEmpty();
 
-			Version = version;
-		}
+            BinaryVersion = binaryVersion;
+        }
 
-		public NetworkAddress(byte[] version, WalletAddress walletAddress)
-			: this(version, walletAddress.Body)
-		{
-		}
+        public NetworkAddress(byte[] binaryVersion, WalletAddress walletAddress)
+            : this(binaryVersion, walletAddress.Body)
+        {
+        }
 
-		public NetworkAddress(AddressParts addressParts)
-			: this(addressParts.Version, addressParts.Body)
-		{
-		}
+        public NetworkAddress(AddressParts addressParts)
+            : this(addressParts.BinaryVersion, addressParts.Body)
+        {
+        }
 
-		public override byte[] ToArray()
-		{
-			return Version.Concat(Body).ToArray();
-		}
-	}
+        public override byte[] ToArray()
+        {
+            return BinaryVersion.Concat(Body).ToArray();
+        }
+    }
 }

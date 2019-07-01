@@ -189,7 +189,6 @@ namespace TangramCypher.ApplicationLayer.Coin
         {
             Guard.Argument(coin, nameof(coin)).NotNull();
 
-			//? "Hash" and "Version" are not included here! See method below!
             return Cryptography.GenericHashNoKey(
                 string.Format("{0} {1} {2} {3} {4} {5} {6} {7} {8}",
                     coin.Envelope.Commitment,
@@ -212,7 +211,6 @@ namespace TangramCypher.ApplicationLayer.Coin
 		{
 			Guard.Argument(coin, nameof(coin)).NotNull();
 
-			//? "RangeProof" is not included here! See method above!
 			return Cryptography.GenericHashWithKey(
 				$"{coin.Envelope.Commitment}" +
 				$" {coin.Envelope.Proof}" +
