@@ -189,6 +189,7 @@ namespace TangramCypher.ApplicationLayer.Coin
         {
             Guard.Argument(coin, nameof(coin)).NotNull();
 
+			//? "Hash" and "Version" are not included here! See method below!
             return Cryptography.GenericHashNoKey(
                 string.Format("{0} {1} {2} {3} {4} {5} {6} {7} {8}",
                     coin.Envelope.Commitment,
@@ -201,6 +202,30 @@ namespace TangramCypher.ApplicationLayer.Coin
                     coin.Principle,
                     coin.Stamp));
         }
+
+		/// <summary>
+		/// Hash the specified coin.
+		/// </summary>
+		/// <returns>The hash.</returns>
+		/// <param name="coin">Coin.</param>
+		public byte[] HashWithKey(CoinDto coin)
+		{
+			Guard.Argument(coin, nameof(coin)).NotNull();
+
+			//? "RangeProof" is not included here! See method above!
+			return Cryptography.GenericHashWithKey(
+				$"{coin.Envelope.Commitment}" +
+				$" {coin.Envelope.Proof}" +
+				$" {coin.Envelope.PublicKey}" +
+				$" {coin.Envelope.Signature}" +
+				$" {coin.Hash}" +
+				$" {coin.Hint}" +
+				$" {coin.Keeper}" +
+				$" {coin.Principle}" +
+				$" {coin.Stamp}" +
+				$" {coin.Version}",
+				coin.Principle.FromHex());
+		}
 
         /// <summary>
         /// Partial release one secret key for escrow.
