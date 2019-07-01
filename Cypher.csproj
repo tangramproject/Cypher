@@ -21,6 +21,11 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="Address\**" />
+    <EmbeddedResource Remove="Address\**" />
+    <None Remove="Address\**" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="McMaster.Extensions.CommandLineUtils" Version="2.2.5" />
@@ -60,5 +65,8 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="ApplicationLayer\Controllers\" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="Address\Address.csproj" />
   </ItemGroup>
 </Project>
