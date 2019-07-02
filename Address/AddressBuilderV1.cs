@@ -11,7 +11,7 @@ namespace Tangram.Address
         public static readonly SimpleBase.Base32Alphabet Base32Alphabet = SimpleBase.Base32Alphabet.Crockford;
 
         public override string Prefix => "tgm_";
-        public override int ChecksumByteCount => 4;
+        public override int ChecksumByteCount => 5;
 
         protected override Encoding TextEncoding => Encoding.UTF8;
 

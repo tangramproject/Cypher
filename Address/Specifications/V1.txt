@@ -9,7 +9,7 @@ Proposed format:
 * Prefix (like "tgm_"). Used for quick detection, but not required for transactions. Fixed size.
 * Version (also used for network type: testnet, mainnet). Each version should have different seeds (see below). Fixed size.
 * Body = Base32Text(Sha256(Body seed || Version || Public key)). Variable size.
-* Checksum = Base32Text(First 4 bytes of SHA256(Checksum seed || Version || Body)). Fixed size, at the end.
+* Checksum = Base32Text(First 5 bytes of SHA256(Checksum seed || Version || Body)). Fixed size, at the end.
 
 The checksum exists to virtually eliminate typing and copy-paste mistakes, which will greatly decrease the chances of users sending coins to addresses that are not owned by anyone.
 
@@ -21,18 +21,31 @@ The address body and checksum are formatted in base 32, with the Crockford alpha
 
 The textual checksum has a fixed size so that parsers don't require a separator to be able to extract the checksum.
 
-Textual checksums with a different last character may be valid for the same address body because of how bytes are (not) aligned to characters.
-
 There is no major advantage for independently encoding to text the address body and checksum. They could be encoded as a single text. The only minor advantage is that the textual body could be processed separately, yet still have the same value as when it's a part of a full Tangram address, so it's visually easy to distinguish it from the checksum.
 
-The unique seeds exist to ensure that the address body and checksum are specific to Tangram. This eliminates the need to have a Tangram specific address prefix, like "tgm_1234567890". This way, even if a different cryptocurrency uses the same address format and algorithms, by using different seeds the body and checksum would not match in Tangram wallets and would therefore be (cryptographically) rejected. The seeds are separate for mainnet and testnet.
+The unique seeds exist to ensure that the address body and checksum are specific to Tangram. This eliminates the need to have a Tangram specific address prefix, like "tgm_". This way, even if a different cryptocurrency uses the same address format and algorithms, by using different seeds the body and checksum would not match in Tangram wallets and would therefore be (cryptographically) rejected. The seeds are separate for mainnet and testnet.
 
 Examples of Tangram addresses (for mainnet):
-* With prefix = tgm_1QBM7HJ1KR0DCWAG1QE4QXP8HT5G4HKRN5WS6Q4V1T6ZH064RTMNGBCWYZ08
-* Without prefix = 1QBM7HJ1KR0DCWAG1QE4QXP8HT5G4HKRN5WS6Q4V1T6ZH064RTMNGBCWYZ08
-* With wrong prefix = tgn_1QBM7HJ1KR0DCWAG1QE4QXP8HT5G4HKRN5WS6Q4V1T6ZH064RTMNGBCWYZ08
-* With wrong version = tgm_ZQBM7HJ1KR0DCWAG1QE4QXP8HT5G4HKRN5WS6Q4V1T6ZH064RTMNGBCWYZ08
-* With wrong body = tgm_1RBM7HJ1KR0DCWAG1QE4QXP8HT5G4HKRN5WS6Q4V1T6ZH064RTMNGBCWYZ08
-* With wrong checksum = tgm_1QBM7HJ1KR0DCWAG1QE4QXP8HT5G4HKRN5WS6Q4V1T6ZH064RTMNGCCWYZ08
+* With prefix = tgm_1QBM7HJ1KR0DCWAG1QE4QXP8HT5G4HKRN5WS6Q4V1T6ZH064RTMNGBCWYZ08Z
+* Without prefix = 1QBM7HJ1KR0DCWAG1QE4QXP8HT5G4HKRN5WS6Q4V1T6ZH064RTMNGBCWYZ08Z
+* With wrong prefix = tgn_1QBM7HJ1KR0DCWAG1QE4QXP8HT5G4HKRN5WS6Q4V1T6ZH064RTMNGBCWYZ08Z
+* With wrong version = tgm_ZQBM7HJ1KR0DCWAG1QE4QXP8HT5G4HKRN5WS6Q4V1T6ZH064RTMNGBCWYZ08Z
+* With wrong body = tgm_1RBM7HJ1KR0DCWAG1QE4QXP8HT5G4HKRN5WS6Q4V1T6ZH064RTMNGBCWYZ08Z
+* With wrong checksum = tgm_1QBM7HJ1KR0DCWAG1QE4QXP8HT5G4HKRN5WS6Q4V1T6ZH064RTMNGCCWYZ08Z
 
-For the testnet, the same public key produces the following address: tgm_0W9AZ0FMX2TPMH1NJQ528GFVG7PK58A6R5D30P6N52HFXV4KSN65GJYHKB8G
+For the testnet, the same public key produces the following address: tgm_0W9AZ0FMX2TPMH1NJQ528GFVG7PK58A6R5D30P6N52HFXV4KSN65GJYHKB8GZ
+
+
+## CONSIDERATIONS
+
+This is a scenario to consider when deciding how many bytes to use for the cheksum, and what base for the text conversion.
+
+It's possible that the textual checksums ABCDEFG and ABCDEFH may represent the same binary checksum 0x12345678. This is when the binary checksum has 4 bytes (32 bits), while the textual checksum in base 32 has 7 characters which means 7 chars * 5 bits = 35 bits, which means that 3 bits from the textual checksum can vary without changing the binary checksum.
+
+There are 2 possible solutions to fix this:
+* Use 4 bytes (32 bits) for the binary checksum and base 16 for the textual checksum (4 bits per character), since 8 characters * 4 bits = 32 bits is a perfect fit.
+* Use 5 bytes (40 bits) for the binary checksum and base 32 for the textual checksum (5 bits per character), since 8 characters * 5 bits = 40 bits is a perfect fit.
+
+Either of these solutions adds 1 more character to the address, compared to using 4 bytes for the binary checksum and base 32 for the textual checksum.
+
+The second solution looks best since the same number of characters (8) represent a lot more combinations (1 trillion versus 4 billions), so it has a much lower probability to make mistakes.
