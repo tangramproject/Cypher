@@ -52,7 +52,7 @@ namespace Tangram.Address
         {
             Guard.Argument(parts, nameof(parts)).NotNull();
 
-            var addressBuilder = GetAddressBuilder(parts.Version);
+            var addressBuilder = GetAddressBuilder(parts.Version, false);
 
             return addressBuilder != null ? addressBuilder.Verify(parts) : false;
         }

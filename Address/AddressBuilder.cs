@@ -89,17 +89,11 @@ namespace Tangram.Address
             Guard.Argument(parts, nameof(parts)).NotNull();
 
             if (!BinaryVersion.SequenceEqual(parts.BinaryVersion))
-            {
-                throw new InvalidAddressException($"The address version '{Utilities.BinaryToHex(parts.BinaryVersion)}'"
-                    + $" is different than the address builder version '{Utilities.BinaryToHex(BinaryVersion)}'");
-            }
+                return false;
 
             var checksum = BuildChecksum(parts.Body);
 
-            if (!checksum.SequenceEqual(parts.Checksum))
-                return false;
-
-            return true;
+            return checksum.SequenceEqual(parts.Checksum);
         }
 
         public AddressParts VerifyThrow(string address)
