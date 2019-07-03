@@ -6,6 +6,9 @@ using System.Text;
 
 namespace Tangram.Address
 {
+    /// <summary>
+    /// V1 addresses are case insensitive.
+    /// </summary>
     public abstract class AddressBuilderV1 : AddressBuilder
     {
         public static readonly SimpleBase.Base32Alphabet Base32Alphabet = SimpleBase.Base32Alphabet.Crockford;
@@ -82,7 +85,7 @@ namespace Tangram.Address
         {
             Guard.Argument(sharedData, nameof(sharedData)).MinCount(1);
 
-            var toHash = BodySeed.Concat(BinaryVersion).Concat(sharedData).ToArray();
+            var toHash = sharedData;
             var hash = Hash(toHash);
 
             return hash;
@@ -101,30 +104,18 @@ namespace Tangram.Address
             return checksum;
         }
 
-        protected override bool TryParseNoVerify(string address, out AddressParts parts)
+        protected override AddressParts TryDecodeAddressPartsNoVerify(string address)
         {
             if (address == null || address.Length < 1 /* version */ + 1 /* body */ + ChecksumCharacterCount)
-            {
-                parts = null;
-
-                return false;
-            }
+                return null;
 
             string prefix = address.StartsWith(Prefix) ? Prefix : "";
             if (prefix != "" && !string.Equals(prefix, Prefix, StringComparison.InvariantCultureIgnoreCase))
-            {
-                parts = null;
-
-                return false;
-            }
+                return null;
 
             string version = address.Substring(prefix.Length, 1);
             if (!string.Equals(version, TextualVersion, StringComparison.InvariantCultureIgnoreCase))
-            {
-                parts = null;
-
-                return false;
-            }
+                return null;
 
             int bodyStartIndex = prefix.Length + version.Length;
             int checksumStartIndex = address.Length - ChecksumCharacterCount;
@@ -135,9 +126,7 @@ namespace Tangram.Address
             var bodyArray = ConvertToArray(body);
             var checksumArray = ConvertToArray(checksum);
 
-            parts = new AddressParts(Version, prefix, TextualVersion, BinaryVersion, bodyArray, checksumArray);
-
-            return true;
+            return new AddressParts(Version, prefix, TextualVersion, BinaryVersion, bodyArray, checksumArray);
         }
     }
 }

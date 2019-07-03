@@ -1,5 +1,5 @@
 ﻿using Dawn;
-using System;
+using Tangram.Address.Exceptions;
 
 namespace Tangram.Address
 {
@@ -36,30 +36,80 @@ namespace Tangram.Address
             return GetAddressBuilder(version).Encode(networkAddress);
         }
 
-        public bool Verify(string address, out AddressParts parts)
-        {
-            // Handle the version according to priority. Handle the testnet version first.
-
-            if (new AddressBuilderV1Testnet().Verify(address, out parts))
-                return true;
-            else if (new AddressBuilderV1Mainnet().Verify(address, out parts))
-                return true;
-            else
-                return false;
-        }
-
-        public bool Verify(AddressParts parts)
+        public bool TryVerify(AddressParts parts)
         {
             Guard.Argument(parts, nameof(parts)).NotNull();
 
             var addressBuilder = GetAddressBuilder(parts.Version, false);
 
-            return addressBuilder != null ? addressBuilder.Verify(parts) : false;
+            return addressBuilder != null ? addressBuilder.TryVerify(parts) : false;
         }
 
-        public AddressParts VerifyThrow(string address, AddressVersion version)
+        public AddressParts TryDecodeAddressPartsVerify(string address)
         {
-            return GetAddressBuilder(version).VerifyThrow(address);
+            // Handle the version according to priority. Handle the testnet version first.
+
+            AddressParts addressParts;
+
+            addressParts = new AddressBuilderV1Testnet().TryDecodeAddressPartsVerify(address);
+            if (addressParts != null)
+                return addressParts;
+
+            addressParts = new AddressBuilderV1Mainnet().TryDecodeAddressPartsVerify(address);
+            if (addressParts != null)
+                return addressParts;
+
+            return null;
+        }
+
+        public WalletAddress TryDecodeWalletAddressVerify(string address)
+        {
+            AddressParts addressParts = TryDecodeAddressPartsVerify(address);
+
+            return addressParts != null ? new WalletAddress(addressParts) : null;
+        }
+
+        public NetworkAddress TryDecodeNetworkAddressVerify(string address)
+        {
+            AddressParts addressParts = TryDecodeAddressPartsVerify(address);
+
+            return addressParts != null ? new NetworkAddress(addressParts) : null;
+        }
+
+        public AddressParts TryDecodeAddressPartsVerify(string address, AddressVersion version)
+        {
+            var addressBuilder = GetAddressBuilder(version, false);
+
+            return addressBuilder != null ? addressBuilder.TryDecodeAddressPartsVerify(address) : null;
+        }
+
+        public WalletAddress TryDecodeWalletAddressVerify(string address, AddressVersion version)
+        {
+            var addressBuilder = GetAddressBuilder(version, false);
+
+            return addressBuilder != null ? addressBuilder.TryDecodeWalletAddressVerify(address) : null;
+        }
+
+        public NetworkAddress TryDecodeNetworkAddressVerify(string address, AddressVersion version)
+        {
+            var addressBuilder = GetAddressBuilder(version, false);
+
+            return addressBuilder != null ? addressBuilder.TryDecodeNetworkAddressVerify(address) : null;
+        }
+
+        public AddressParts DecodeAddressPartsVerifyThrow(string address, AddressVersion version)
+        {
+            return GetAddressBuilder(version).DecodeAddressPartsVerifyThrow(address);
+        }
+
+        public WalletAddress DecodeWalletAddressVerifyThrow(string address, AddressVersion version)
+        {
+            return GetAddressBuilder(version).DecodeWalletAddressVerifyThrow(address);
+        }
+
+        public NetworkAddress DecodeNetworkAddressVerifyThrow(string address, AddressVersion version)
+        {
+            return GetAddressBuilder(version).DecodeNetworkAddressVerifyThrow(address);
         }
 
         public WalletAddress BuildWalletAddress(byte[] sharedData, AddressVersion version)
@@ -89,7 +139,7 @@ namespace Tangram.Address
                     return new AddressBuilderV1Mainnet();
                 default:
                     if (throwIfUnknownVersion)
-                        throw new ArgumentOutOfRangeException(nameof(version), version, null);
+                        throw new UnknownAddressVersionException($"Unknown address version '{version}'.");
                     else
                         return null;
             }

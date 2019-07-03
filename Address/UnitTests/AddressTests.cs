@@ -58,52 +58,52 @@ namespace Tangram.Address.UnitTests
         [Test]
         public void ParseTangramAddress()
         {
-            bool verified = Factory.Verify(TangramAddress, out AddressParts addressParts);
+            AddressParts addressParts = Factory.TryDecodeAddressPartsVerify(TangramAddress);
 
-            Assert.IsTrue(verified);
+            Assert.IsNotNull(addressParts);
             Assert.AreEqual(WalletAddress, addressParts.Body);
         }
 
         [Test]
         public void ParseLowerCaseTangramAddress()
         {
-            bool verified = Factory.Verify(TangramAddress.ToLowerInvariant(), out AddressParts addressParts);
+            AddressParts addressParts = Factory.TryDecodeAddressPartsVerify(TangramAddress.ToLowerInvariant());
 
-            Assert.IsTrue(verified);
+            Assert.IsNotNull(addressParts);
             Assert.AreEqual(WalletAddress, addressParts.Body);
         }
 
         [Test]
         public void ParseTangramAddressWithoutPrefix()
         {
-            bool verified = Factory.Verify(TangramAddressWithoutPrefix, out AddressParts addressParts);
+            AddressParts addressParts = Factory.TryDecodeAddressPartsVerify(TangramAddressWithoutPrefix);
 
-            Assert.IsTrue(verified);
+            Assert.IsNotNull(addressParts);
             Assert.AreEqual(WalletAddress, addressParts.Body);
         }
 
         [Test]
         public void ParseTangramAddressWithWrongPrefixThrowsInvalidAddress()
         {
-            Assert.Throws<InvalidAddressException>(() => Factory.VerifyThrow(TangramAddressWithWrongPrefix, AddressVersion));
+            Assert.Throws<InvalidAddressException>(() => Factory.DecodeAddressPartsVerifyThrow(TangramAddressWithWrongPrefix, AddressVersion));
         }
 
         [Test]
         public void ParseTangramAddressWithWrongVersionThrowsInvalidAddress()
         {
-            Assert.Throws<InvalidAddressException>(() => Factory.VerifyThrow(TangramAddressWithWrongVersion, AddressVersion));
+            Assert.Throws<InvalidAddressException>(() => Factory.DecodeAddressPartsVerifyThrow(TangramAddressWithWrongVersion, AddressVersion));
         }
 
         [Test]
         public void ParseTangramAddressWithWrongBodyThrowsInvalidChecksum()
         {
-            Assert.Throws<InvalidChecksumException>(() => Factory.VerifyThrow(TangramAddressWithWrongBody, AddressVersion));
+            Assert.Throws<InvalidChecksumException>(() => Factory.DecodeAddressPartsVerifyThrow(TangramAddressWithWrongBody, AddressVersion));
         }
 
         [Test]
         public void ParseTangramAddressWithWrongChecksumThrowsInvalidChecksum()
         {
-            Assert.Throws<InvalidChecksumException>(() => Factory.VerifyThrow(TangramAddressWithWrongChecksum, AddressVersion));
+            Assert.Throws<InvalidChecksumException>(() => Factory.DecodeAddressPartsVerifyThrow(TangramAddressWithWrongChecksum, AddressVersion));
         }
     }
 }

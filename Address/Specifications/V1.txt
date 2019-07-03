@@ -1,39 +1,41 @@
 ﻿# ADDRESS FORMAT PROPOSAL
 
-Address format proposal to greatly reduce typing and copy-paste mistakes.
+Address format proposal that greatly reduces the effect of typing and copy-paste mistakes, which greatly decreases the chances of users sending coins to addresses that are not owned by anyone.
 
 Current address generation is in "`WalletService.NetworkAddress([public key])`" and uses the encoding of the Bitcoin address standard, which is a simple bytes to text conversion.
 
 
 Proposed format:
 * Prefix (like "tgm_"). Used for quick detection, but not required for transactions. Fixed size.
-* Version (also used for network type: testnet, mainnet). Each version should have different seeds (see below). Fixed size.
-* Body = Base32Text(Sha256(Body seed || Version || Public key)). Variable size.
+* Version (also used for network type: testnet, mainnet). Each version should have a different checksum seed. Fixed size. The testnet can have the same version forever because only one needs to be active at a time.
+* Body = Base32Text(Public key). Variable size. This can't be hashed because Tangram expects to be able to extract the public key from the address.
 * Checksum = Base32Text(First 5 bytes of SHA256(Checksum seed || Version || Body)). Fixed size, at the end.
 
-The checksum exists to virtually eliminate typing and copy-paste mistakes, which will greatly decrease the chances of users sending coins to addresses that are not owned by anyone.
+Addresses are case insensitive.
 
 The prefix makes it easy for people to distinguish Tangram addresses, but is not required for transactions. A prefix should still be present for users to see, and for software that works with multiple currencies to be able to make quick decisions.
 
 The version is encoded as separate text in order to make it easy for address parsers to know whether they should process an address without decoding the entire text to a byte array (which could cause exceptions).
 
-The address body and checksum are formatted in base 32, with the Crockford alphabet; they are case insensitive. For user friendly addresses, the encoding should be base 32 because it's easier to spell them, and on mobile keyboards both letters and digits can be typed with a single tap, while having lower and upper case letters can require 2 taps. Maybe not that important since addresses will most likely be copy-pasted on mobile.
+The address body and checksum are formatted in base 32, with the Crockford alphabet. For user friendly addresses, the encoding should be base 32 because it's easier to spell them, and on mobile keyboards both letters and digits can be typed with a single tap, while having lower and upper case letters can require 2 taps. Maybe not that important since addresses will most likely be copy-pasted on mobile.
 
 The textual checksum has a fixed size so that parsers don't require a separator to be able to extract the checksum.
 
-There is no major advantage for independently encoding to text the address body and checksum. They could be encoded as a single text. The only minor advantage is that the textual body could be processed separately, yet still have the same value as when it's a part of a full Tangram address, so it's visually easy to distinguish it from the checksum.
+The address body and checksum are independently encoded to text so that the binary checksum can fit perfectly into the textual checksum, so as to not confuse users (see the "CONSIDERATIONS" section below).
 
-The unique seeds exist to ensure that the address body and checksum are specific to Tangram. This eliminates the need to have a Tangram specific address prefix, like "tgm_". This way, even if a different cryptocurrency uses the same address format and algorithms, by using different seeds the body and checksum would not match in Tangram wallets and would therefore be (cryptographically) rejected. The seeds are separate for mainnet and testnet.
+The checksum ensures the integrity of addresses. It virtually eliminates typing and copy-paste mistakes, which greatly decreases the chances of users sending coins to addresses that are not owned by anyone.
+
+The unique checksum seed exists in order to ensure that the address checksum is specific to Tangram. This eliminates the need to have a Tangram specific address prefix, like "tgm_". This way, even if a different cryptocurrency uses the same address format, by using a different seed the checksum would not match in Tangram wallets and would therefore be (cryptographically) rejected. The mainnet and testnet use different seeds.
 
 Examples of Tangram addresses (for mainnet):
-* With prefix = tgm_1QBM7HJ1KR0DCWAG1QE4QXP8HT5G4HKRN5WS6Q4V1T6ZH064RTMNGBCWYZ08Z
-* Without prefix = 1QBM7HJ1KR0DCWAG1QE4QXP8HT5G4HKRN5WS6Q4V1T6ZH064RTMNGBCWYZ08Z
-* With wrong prefix = tgn_1QBM7HJ1KR0DCWAG1QE4QXP8HT5G4HKRN5WS6Q4V1T6ZH064RTMNGBCWYZ08Z
-* With wrong version = tgm_ZQBM7HJ1KR0DCWAG1QE4QXP8HT5G4HKRN5WS6Q4V1T6ZH064RTMNGBCWYZ08Z
-* With wrong body = tgm_1RBM7HJ1KR0DCWAG1QE4QXP8HT5G4HKRN5WS6Q4V1T6ZH064RTMNGBCWYZ08Z
-* With wrong checksum = tgm_1QBM7HJ1KR0DCWAG1QE4QXP8HT5G4HKRN5WS6Q4V1T6ZH064RTMNGCCWYZ08Z
+* With prefix = tgm_1VCWCR0HZZHDC60S9VYEG1VJBFHDFKN8QQ03FSSZ4ES1NJG4W8S1G25TPSAJX
+* Without prefix = 1VCWCR0HZZHDC60S9VYEG1VJBFHDFKN8QQ03FSSZ4ES1NJG4W8S1G25TPSAJX
+* With wrong prefix = tgn_1VCWCR0HZZHDC60S9VYEG1VJBFHDFKN8QQ03FSSZ4ES1NJG4W8S1G25TPSAJX
+* With wrong version = tgm_ZVCWCR0HZZHDC60S9VYEG1VJBFHDFKN8QQ03FSSZ4ES1NJG4W8S1G25TPSAJX
+* With wrong body = tgm_1WCWCR0HZZHDC60S9VYEG1VJBFHDFKN8QQ03FSSZ4ES1NJG4W8S1G25TPSAJX
+* With wrong checksum = tgm_1VCWCR0HZZHDC60S9VYEG1VJBFHDFKN8QQ03FSSZ4ES1NJG4W8S1G35TPSAJX
 
-For the testnet, the same public key produces the following address: tgm_0W9AZ0FMX2TPMH1NJQ528GFVG7PK58A6R5D30P6N52HFXV4KSN65GJYHKB8GZ
+For the testnet, the same public key produces the following address: tgm_0VCWCR0HZZHDC60S9VYEG1VJBFHDFKN8QQ03FSSZ4ES1NJG4W8S1G19T9P1WZ
 
 
 ## CONSIDERATIONS

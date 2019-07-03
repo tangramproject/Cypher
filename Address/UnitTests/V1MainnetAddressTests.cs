@@ -7,13 +7,13 @@ namespace Tangram.Address.UnitTests
     public class V1MainnetAddressTests : AddressTests
     {
         protected override AddressVersion AddressVersion => AddressVersion.V1Mainnet;
-        protected override byte[] WalletAddress => Base16.Decode("BAE878C833C01ACE2A01BB897ED911D16048CF152F326B9361D1BF101898D52B").ToArray();
-        protected override byte[] NetworkAddress => Base16.Decode("01BAE878C833C01ACE2A01BB897ED911D16048CF152F326B9361D1BF101898D52B").ToArray();
-        protected override string TangramAddress => "tgm_1QBM7HJ1KR0DCWAG1QE4QXP8HT5G4HKRN5WS6Q4V1T6ZH064RTMNGBCWYZ08Z";
-        protected override string TangramAddressWithoutPrefix => "1QBM7HJ1KR0DCWAG1QE4QXP8HT5G4HKRN5WS6Q4V1T6ZH064RTMNGBCWYZ08Z";
-        protected override string TangramAddressWithWrongPrefix => "tgn_1QBM7HJ1KR0DCWAG1QE4QXP8HT5G4HKRN5WS6Q4V1T6ZH064RTMNGBCWYZ08Z";
-        protected override string TangramAddressWithWrongVersion => "tgm_ZQBM7HJ1KR0DCWAG1QE4QXP8HT5G4HKRN5WS6Q4V1T6ZH064RTMNGBCWYZ08Z";
-        protected override string TangramAddressWithWrongBody => "tgm_1RBM7HJ1KR0DCWAG1QE4QXP8HT5G4HKRN5WS6Q4V1T6ZH064RTMNGBCWYZ08Z";
-        protected override string TangramAddressWithWrongChecksum => "tgm_1QBM7HJ1KR0DCWAG1QE4QXP8HT5G4HKRN5WS6Q4V1T6ZH064RTMNGCCWYZ08Z";
+        protected override byte[] WalletAddress => Base16.Decode("DB38CC023FFC5AC30329DF9D00EE4B7C5AF9D517B806FCE7E4764359409C4643").ToArray();
+        protected override byte[] NetworkAddress => Base16.Decode("01DB38CC023FFC5AC30329DF9D00EE4B7C5AF9D517B806FCE7E4764359409C4643").ToArray();
+        protected override string TangramAddress => "tgm_1VCWCR0HZZHDC60S9VYEG1VJBFHDFKN8QQ03FSSZ4ES1NJG4W8S1G25TPSAJX";
+        protected override string TangramAddressWithoutPrefix => "1VCWCR0HZZHDC60S9VYEG1VJBFHDFKN8QQ03FSSZ4ES1NJG4W8S1G25TPSAJX";
+        protected override string TangramAddressWithWrongPrefix => "tgn_1VCWCR0HZZHDC60S9VYEG1VJBFHDFKN8QQ03FSSZ4ES1NJG4W8S1G25TPSAJX";
+        protected override string TangramAddressWithWrongVersion => "tgm_ZVCWCR0HZZHDC60S9VYEG1VJBFHDFKN8QQ03FSSZ4ES1NJG4W8S1G25TPSAJX";
+        protected override string TangramAddressWithWrongBody => "tgm_1WCWCR0HZZHDC60S9VYEG1VJBFHDFKN8QQ03FSSZ4ES1NJG4W8S1G25TPSAJX";
+        protected override string TangramAddressWithWrongChecksum => "tgm_1VCWCR0HZZHDC60S9VYEG1VJBFHDFKN8QQ03FSSZ4ES1NJG4W8S1G35TPSAJX";
     }
 }

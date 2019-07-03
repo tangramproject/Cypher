@@ -15,26 +15,12 @@ namespace Tangram.Address
     {
         public abstract AddressVersion Version { get; }
         public abstract string Prefix { get; } // Optional. Case insensitive.
-        public abstract string TextualVersion { get; } // Mandatory. The testnet can have the same version forever.
+        public abstract string TextualVersion { get; } // Mandatory. Case insensitive. The testnet can have the same version forever.
         public abstract byte[] BinaryVersion { get; } // Mandatory. The testnet can have the same version forever.
         public abstract int ChecksumByteCount { get; }
-        public abstract string TextualBodySeed { get; } // Mandatory. Should be unique for every version.
         public abstract string TextualChecksumSeed { get; } // Mandatory. Should be unique for every version.
 
         protected abstract Encoding TextEncoding { get; }
-
-        // Cache value.
-        private byte[] _BodySeed;
-        protected byte[] BodySeed
-        {
-            get
-            {
-                if (_BodySeed == null)
-                    _BodySeed = Hash(TextEncoding.GetBytes(TextualBodySeed));
-
-                return _BodySeed;
-            }
-        }
 
         // Cache value.
         private byte[] _ChecksumSeed;
@@ -76,19 +62,11 @@ namespace Tangram.Address
             return EncodeFromBody(networkAddress.Body);
         }
 
-        public bool Verify(string address, out AddressParts parts)
-        {
-            if (!TryParseNoVerify(address, out parts))
-                return false;
-
-            return Verify(parts);
-        }
-
-        public bool Verify(AddressParts parts)
+        public bool TryVerify(AddressParts parts)
         {
             Guard.Argument(parts, nameof(parts)).NotNull();
 
-            if (!BinaryVersion.SequenceEqual(parts.BinaryVersion))
+            if (!VerifyVersion(parts, false))
                 return false;
 
             var checksum = BuildChecksum(parts.Body);
@@ -96,16 +74,43 @@ namespace Tangram.Address
             return checksum.SequenceEqual(parts.Checksum);
         }
 
-        public AddressParts VerifyThrow(string address)
+        public AddressParts TryDecodeAddressPartsVerify(string address)
         {
-            if (!TryParseNoVerify(address, out AddressParts parts))
+            AddressParts addressParts = TryDecodeAddressPartsNoVerify(address);
+            if (addressParts == null)
+                return null;
+
+            if (!TryVerify(addressParts))
+                return null;
+
+            return addressParts;
+        }
+
+        public WalletAddress TryDecodeWalletAddressVerify(string address)
+        {
+            AddressParts addressParts = TryDecodeAddressPartsVerify(address);
+            if (addressParts == null)
+                return null;
+
+            return new WalletAddress(addressParts);
+        }
+
+        public NetworkAddress TryDecodeNetworkAddressVerify(string address)
+        {
+            AddressParts addressParts = TryDecodeAddressPartsVerify(address);
+            if (addressParts == null)
+                return null;
+
+            return new NetworkAddress(addressParts);
+        }
+
+        public AddressParts DecodeAddressPartsVerifyThrow(string address)
+        {
+            AddressParts parts = TryDecodeAddressPartsNoVerify(address);
+            if (parts == null)
                 throw new InvalidAddressException($"Failed to parse wallet address '{address}'.");
 
-            if (!BinaryVersion.SequenceEqual(parts.BinaryVersion))
-            {
-                throw new InvalidAddressException($"The address version '{Utilities.BinaryToHex(parts.BinaryVersion)}'"
-                    + $" is different than the address builder version '{Utilities.BinaryToHex(BinaryVersion)}'");
-            }
+            VerifyVersion(parts, true);
 
             var checksum = BuildChecksum(parts.Body);
 
@@ -113,6 +118,64 @@ namespace Tangram.Address
                 throw new InvalidChecksumException($"Invalid checksum for wallet address '{address}'.");
 
             return parts;
+        }
+
+        public WalletAddress DecodeWalletAddressVerifyThrow(string address)
+        {
+            AddressParts addressParts = DecodeAddressPartsVerifyThrow(address);
+
+            return new WalletAddress(addressParts);
+        }
+
+        public NetworkAddress DecodeNetworkAddressVerifyThrow(string address)
+        {
+            AddressParts addressParts = DecodeAddressPartsVerifyThrow(address);
+
+            return new NetworkAddress(addressParts);
+        }
+
+        protected bool VerifyVersion(AddressParts parts, bool throwIfDifferent)
+        {
+            if (Version != parts.Version)
+            {
+                if (throwIfDifferent)
+                {
+                    throw new InvalidAddressException($"The address version '{parts.Version}'"
+                        + $" is different than the address builder version '{Version}'");
+                }
+                else
+                {
+                    return false;
+                }
+            }
+
+            if (!string.Equals(TextualVersion, parts.TextualVersion, StringComparison.InvariantCultureIgnoreCase))
+            {
+                if (throwIfDifferent)
+                {
+                    throw new InvalidAddressException($"The textual address version '{parts.TextualVersion}'"
+                        + $" is different than the address builder version '{TextualVersion}'");
+                }
+                else
+                {
+                    return false;
+                }
+            }
+
+            if (!BinaryVersion.SequenceEqual(parts.BinaryVersion))
+            {
+                if (throwIfDifferent)
+                {
+                    throw new InvalidAddressException($"The binary address version '{Utilities.BinaryToHex(parts.BinaryVersion)}'"
+                        + $" is different than the address builder version '{Utilities.BinaryToHex(BinaryVersion)}'");
+                }
+                else
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         public abstract WalletAddress BuildWalletAddress(byte[] sharedData);
@@ -124,6 +187,6 @@ namespace Tangram.Address
         protected abstract byte[] Hash(byte[] array);
         protected abstract byte[] BuildBody(byte[] sharedData);
         protected abstract byte[] BuildChecksum(byte[] body);
-        protected abstract bool TryParseNoVerify(string address, out AddressParts parts);
+        protected abstract AddressParts TryDecodeAddressPartsNoVerify(string address);
     }
 }
