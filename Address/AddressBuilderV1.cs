@@ -15,6 +15,7 @@ namespace Tangram.Address
 
         public override string Prefix => "tgm_";
         public override int ChecksumByteCount => 5;
+        public override int PublicKeyMaxSize => 32;
 
         protected override Encoding TextEncoding => Encoding.UTF8;
 
@@ -39,20 +40,26 @@ namespace Tangram.Address
             }
         }
 
-        private readonly SimpleBase.Base32 Base32 = new SimpleBase.Base32(Base32Alphabet);
+        protected readonly SimpleBase.Base32 Base32 = new SimpleBase.Base32(Base32Alphabet);
 
-        public override WalletAddress BuildWalletAddress(byte[] sharedData)
+        public override NetworkAddress BuildNetworkAddressFromBody(byte[] body)
         {
-            var body = BuildBody(sharedData);
-
-            return new WalletAddress(body);
+            return new NetworkAddress(BinaryVersion, BuildBodyFromExactData(body));
         }
 
-        public override NetworkAddress BuildNetworkAddress(byte[] sharedData)
+        public override NetworkAddress BuildNetworkAddressFromPublicKey(byte[] publicKey)
         {
-            var body = BuildBody(sharedData);
+            return new NetworkAddress(BinaryVersion, BuildBodyFromPublicKey(publicKey));
+        }
 
-            return new NetworkAddress(BinaryVersion, body);
+        public override NetworkAddress BuildNetworkAddressFromSharedBlob(byte[] sharedBlob, byte[] compressionKey)
+        {
+            return new NetworkAddress(BinaryVersion, BuildBodyFromSharedBlob(sharedBlob, compressionKey));
+        }
+
+        public override NetworkAddress BuildNetworkAddressFromSharedBlob(string sharedBlob, byte[] compressionKey)
+        {
+            return new NetworkAddress(BinaryVersion, BuildBodyFromSharedBlob(sharedBlob, compressionKey));
         }
 
         public override string EncodeFromBody(byte[] body)
@@ -69,26 +76,26 @@ namespace Tangram.Address
             return Base32.Decode(text).ToArray();
         }
 
-        protected override string ConvertToText(byte[] array)
+        protected override string ConvertToText(byte[] data)
         {
-            Guard.Argument(array, nameof(array)).NotEmpty();
+            Guard.Argument(data, nameof(data)).NotEmpty();
 
-            return Base32.Encode(array, false);
+            return Base32.Encode(data, false);
         }
 
-        protected override byte[] Hash(byte[] array)
+        protected override byte[] Compress(byte[] data)
         {
-            return CryptoHash.Sha256(array);
+            Guard.Argument(data, nameof(data)).NotEmpty();
+
+            return CryptoHash.Sha256(data);
         }
 
-        protected override byte[] BuildBody(byte[] sharedData)
+        protected override byte[] Compress(byte[] data, byte[] compressionKey)
         {
-            Guard.Argument(sharedData, nameof(sharedData)).MinCount(1);
+            Guard.Argument(data, nameof(data)).NotEmpty();
+            Guard.Argument(compressionKey, nameof(compressionKey)).NotEmpty();
 
-            var toHash = sharedData;
-            var hash = Hash(toHash);
-
-            return hash;
+            return GenericHash.Hash(data, compressionKey, PublicKeyMaxSize);
         }
 
         protected override byte[] BuildChecksum(byte[] body)
@@ -96,7 +103,7 @@ namespace Tangram.Address
             Guard.Argument(body, nameof(body)).MinCount(1);
 
             var toHash = ChecksumSeed.Concat(BinaryVersion).Concat(body).ToArray();
-            var hash = Hash(toHash);
+            var hash = Compress(toHash);
 
             var checksum = new byte[ChecksumByteCount];
             Array.Copy(hash, 0, checksum, 0, ChecksumByteCount);

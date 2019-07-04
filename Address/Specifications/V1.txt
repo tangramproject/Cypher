@@ -28,14 +28,16 @@ The checksum ensures the integrity of addresses. It virtually eliminates typing 
 The unique checksum seed exists in order to ensure that the address checksum is specific to Tangram. This eliminates the need to have a Tangram specific address prefix, like "tgm_". This way, even if a different cryptocurrency uses the same address format, by using a different seed the checksum would not match in Tangram wallets and would therefore be (cryptographically) rejected. The mainnet and testnet use different seeds.
 
 Examples of Tangram addresses (for mainnet):
-* With prefix = tgm_1VCWCR0HZZHDC60S9VYEG1VJBFHDFKN8QQ03FSSZ4ES1NJG4W8S1G25TPSAJX
-* Without prefix = 1VCWCR0HZZHDC60S9VYEG1VJBFHDFKN8QQ03FSSZ4ES1NJG4W8S1G25TPSAJX
-* With wrong prefix = tgn_1VCWCR0HZZHDC60S9VYEG1VJBFHDFKN8QQ03FSSZ4ES1NJG4W8S1G25TPSAJX
-* With wrong version = tgm_ZVCWCR0HZZHDC60S9VYEG1VJBFHDFKN8QQ03FSSZ4ES1NJG4W8S1G25TPSAJX
-* With wrong body = tgm_1WCWCR0HZZHDC60S9VYEG1VJBFHDFKN8QQ03FSSZ4ES1NJG4W8S1G25TPSAJX
-* With wrong checksum = tgm_1VCWCR0HZZHDC60S9VYEG1VJBFHDFKN8QQ03FSSZ4ES1NJG4W8S1G35TPSAJX
+* Wallet address = 0A0B0C0D0E0F101112131415161718191A1B1C1D1E1F20212223242526272829
+* Network address = 010A0B0C0D0E0F101112131415161718191A1B1C1D1E1F20212223242526272829
+* With prefix = tgm_1185GR38E1W8124GK2GAHC5RR34D1P70X3RFJ08924CJ2A9H750MGSFNWEJAB
+* Without prefix = 1185GR38E1W8124GK2GAHC5RR34D1P70X3RFJ08924CJ2A9H750MGSFNWEJAB
+* With wrong prefix = tgn_1185GR38E1W8124GK2GAHC5RR34D1P70X3RFJ08924CJ2A9H750MGSFNWEJAB
+* With wrong version = tgm_Z185GR38E1W8124GK2GAHC5RR34D1P70X3RFJ08924CJ2A9H750MGSFNWEJAB
+* With wrong body = tgm_1285GR38E1W8124GK2GAHC5RR34D1P70X3RFJ08924CJ2A9H750MGSFNWEJAB
+* With wrong checksum = tgm_1185GR38E1W8124GK2GAHC5RR34D1P70X3RFJ08924CJ2A9H750MGTFNWEJAB
 
-For the testnet, the same public key produces the following address: tgm_0VCWCR0HZZHDC60S9VYEG1VJBFHDFKN8QQ03FSSZ4ES1NJG4W8S1G19T9P1WZ
+For the testnet, the same public key produces the following address: tgm_0185GR38E1W8124GK2GAHC5RR34D1P70X3RFJ08924CJ2A9H750MG40WBM183. Notice that the version and the checksum are different, while the body is the same (because it's generated from the same public key).
 
 
 ## CONSIDERATIONS

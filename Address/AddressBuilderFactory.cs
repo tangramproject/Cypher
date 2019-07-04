@@ -21,9 +21,84 @@ namespace Tangram.Address
             }
         }
 
-        public string EncodeFromSharedData(byte[] sharedData, AddressVersion version)
+        public byte[] BuildBodyFromExactData(byte[] body, AddressVersion version)
         {
-            return GetAddressBuilder(version).EncodeFromSharedData(sharedData);
+            return GetAddressBuilder(version).BuildBodyFromExactData(body);
+        }
+
+        public byte[] BuildBodyFromPublicKey(byte[] publicKey, AddressVersion version)
+        {
+            return GetAddressBuilder(version).BuildBodyFromPublicKey(publicKey);
+        }
+
+        public byte[] BuildBodyFromSharedBlob(byte[] sharedBlob, byte[] compressionKey, AddressVersion version)
+        {
+            return GetAddressBuilder(version).BuildBodyFromSharedBlob(sharedBlob, compressionKey);
+        }
+
+        public byte[] BuildBodyFromSharedBlob(string sharedBlob, byte[] compressionKey, AddressVersion version)
+        {
+            return GetAddressBuilder(version).BuildBodyFromSharedBlob(sharedBlob, compressionKey);
+        }
+
+        public WalletAddress BuildWalletAddressFromBody(byte[] body, AddressVersion version)
+        {
+            return GetAddressBuilder(version).BuildWalletAddressFromBody(body);
+        }
+
+        public WalletAddress BuildWalletAddressFromPublicKey(byte[] publicKey, AddressVersion version)
+        {
+            return GetAddressBuilder(version).BuildWalletAddressFromPublicKey(publicKey);
+        }
+
+        public WalletAddress BuildWalletAddressFromSharedBlob(byte[] sharedBlob, byte[] compressionKey, AddressVersion version)
+        {
+            return GetAddressBuilder(version).BuildWalletAddressFromSharedBlob(sharedBlob, compressionKey);
+        }
+
+        public WalletAddress BuildWalletAddressFromSharedBlob(string sharedBlob, byte[] compressionKey, AddressVersion version)
+        {
+            return GetAddressBuilder(version).BuildWalletAddressFromSharedBlob(sharedBlob, compressionKey);
+        }
+
+        public NetworkAddress BuildNetworkAddressFromBody(byte[] body, AddressVersion version)
+        {
+            return GetAddressBuilder(version).BuildNetworkAddressFromBody(body);
+        }
+
+        public NetworkAddress BuildNetworkAddressFromPublicKey(byte[] publicKey, AddressVersion version)
+        {
+            return GetAddressBuilder(version).BuildNetworkAddressFromPublicKey(publicKey);
+        }
+
+        public NetworkAddress BuildNetworkAddressFromSharedBlob(byte[] sharedBlob, byte[] compressionKey, AddressVersion version)
+        {
+            return GetAddressBuilder(version).BuildNetworkAddressFromSharedBlob(sharedBlob, compressionKey);
+        }
+
+        public NetworkAddress BuildNetworkAddressFromSharedBlob(string sharedBlob, byte[] compressionKey, AddressVersion version)
+        {
+            return GetAddressBuilder(version).BuildNetworkAddressFromSharedBlob(sharedBlob, compressionKey);
+        }
+
+        public string EncodeFromBody(byte[] body, AddressVersion version)
+        {
+            return GetAddressBuilder(version).EncodeFromBody(body);
+        }
+
+        public string EncodeFromPublicKey(byte[] publicKey, AddressVersion version)
+        {
+            return GetAddressBuilder(version).EncodeFromPublicKey(publicKey);
+        }
+
+        public string EncodeFromSharedBlob(byte[] sharedBlob, byte[] compressionKey, AddressVersion version)
+        {
+            return GetAddressBuilder(version).EncodeFromSharedBlob(sharedBlob, compressionKey);
+        }
+
+        public string EncodeFromSharedBlob(string sharedBlob, byte[] compressionKey, AddressVersion version)
+        {
+            return GetAddressBuilder(version).EncodeFromSharedBlob(sharedBlob, compressionKey);
         }
 
         public string Encode(WalletAddress walletAddress, AddressVersion version)
@@ -62,25 +137,18 @@ namespace Tangram.Address
             return null;
         }
 
-        public WalletAddress TryDecodeWalletAddressVerify(string address)
-        {
-            AddressParts addressParts = TryDecodeAddressPartsVerify(address);
-
-            return addressParts != null ? new WalletAddress(addressParts) : null;
-        }
-
-        public NetworkAddress TryDecodeNetworkAddressVerify(string address)
-        {
-            AddressParts addressParts = TryDecodeAddressPartsVerify(address);
-
-            return addressParts != null ? new NetworkAddress(addressParts) : null;
-        }
-
         public AddressParts TryDecodeAddressPartsVerify(string address, AddressVersion version)
         {
             var addressBuilder = GetAddressBuilder(version, false);
 
             return addressBuilder != null ? addressBuilder.TryDecodeAddressPartsVerify(address) : null;
+        }
+
+        public WalletAddress TryDecodeWalletAddressVerify(string address)
+        {
+            AddressParts addressParts = TryDecodeAddressPartsVerify(address);
+
+            return addressParts != null ? new WalletAddress(addressParts) : null;
         }
 
         public WalletAddress TryDecodeWalletAddressVerify(string address, AddressVersion version)
@@ -90,6 +158,13 @@ namespace Tangram.Address
             return addressBuilder != null ? addressBuilder.TryDecodeWalletAddressVerify(address) : null;
         }
 
+        public NetworkAddress TryDecodeNetworkAddressVerify(string address)
+        {
+            AddressParts addressParts = TryDecodeAddressPartsVerify(address);
+
+            return addressParts != null ? new NetworkAddress(addressParts) : null;
+        }
+
         public NetworkAddress TryDecodeNetworkAddressVerify(string address, AddressVersion version)
         {
             var addressBuilder = GetAddressBuilder(version, false);
@@ -97,9 +172,26 @@ namespace Tangram.Address
             return addressBuilder != null ? addressBuilder.TryDecodeNetworkAddressVerify(address) : null;
         }
 
+        public AddressParts DecodeAddressPartsVerifyThrow(string address)
+        {
+            AddressParts addressParts = TryDecodeAddressPartsVerify(address);
+
+            if (addressParts == null)
+                throw new InvalidAddressException($"Failed to decode address '{address}'.");
+
+            return addressParts;
+        }
+
         public AddressParts DecodeAddressPartsVerifyThrow(string address, AddressVersion version)
         {
             return GetAddressBuilder(version).DecodeAddressPartsVerifyThrow(address);
+        }
+
+        public WalletAddress DecodeWalletAddressVerifyThrow(string address)
+        {
+            AddressParts addressParts = DecodeAddressPartsVerifyThrow(address);
+
+            return new WalletAddress(addressParts);
         }
 
         public WalletAddress DecodeWalletAddressVerifyThrow(string address, AddressVersion version)
@@ -107,24 +199,16 @@ namespace Tangram.Address
             return GetAddressBuilder(version).DecodeWalletAddressVerifyThrow(address);
         }
 
+        public NetworkAddress DecodeNetworkAddressVerifyThrow(string address)
+        {
+            AddressParts addressParts = DecodeAddressPartsVerifyThrow(address);
+
+            return new NetworkAddress(addressParts);
+        }
+
         public NetworkAddress DecodeNetworkAddressVerifyThrow(string address, AddressVersion version)
         {
             return GetAddressBuilder(version).DecodeNetworkAddressVerifyThrow(address);
-        }
-
-        public WalletAddress BuildWalletAddress(byte[] sharedData, AddressVersion version)
-        {
-            return GetAddressBuilder(version).BuildWalletAddress(sharedData);
-        }
-
-        public NetworkAddress BuildNetworkAddress(byte[] sharedData, AddressVersion version)
-        {
-            return GetAddressBuilder(version).BuildNetworkAddress(sharedData);
-        }
-
-        public string EncodeFromBody(byte[] body, AddressVersion version)
-        {
-            return GetAddressBuilder(version).EncodeFromBody(body);
         }
 
         private AddressBuilder GetAddressBuilder(AddressVersion version, bool throwIfUnknownVersion = true)

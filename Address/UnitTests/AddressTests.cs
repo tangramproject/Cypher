@@ -25,7 +25,7 @@ namespace Tangram.Address.UnitTests
         [Test]
         public void BuildWalletAddress()
         {
-            var walletAddress = Factory.BuildWalletAddress(PublicKey, AddressVersion);
+            var walletAddress = Factory.BuildWalletAddressFromPublicKey(PublicKey, AddressVersion);
 
             Trace.WriteLine($"Address version = '{AddressVersion}'"
                 + $", wallet address = '{SimpleBase.Base16.EncodeUpper(walletAddress.ToArray())}'");
@@ -36,7 +36,7 @@ namespace Tangram.Address.UnitTests
         [Test]
         public void BuildNetworkAddress()
         {
-            var networkAddress = Factory.BuildNetworkAddress(PublicKey, AddressVersion);
+            var networkAddress = Factory.BuildNetworkAddressFromPublicKey(PublicKey, AddressVersion);
 
             Trace.WriteLine($"Address version = '{AddressVersion}'"
                 + $", network address = '{SimpleBase.Base16.EncodeUpper(networkAddress.ToArray())}'");
@@ -47,7 +47,7 @@ namespace Tangram.Address.UnitTests
         [Test]
         public void EncodeTangramAddress()
         {
-            var walletAddress = Factory.BuildWalletAddress(PublicKey, AddressVersion);
+            var walletAddress = Factory.BuildWalletAddressFromPublicKey(PublicKey, AddressVersion);
             var tangramAddress = Factory.Encode(walletAddress, AddressVersion);
 
             Trace.WriteLine($"Address version = '{AddressVersion}', tangram address = '{tangramAddress}'");

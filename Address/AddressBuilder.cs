@@ -19,6 +19,7 @@ namespace Tangram.Address
         public abstract byte[] BinaryVersion { get; } // Mandatory. The testnet can have the same version forever.
         public abstract int ChecksumByteCount { get; }
         public abstract string TextualChecksumSeed { get; } // Mandatory. Should be unique for every version.
+        public abstract int PublicKeyMaxSize { get; }
 
         protected abstract Encoding TextEncoding { get; }
 
@@ -29,17 +30,67 @@ namespace Tangram.Address
             get
             {
                 if (_ChecksumSeed == null)
-                    _ChecksumSeed = Hash(TextEncoding.GetBytes(TextualChecksumSeed));
+                    _ChecksumSeed = Compress(TextEncoding.GetBytes(TextualChecksumSeed));
 
                 return _ChecksumSeed;
             }
         }
 
-        public string EncodeFromSharedData(byte[] sharedData)
+        public byte[] BuildBodyFromExactData(byte[] data)
         {
-            var body = BuildBody(sharedData);
+            Guard.Argument(data, nameof(data)).MinCount(1).MaxCount(PublicKeyMaxSize);
 
-            return EncodeFromBody(body);
+            return data;
+        }
+
+        public byte[] BuildBodyFromPublicKey(byte[] publicKey)
+        {
+            return BuildBodyFromExactData(publicKey);
+        }
+
+        public byte[] BuildBodyFromSharedBlob(byte[] sharedBlob, byte[] compressionKey)
+        {
+            return BuildBodyFromExactData(Compress(sharedBlob, compressionKey));
+        }
+
+        public byte[] BuildBodyFromSharedBlob(string sharedBlob, byte[] compressionKey)
+        {
+            return BuildBodyFromExactData(Compress(TextEncoding.GetBytes(sharedBlob), compressionKey));
+        }
+
+        public WalletAddress BuildWalletAddressFromBody(byte[] body)
+        {
+            return new WalletAddress(BuildBodyFromExactData(body));
+        }
+
+        public WalletAddress BuildWalletAddressFromPublicKey(byte[] publicKey)
+        {
+            return new WalletAddress(BuildBodyFromPublicKey(publicKey));
+        }
+
+        public WalletAddress BuildWalletAddressFromSharedBlob(byte[] sharedBlob, byte[] compressionKey)
+        {
+            return new WalletAddress(BuildBodyFromSharedBlob(sharedBlob, compressionKey));
+        }
+
+        public WalletAddress BuildWalletAddressFromSharedBlob(string sharedBlob, byte[] compressionKey)
+        {
+            return new WalletAddress(BuildBodyFromSharedBlob(sharedBlob, compressionKey));
+        }
+
+        public string EncodeFromPublicKey(byte[] publicKey)
+        {
+            return EncodeFromBody(BuildBodyFromPublicKey(publicKey));
+        }
+
+        public string EncodeFromSharedBlob(byte[] sharedBlob, byte[] compressionKey)
+        {
+            return EncodeFromBody(BuildBodyFromSharedBlob(sharedBlob, compressionKey));
+        }
+
+        public string EncodeFromSharedBlob(string sharedBlob, byte[] compressionKey)
+        {
+            return EncodeFromBody(BuildBodyFromSharedBlob(sharedBlob, compressionKey));
         }
 
         public string Encode(WalletAddress walletAddress)
@@ -178,14 +229,16 @@ namespace Tangram.Address
             return true;
         }
 
-        public abstract WalletAddress BuildWalletAddress(byte[] sharedData);
-        public abstract NetworkAddress BuildNetworkAddress(byte[] sharedData);
+        public abstract NetworkAddress BuildNetworkAddressFromBody(byte[] body);
+        public abstract NetworkAddress BuildNetworkAddressFromPublicKey(byte[] publicKey);
+        public abstract NetworkAddress BuildNetworkAddressFromSharedBlob(byte[] sharedBlob, byte[] compressionKey);
+        public abstract NetworkAddress BuildNetworkAddressFromSharedBlob(string sharedBlob, byte[] compressionKey);
         public abstract string EncodeFromBody(byte[] body);
 
         protected abstract byte[] ConvertToArray(string text);
-        protected abstract string ConvertToText(byte[] array);
-        protected abstract byte[] Hash(byte[] array);
-        protected abstract byte[] BuildBody(byte[] sharedData);
+        protected abstract string ConvertToText(byte[] data);
+        protected abstract byte[] Compress(byte[] data);
+        protected abstract byte[] Compress(byte[] data, byte[] compressionKey);
         protected abstract byte[] BuildChecksum(byte[] body);
         protected abstract AddressParts TryDecodeAddressPartsNoVerify(string address);
     }

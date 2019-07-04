@@ -12,7 +12,6 @@ using System.Collections.Generic;
 using System.Security;
 using System.Threading.Tasks;
 using MurrayGrant.ReadablePassphrase;
-using SimpleBase;
 using TangramCypher.ApplicationLayer.Vault;
 using TangramCypher.Helper;
 using TangramCypher.Helper.LibSodium;
@@ -33,7 +32,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
     public class WalletService : IWalletService
     {
         private readonly IVaultServiceClient vaultServiceClient;
-		private readonly ICoinService coinService;
+        private readonly ICoinService coinService;
         private readonly IConfigurationSection apiNetworkSection;
         private readonly ILogger logger;
         private readonly string environment;
@@ -42,7 +41,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
         public WalletService(IVaultServiceClient vaultServiceClient, ICoinService coinService, IConfiguration configuration, ILogger logger, IUnitOfWork unitOfWork)
         {
             this.vaultServiceClient = vaultServiceClient;
-			this.coinService = coinService;
+            this.coinService = coinService;
 
             apiNetworkSection = configuration.GetSection(Constant.ApiNetwork);
             environment = apiNetworkSection.GetValue<string>(Constant.Environment);
@@ -415,9 +414,9 @@ namespace TangramCypher.ApplicationLayer.Wallet
             { coin = coin.FormatCoinFromBase64(); }
             catch (FormatException) { }
 
-			var hash = coinService.HashWithKey(coin);
+            var hash = coinService.HashWithKey(coin);
 
-            string address = AddressBuilderFactory.Global.EncodeFromSharedData(hash, CurrentAddressVersion.Get(environment, networkApi));
+            string address = AddressBuilderFactory.Global.EncodeFromBody(hash, CurrentAddressVersion.Get(environment, networkApi));
 
             return Encoding.UTF8.GetBytes(address);
         }
@@ -430,7 +429,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <param name="networkApi">Network API.</param>
         public byte[] NetworkAddress(byte[] pk, NetworkApiMethod networkApi = null)
         {
-            string address = AddressBuilderFactory.Global.EncodeFromSharedData(pk, CurrentAddressVersion.Get(environment, networkApi));
+            string address = AddressBuilderFactory.Global.EncodeFromPublicKey(pk, CurrentAddressVersion.Get(environment, networkApi));
 
             return Encoding.UTF8.GetBytes(address);
         }
