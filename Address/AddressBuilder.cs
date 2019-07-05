@@ -19,26 +19,55 @@ namespace Tangram.Address
         public abstract byte[] BinaryVersion { get; } // Mandatory. The testnet can have the same version forever.
         public abstract int ChecksumByteCount { get; }
         public abstract string TextualChecksumSeed { get; } // Mandatory. Should be unique for every version.
-        public abstract int PublicKeyMaxSize { get; }
+        public abstract int BodyMinSize { get; }
+        public abstract int BodyMaxSize { get; }
 
         protected abstract Encoding TextEncoding { get; }
 
-        // Cache value.
-        private byte[] _ChecksumSeed;
-        protected byte[] ChecksumSeed
+        // Cache value across instances (different per version).
+        protected static CachePerVersion<byte[]> ChecksumSeedCache = new CachePerVersion<byte[]>();
+        protected virtual byte[] ChecksumSeed
         {
             get
             {
-                if (_ChecksumSeed == null)
-                    _ChecksumSeed = Compress(TextEncoding.GetBytes(TextualChecksumSeed));
+                var checksumSeed = ChecksumSeedCache.Get(Version);
 
-                return _ChecksumSeed;
+                if (checksumSeed == null)
+                {
+                    checksumSeed = CompressToBodySize(TextEncoding.GetBytes(TextualChecksumSeed));
+                    ChecksumSeedCache.Set(Version, checksumSeed);
+                }
+
+                return checksumSeed;
+            }
+        }
+
+        // Cache value across instances (different per version).
+        protected static CachePerVersion<int> ChecksumCharacterCountCache = new CachePerVersion<int>();
+        protected virtual int ChecksumCharacterCount
+        {
+            get
+            {
+                var checksumCharacterCount = ChecksumCharacterCountCache.Get(Version);
+
+                if (checksumCharacterCount <= 0)
+                {
+                    byte[] checksum = new byte[ChecksumByteCount];
+                    Array.Fill<byte>(checksum, 255);
+
+                    var textualChecksum = ConvertToText(checksum);
+
+                    checksumCharacterCount = textualChecksum.Length;
+                    ChecksumCharacterCountCache.Set(Version, checksumCharacterCount);
+                }
+
+                return checksumCharacterCount;
             }
         }
 
         public byte[] BuildBodyFromExactData(byte[] data)
         {
-            Guard.Argument(data, nameof(data)).MinCount(1).MaxCount(PublicKeyMaxSize);
+            Guard.Argument(data, nameof(data)).MinCount(BodyMinSize).MaxCount(BodyMaxSize);
 
             return data;
         }
@@ -50,12 +79,12 @@ namespace Tangram.Address
 
         public byte[] BuildBodyFromSharedBlob(byte[] sharedBlob, byte[] compressionKey)
         {
-            return BuildBodyFromExactData(Compress(sharedBlob, compressionKey));
+            return BuildBodyFromExactData(CompressToBodySize(sharedBlob, compressionKey));
         }
 
         public byte[] BuildBodyFromSharedBlob(string sharedBlob, byte[] compressionKey)
         {
-            return BuildBodyFromExactData(Compress(TextEncoding.GetBytes(sharedBlob), compressionKey));
+            return BuildBodyFromExactData(CompressToBodySize(TextEncoding.GetBytes(sharedBlob), compressionKey));
         }
 
         public WalletAddress BuildWalletAddressFromBody(byte[] body)
@@ -159,7 +188,7 @@ namespace Tangram.Address
         {
             AddressParts parts = TryDecodeAddressPartsNoVerify(address);
             if (parts == null)
-                throw new InvalidAddressException($"Failed to parse wallet address '{address}'.");
+                throw new InvalidAddressException($"Failed to decode wallet address '{address}'.");
 
             VerifyVersion(parts, true);
 
@@ -237,8 +266,8 @@ namespace Tangram.Address
 
         protected abstract byte[] ConvertToArray(string text);
         protected abstract string ConvertToText(byte[] data);
-        protected abstract byte[] Compress(byte[] data);
-        protected abstract byte[] Compress(byte[] data, byte[] compressionKey);
+        protected abstract byte[] CompressToBodySize(byte[] data);
+        protected abstract byte[] CompressToBodySize(byte[] data, byte[] compressionKey);
         protected abstract byte[] BuildChecksum(byte[] body);
         protected abstract AddressParts TryDecodeAddressPartsNoVerify(string address);
     }

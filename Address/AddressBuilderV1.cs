@@ -15,30 +15,10 @@ namespace Tangram.Address
 
         public override string Prefix => "tgm_";
         public override int ChecksumByteCount => 5;
-        public override int PublicKeyMaxSize => 32;
+        public override int BodyMinSize => 16;
+        public override int BodyMaxSize => 32;
 
         protected override Encoding TextEncoding => Encoding.UTF8;
-
-        // Cache value.
-        private int _ChecksumCharacterCount = 0;
-        protected int ChecksumCharacterCount
-        {
-            get
-            {
-                if (_ChecksumCharacterCount <= 0)
-                {
-                    byte[] maxChecksum = new byte[ChecksumByteCount];
-                    Array.Fill<byte>(maxChecksum, 255);
-
-                    var checksum = BuildChecksum(maxChecksum);
-                    var textualChecksum = ConvertToText(checksum);
-
-                    _ChecksumCharacterCount = textualChecksum.Length;
-                }
-
-                return _ChecksumCharacterCount;
-            }
-        }
 
         protected readonly SimpleBase.Base32 Base32 = new SimpleBase.Base32(Base32Alphabet);
 
@@ -83,27 +63,29 @@ namespace Tangram.Address
             return Base32.Encode(data, false);
         }
 
-        protected override byte[] Compress(byte[] data)
+        protected override byte[] CompressToBodySize(byte[] data)
         {
             Guard.Argument(data, nameof(data)).NotEmpty();
 
-            return CryptoHash.Sha256(data);
+            var hash = CryptoHash.Sha256(data);
+
+            return hash.Length <= BodyMaxSize ? hash : hash.Take(BodyMaxSize).ToArray();
         }
 
-        protected override byte[] Compress(byte[] data, byte[] compressionKey)
+        protected override byte[] CompressToBodySize(byte[] data, byte[] compressionKey)
         {
             Guard.Argument(data, nameof(data)).NotEmpty();
             Guard.Argument(compressionKey, nameof(compressionKey)).NotEmpty();
 
-            return GenericHash.Hash(data, compressionKey, PublicKeyMaxSize);
+            return GenericHash.Hash(data, compressionKey, BodyMaxSize);
         }
 
         protected override byte[] BuildChecksum(byte[] body)
         {
-            Guard.Argument(body, nameof(body)).MinCount(1);
+            Guard.Argument(body, nameof(body)).MinCount(BodyMinSize).MaxCount(BodyMaxSize);
 
             var toHash = ChecksumSeed.Concat(BinaryVersion).Concat(body).ToArray();
-            var hash = Compress(toHash);
+            var hash = CompressToBodySize(toHash);
 
             var checksum = new byte[ChecksumByteCount];
             Array.Copy(hash, 0, checksum, 0, ChecksumByteCount);
@@ -113,7 +95,7 @@ namespace Tangram.Address
 
         protected override AddressParts TryDecodeAddressPartsNoVerify(string address)
         {
-            if (address == null || address.Length < 1 /* version */ + 1 /* body */ + ChecksumCharacterCount)
+            if (address == null || address.Length < 1 /* version */ + BodyMinSize /* body */ + ChecksumCharacterCount)
                 return null;
 
             string prefix = address.StartsWith(Prefix) ? Prefix : "";
@@ -128,6 +110,9 @@ namespace Tangram.Address
             int checksumStartIndex = address.Length - ChecksumCharacterCount;
 
             string body = address.Substring(bodyStartIndex, checksumStartIndex - bodyStartIndex);
+            if (body.Length < BodyMinSize)
+                return null;
+
             string checksum = address.Substring(checksumStartIndex, ChecksumCharacterCount);
 
             var bodyArray = ConvertToArray(body);
