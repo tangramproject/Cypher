@@ -18,3 +18,5 @@ shard
 vault.exe
 vault.json
 vault
+/Address/bin
+/Address/obj

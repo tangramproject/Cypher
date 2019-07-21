@@ -16,7 +16,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using SimpleBase;
 using Sodium;
 using TangramCypher.ApplicationLayer.Wallet;
 using TangramCypher.Helper;
@@ -28,6 +27,7 @@ using TangramCypher.ApplicationLayer.Onion;
 using TangramCypher.Model;
 using Stateless;
 using System.Collections.Concurrent;
+using Tangram.Address;
 
 namespace TangramCypher.ApplicationLayer.Actor
 {
@@ -38,6 +38,8 @@ namespace TangramCypher.ApplicationLayer.Actor
         private readonly IWalletService walletService;
         private readonly ICoinService coinService;
         private readonly IUnitOfWork unitOfWork;
+        private readonly IConfigurationSection apiNetworkSection;
+        private readonly string environment;
         private StateMachine<State, Trigger> machine;
         private readonly StateMachine<State, Trigger>.TriggerWithParameters<Guid> verifyTrigger;
         private readonly StateMachine<State, Trigger>.TriggerWithParameters<Guid> unlockTrigger;
@@ -74,6 +76,9 @@ namespace TangramCypher.ApplicationLayer.Actor
             this.logger = logger;
             this.unitOfWork = unitOfWork;
 
+            apiNetworkSection = configuration.GetSection(Constant.ApiNetwork);
+            environment = apiNetworkSection.GetValue<string>(Constant.Environment);
+
             Client = onionService.OnionEnabled.Equals(1) ?
                 new Client(configuration, logger, new DotNetTor.SocksPort.SocksPortHandler(onionService.SocksHost, onionService.SocksPort)) :
                 new Client(configuration, logger);
@@ -106,13 +111,6 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// <param name="sessionId"></param>
         /// <returns></returns>
         public Session GetSession(Guid sessionId) => Sessions.GetValueOrDefault(sessionId);
-
-        /// <summary>
-        /// Decodes the address.
-        /// </summary>
-        /// <returns>The address.</returns>
-        /// <param name="key">Key.</param>
-        private Span<byte> DecodeAddress(string key) => Base58.Bitcoin.Decode(key);
 
         /// <summary>
         /// Sets the cypher.
@@ -187,13 +185,13 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             IEnumerable<MessageDto> messages;
             var session = GetSession(sessionId);
-            var pk = Util.FormatNetworkAddress(DecodeAddress(address).ToArray());
+            var pk = DecodeAddress(address);
 
             string msgAddress = sharedKey ? pk.ToHex() : Cryptography.GenericHashWithKey(pk.ToHex(), pk).ToHex();
 
             if (sharedKey)
             {
-                pk = Util.FormatNetworkAddress(receiverPk);
+                pk = receiverPk;
             }
 
             var track = await unitOfWork.GetTrackRepository().Get(session, StoreKey.PublicKey, pk.ToHex());
@@ -234,7 +232,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             try
             {
-                bool TestFromAddress() => Util.FormatNetworkAddress(DecodeAddress(session.SenderAddress).ToArray()) != null;
+                bool TestFromAddress() => TryDecodeAddress(session.SenderAddress) != null;
                 if (TestFromAddress().Equals(false))
                 {
                     return TaskResult<bool>.CreateFailure(JObject.FromObject(new
@@ -246,7 +244,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
                 await SetSecretKey(session.SessionId);
 
-                var pk = Util.FormatNetworkAddress(DecodeAddress(session.SenderAddress).ToArray());
+                var pk = DecodeAddress(session.SenderAddress);
                 var message = JObject.Parse(cypher).ToObject<MessageDto>();
                 var rmsg = ReadMessage(session.SecretKey, message.Body, pk);
 
@@ -462,7 +460,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             try
             {
-                var pk = Util.FormatNetworkAddress(DecodeAddress(session.RecipientAddress).ToArray());
+                var pk = DecodeAddress(session.RecipientAddress);
                 var msgAddress = Cryptography.GenericHashWithKey(pk.ToHex(), pk);
                 var senderPk = session.PublicKey.ToUnSecureString();
                 var innerMessage = JObject.FromObject(new
@@ -501,23 +499,46 @@ namespace TangramCypher.ApplicationLayer.Actor
         /// </summary>
         /// <returns>The address.</returns>
         /// <param name="pk">Pk.</param>
-        private string EncodeAddress(string pk)
+        private string EncodeAddress(string pk, NetworkApiMethod networkApi = null)
         {
             Guard.Argument(pk, nameof(pk)).NotNull().NotEmpty();
 
-            string address;
-
             try
             {
-                address = Base58.Bitcoin.Encode(Utilities.HexToBinary(pk));
+                return AddressBuilderFactory.Global.EncodeFromBody(Utilities.HexToBinary(pk)
+                    , CurrentAddressVersion.Get(environment, networkApi));
             }
             catch (Exception ex)
             {
                 logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
-                throw ex;
+                throw;
             }
+        }
 
-            return address;
+        /// <summary>
+        /// Decodes the address.
+        /// </summary>
+        /// <returns>The address.</returns>
+        /// <param name="key">Key.</param>
+        private byte[] DecodeAddress(string key, NetworkApiMethod networkApi = null)
+        {
+            WalletAddress walletAddress = AddressBuilderFactory.Global.DecodeWalletAddressVerifyThrow(key
+                , CurrentAddressVersion.Get(environment, networkApi));
+
+            return walletAddress.ToArray();
+        }
+
+        /// <summary>
+        /// Tries to decode the address.
+        /// </summary>
+        /// <returns>The address.</returns>
+        /// <param name="key">Key.</param>
+        private byte[] TryDecodeAddress(string key, NetworkApiMethod networkApi = null)
+        {
+            WalletAddress walletAddress = AddressBuilderFactory.Global.TryDecodeWalletAddressVerify(key
+                , CurrentAddressVersion.Get(environment, networkApi));
+
+            return walletAddress != null ? walletAddress.ToArray() : null;
         }
 
         private async Task<TaskResult<bool>> Unlock(Guid sessionId)
@@ -737,7 +758,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                     store = JsonConvert.SerializeObject(redemption)
                 });
                 var paddedBuf = Cryptography.Pad(innerMessage.ToString());
-                var pk = Util.FormatNetworkAddress(DecodeAddress(session.RecipientAddress).ToArray());
+                var pk = DecodeAddress(session.RecipientAddress);
                 var cypher = Cypher(Encoding.UTF8.GetString(paddedBuf), pk);
                 var sharedKey = ToSharedKey(session.SecretKey, pk.ToArray());
                 var msgAddress = Cryptography.GenericHashWithKey(sharedKey.ToHex(), pk);
@@ -797,7 +818,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             UpdateMessagePump("Busy committing sender coin ...");
 
-            bool TestToAddress() => Util.FormatNetworkAddress(DecodeAddress(session.RecipientAddress).ToArray()) != null;
+            bool TestToAddress() => TryDecodeAddress(session.RecipientAddress) != null;
             if (TestToAddress().Equals(false))
             {
                 return TaskResult<bool>.CreateFailure(JObject.FromObject(new
@@ -980,6 +1001,42 @@ namespace TangramCypher.ApplicationLayer.Actor
             return result;
         }
 
-        private async Task Test()         {             try             {                 var session = new Session("id_a71326d441f8c8bee0380e565208cd43".ToSecureString(), "his valuable garnishes announced should a taxonomic iota impair the interlude".ToSecureString())                 {                     Amount = 20000000000000                 };                  session = SessionAddOrUpdate(session);                  coinService.Receiver(session.MasterKey, session.Amount, out CoinDto coin, out byte[] blind, out byte[] salt);                  coin.Hash = coinService.Hash(coin).ToHex();                 coin.Network = walletService.NetworkAddress(coin).ToHex();                  var coinResult = await PostArticle(coin.FormatCoinToBase64(), RestApiMethod.PostCoin);                  if (coinResult.Success.Equals(false))                 {                     throw new Exception(JsonConvert.SerializeObject(coinResult.NonSuccessMessage));                 }                  var added = await AddWalletTransaction(session.SessionId, coinResult.Result, session.Amount, "Check running total..", blind, salt, TransactionType.Receive);                  if (added.Equals(false))                 {                     throw new Exception("Transaction wallet failed to add!");                 }              }             catch (Exception ex)             {                 throw ex;             }          }
+        private async Task Test()
+        {
+            try
+            {
+                var session = new Session("id_a71326d441f8c8bee0380e565208cd43".ToSecureString(), "his valuable garnishes announced should a taxonomic iota impair the interlude".ToSecureString())
+                {
+                    Amount = 20000000000000
+                };
+
+                session = SessionAddOrUpdate(session);
+
+                coinService.Receiver(session.MasterKey, session.Amount, out CoinDto coin, out byte[] blind, out byte[] salt);
+
+                coin.Hash = coinService.Hash(coin).ToHex();
+                coin.Network = walletService.NetworkAddress(coin).ToHex();
+
+                var coinResult = await PostArticle(coin.FormatCoinToBase64(), RestApiMethod.PostCoin);
+
+                if (coinResult.Success.Equals(false))
+                {
+                    throw new Exception(JsonConvert.SerializeObject(coinResult.NonSuccessMessage));
+                }
+
+                var added = await AddWalletTransaction(session.SessionId, coinResult.Result, session.Amount, "Check running total..", blind, salt, TransactionType.Receive);
+
+                if (added.Equals(false))
+                {
+                    throw new Exception("Transaction wallet failed to add!");
+                }
+
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+
+        }
     }
 }

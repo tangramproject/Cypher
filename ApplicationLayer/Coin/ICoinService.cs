@@ -23,6 +23,7 @@ namespace TangramCypher.ApplicationLayer.Coin
         byte[] DeriveKey(ulong amount, string stamp, int version, SecureString secret, SecureString salt);
         string DeriveKey(int version, string stamp, SecureString secret, SecureString salt, int bytes = 32);
         byte[] Hash(CoinDto coin);
+		byte[] HashWithKey(CoinDto coin);
         (string, string) HotRelease(int version, string stamp, SecureString secret, SecureString salt);
         CoinDto MakeSingleCoin(SecureString secret, SecureString salt, string stamp, int version);
         string PartialRelease(int version, string stamp, string memo, SecureString secret, SecureString salt);

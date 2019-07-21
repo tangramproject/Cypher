@@ -180,21 +180,6 @@ namespace TangramCypher.Helper
             logger.LogWarning(message);
         }
 
-        public static byte[] FormatNetworkAddress(byte[] networkAddress)
-        {
-            try
-            {
-                byte[] pk = new byte[32];
-                Array.Copy(networkAddress, 1, pk, 0, 32);
-                return pk;
-            }
-            catch
-            {
-            }
-
-            return networkAddress;
-        }
-
         public async static Task<T> TriesUntilCompleted<T>(Func<Task<T>> action, int tries, int delay, T expected)
         {
             var result = default(T);

@@ -202,6 +202,29 @@ namespace TangramCypher.ApplicationLayer.Coin
                     coin.Stamp));
         }
 
+		/// <summary>
+		/// Hash the specified coin.
+		/// </summary>
+		/// <returns>The hash.</returns>
+		/// <param name="coin">Coin.</param>
+		public byte[] HashWithKey(CoinDto coin)
+		{
+			Guard.Argument(coin, nameof(coin)).NotNull();
+
+			return Cryptography.GenericHashWithKey(
+				$"{coin.Envelope.Commitment}" +
+				$" {coin.Envelope.Proof}" +
+				$" {coin.Envelope.PublicKey}" +
+				$" {coin.Envelope.Signature}" +
+				$" {coin.Hash}" +
+				$" {coin.Hint}" +
+				$" {coin.Keeper}" +
+				$" {coin.Principle}" +
+				$" {coin.Stamp}" +
+				$" {coin.Version}",
+				coin.Principle.FromHex());
+		}
+
         /// <summary>
         /// Partial release one secret key for escrow.
         /// </summary>
