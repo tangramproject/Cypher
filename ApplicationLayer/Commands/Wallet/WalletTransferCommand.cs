@@ -18,6 +18,7 @@ using Kurukuru;
 using TangramCypher.ApplicationLayer.Wallet;
 using Microsoft.Extensions.Logging;
 using TangramCypher.Model;
+using TangramCypher.ApplicationLayer.Send;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
 {
@@ -26,6 +27,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
     {
         readonly IActorService actorService;
         readonly IWalletService walletService;
+        readonly ISendService sendService;
         readonly IConsole console;
         readonly ILogger logger;
 
@@ -37,6 +39,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
         {
             actorService = serviceProvider.GetService<IActorService>();
             walletService = serviceProvider.GetService<IWalletService>();
+            sendService = serviceProvider.GetService<ISendService>();
             console = serviceProvider.GetService<IConsole>();
             logger = serviceProvider.GetService<ILogger>();
 
@@ -69,10 +72,10 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                                 RecipientAddress = address
                             };
 
-                            await actorService.Tansfer(session);
+                            await sendService.Tansfer(session);
                             session = actorService.GetSession(session.SessionId);
 
-                            if (actorService.State != State.Completed)
+                            if (sendService.State != State.Completed)
                             {
                                 var failedMessage = JsonConvert.SerializeObject(session.LastError.GetValue("message"));
                                 logger.LogCritical(failedMessage);

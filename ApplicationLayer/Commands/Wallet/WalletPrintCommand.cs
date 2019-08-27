@@ -8,18 +8,16 @@
 
 using System;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
 using McMaster.Extensions.CommandLineUtils;
-using TangramCypher.ApplicationLayer.Vault;
 using Microsoft.Extensions.DependencyInjection;
 using TangramCypher.ApplicationLayer.Actor;
 using TangramCypher.Helper;
 using TangramCypher.ApplicationLayer.Wallet;
 using TangramCypher.ApplicationLayer.Coin;
 using Kurukuru;
-using System.Security;
 using Microsoft.Extensions.Logging;
 using TangramCypher.Model;
+using TangramCypher.ApplicationLayer.Send;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
 {
@@ -30,7 +28,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
         readonly ICoinService coinService;
         readonly IConsole console;
         readonly ILogger logger;
-
+        readonly ISendService sendService;
         private Spinner spinner;
 
         public WalletPrintCommand(IServiceProvider serviceProvider)
@@ -40,6 +38,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
             coinService = serviceProvider.GetService<ICoinService>();
             console = serviceProvider.GetService<IConsole>();
             logger = serviceProvider.GetService<ILogger>();
+            sendService = serviceProvider.GetService<ISendService>();
 
             actorService.MessagePump += ActorService_MessagePump;
         }
@@ -74,7 +73,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                                 RecipientAddress = address
                             };
 
-                            await actorService.Tansfer(session);
+                            await sendService.Tansfer(session);
 
                         }
                         catch (Exception ex)
