@@ -18,9 +18,17 @@ namespace TangramCypher.ApplicationLayer.Actor
         event MessagePumpEventHandler MessagePump;
         Session GetSession(Guid sessionId);
         Client Client { get; }
-        State State { get; }
-        Task Tansfer(Session Session);
+
         Task ReceivePayment(Session session);
         Task<TaskResult<bool>> ReceivePaymentRedemptionKey(Session session, string cypher);
+        Session SessionAddOrUpdate(Session session);
+        TaskResult<Session> SufficientFunds(Guid sessionId);
+        TaskResult<bool> Unlock(Guid sessionId);
+        TaskResult<bool> Burn(Guid sessionId);
+        TaskResult<bool> CommitReceiver(Guid sessionId);
+        TaskResult<bool> PublicKeyAgreementMessage(Guid sessionId);
+        TaskResult<bool> RedemptionKeyMessage(Guid sessionId);
+        Task<TaskResult<T>> PostArticle<T>(T payload, RestApiMethod api) where T : class;
+        void UpdateMessagePump(string message);
     }
 }

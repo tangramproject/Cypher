@@ -9,18 +9,16 @@
 using System;
 using System.Threading.Tasks;
 using McMaster.Extensions.CommandLineUtils;
-using TangramCypher.ApplicationLayer.Vault;
 using Microsoft.Extensions.DependencyInjection;
 using TangramCypher.ApplicationLayer.Actor;
 using TangramCypher.Helper;
 using Newtonsoft.Json;
 using System.IO;
 using Kurukuru;
-using Newtonsoft.Json.Linq;
 using TangramCypher.ApplicationLayer.Wallet;
-using System.Security;
 using Microsoft.Extensions.Logging;
 using TangramCypher.Model;
+using TangramCypher.ApplicationLayer.Send;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
 {
@@ -29,7 +27,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
     {
         readonly IActorService actorService;
         readonly IWalletService walletService;
-        readonly IUnitOfWork unitOfWork;
+        readonly ISendService sendService;
         readonly IConsole console;
         readonly ILogger logger;
 
@@ -41,7 +39,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
         {
             actorService = serviceProvider.GetService<IActorService>();
             walletService = serviceProvider.GetService<IWalletService>();
-            unitOfWork = serviceProvider.GetService<IUnitOfWork>();
+            sendService = serviceProvider.GetService<ISendService>();
             console = serviceProvider.GetService<IConsole>();
             logger = serviceProvider.GetService<ILogger>();
 
@@ -74,10 +72,10 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                                 RecipientAddress = address
                             };
 
-                            await actorService.Tansfer(session);
+                            await sendService.Tansfer(session);
                             session = actorService.GetSession(session.SessionId);
 
-                            if (actorService.State != State.Completed)
+                            if (sendService.State != State.Completed)
                             {
                                 var failedMessage = JsonConvert.SerializeObject(session.LastError.GetValue("message"));
                                 logger.LogCritical(failedMessage);
@@ -87,7 +85,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
 
                             if (session.ForwardMessage.Equals(false))
                             {
-                                await SaveRedemptionKeyLocal(session.SessionId);
+                                SaveRedemptionKeyLocal(session.SessionId);
                             }
                         }
                         catch (Exception ex)
@@ -97,7 +95,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                         }
                         finally
                         {
-                            var balance = await walletService.AvailableBalance(identifier, password);
+                            var balance = walletService.AvailableBalance(identifier, password);
                             spinner.Text = $"Available Balance: {balance.Result.DivWithNaT().ToString("F9")}";
                         }
                     }, Patterns.Toggle3);
@@ -105,20 +103,17 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
             }
         }
 
-        private async Task SaveRedemptionKeyLocal(Guid sessionId)
+        private void SaveRedemptionKeyLocal(Guid sessionId)
         {
             spinner.Text = string.Empty;
             spinner.Stop();
 
-            var session = actorService.GetSession(sessionId);
-            var getMessageStore = await unitOfWork
-                        .GetRedemptionRepository()
-                        .Get(session, StoreKey.TransactionIdKey, session.SessionId.ToString());
+            MessageStoreDto messageStore;
 
-            if (getMessageStore.Success.Equals(false))
+            var session = actorService.GetSession(sessionId);
+            using (var db = Util.LiteRepositoryFactory(session.MasterKey, session.Identifier.ToUnSecureString()))
             {
-                console.WriteLine($"Error: {getMessageStore.Exception.Message}");
-                return;
+                messageStore = db.Query<MessageStoreDto>().Where(m => m.TransactionId.Equals(session.SessionId)).FirstOrDefault();
             }
 
             console.ForegroundColor = ConsoleColor.Magenta;
@@ -135,7 +130,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                 var content =
                     "--------------Begin Redemption Key--------------" +
                     Environment.NewLine +
-                    JsonConvert.SerializeObject(getMessageStore.Result.Message) +
+                    JsonConvert.SerializeObject(messageStore.Message) +
                     Environment.NewLine +
                     "--------------End Redemption Key----------------";
 

@@ -124,52 +124,6 @@ namespace TangramCypher.Helper
             handle.Free();
         }
 
-        public static CoinDto FormatCoinToBase64(this CoinDto coin)
-        {
-            var formattedCoin = new CoinDto
-            {
-                Envelope = new EnvelopeDto()
-                {
-                    Commitment = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Envelope.Commitment)),
-                    Proof = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Envelope.Proof)),
-                    PublicKey = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Envelope.PublicKey)),
-                    Signature = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Envelope.Signature)),
-                    RangeProof = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Envelope.RangeProof)),
-                }
-            };
-            formattedCoin.Hash = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Hash));
-            formattedCoin.Hint = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Hint));
-            formattedCoin.Keeper = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Keeper));
-            formattedCoin.Network = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Network));
-            formattedCoin.Principle = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Principle));
-            formattedCoin.Stamp = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Stamp));
-            formattedCoin.Version = coin.Version;
-
-            return formattedCoin;
-        }
-        public static CoinDto FormatCoinFromBase64(this CoinDto coin)
-        {
-            var formattedCoin = new CoinDto
-            {
-                Envelope = new EnvelopeDto()
-                {
-                    Commitment = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Envelope.Commitment)),
-                    Proof = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Envelope.Proof)),
-                    PublicKey = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Envelope.PublicKey)),
-                    Signature = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Envelope.Signature))
-                }
-            };
-            formattedCoin.Hash = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Hash));
-            formattedCoin.Hint = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Hint));
-            formattedCoin.Keeper = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Keeper));
-            // formattedCoin.Network = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Network));
-            formattedCoin.Principle = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Principle));
-            formattedCoin.Stamp = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Stamp));
-            formattedCoin.Version = coin.Version;
-
-            return formattedCoin;
-        }
-
         public static ulong MulWithNaT(this ulong value) => (ulong)(value * Constant.NanoTan);
 
         public static double DivWithNaT(this ulong value) => Convert.ToDouble(value) / Constant.NanoTan;

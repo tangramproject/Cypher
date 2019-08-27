@@ -15,8 +15,8 @@ namespace TangramCypher.Model
     {
         public DateTime DateTime { get; set; }
         public string Memo { get; set; }
-        public string Debit { get; set; }
-        public string Credit { get; set; }
+        public string MoneyOut { get; set; }
+        public string MoneyIn { get; set; }
         public string Balance { get; set; }
     }
 }

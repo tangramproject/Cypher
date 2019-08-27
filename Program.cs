@@ -9,7 +9,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using TangramCypher.ApplicationLayer.Actor;
 using TangramCypher.ApplicationLayer.Commands;
-using TangramCypher.ApplicationLayer.Vault;
 using TangramCypher.ApplicationLayer.Wallet;
 using Microsoft.Extensions.Logging;
 using System.Threading.Tasks;
@@ -21,6 +20,7 @@ using TangramCypher.ApplicationLayer.Coin;
 using System;
 using TangramCypher.ApplicationLayer.Onion;
 using TangramCypher.Model;
+using TangramCypher.ApplicationLayer.Send;
 
 namespace TangramCypher
 {
@@ -46,13 +46,12 @@ namespace TangramCypher
 
                     services
                         .AddSingleton<IActorService, ActorService>()
+                        .AddSingleton<ISendService, SendService>()
                         .AddSingleton<IWalletService, WalletService>()
                         .AddSingleton<IOnionServiceClient, OnionServiceClient>()
-                        .AddSingleton<IVaultServiceClient, VaultServiceClient>()
                         .AddSingleton<ICommandService, CommandService>()
                         .AddSingleton<ICoinService, CoinService>()
                         .AddSingleton<IHostedService, OnionService>()
-                        .AddSingleton<IHostedService, VaultService>()
                         .AddSingleton<IUnitOfWork, UnitOfWork>()
                         .AddSingleton<IHostedService, CommandService>(sp =>
                         {

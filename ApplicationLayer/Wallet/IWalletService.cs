@@ -6,12 +6,9 @@
 // You should have received a copy of the license along with this
 // work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
 
-using System;
 using System.Collections.Generic;
 using System.Security;
-using System.Threading.Tasks;
 using TangramCypher.ApplicationLayer.Actor;
-using TangramCypher.ApplicationLayer.Coin;
 using TangramCypher.Helper;
 using TangramCypher.Model;
 
@@ -19,20 +16,21 @@ namespace TangramCypher.ApplicationLayer.Wallet
 {
     public interface IWalletService
     {
-        Task<TaskResult<ulong>> AvailableBalance(SecureString identifier, SecureString password);
+        TaskResult<ulong> AvailableBalance(SecureString identifier, SecureString password);
+        void AddKeySet(SecureString secret, string identifier);
         KeySetDto CreateKeySet();
-        Task<CredentialsDto> CreateWallet();
+        CredentialsDto CreateWallet();
         SecureString NewID(int bytes = 32);
         SecureString Passphrase();
         byte[] HashPassword(SecureString passphrase);
-        Task<ulong> TotalTransactionAmount(SecureString identifier, SecureString password, string stamp);
-        Task<TransactionDto> LastTransaction(SecureString identifier, SecureString password, TransactionType transactionType);
-        Task<TaskResult<PurchaseDto>> SortChange(Session session);
-        byte[] NetworkAddress(CoinDto coin, NetworkApiMethod networkApi = null);
+        ulong TotalTransactionAmount(SecureString identifier, SecureString password, string stamp);
+        TransactionDto LastTransaction(SecureString identifier, SecureString password, TransactionType transactionType);
+        TaskResult<PurchaseDto> SortChange(Session session);
+        byte[] NetworkAddress(ICoinDto coin, NetworkApiMethod networkApi = null);
         byte[] NetworkAddress(byte[] pk, NetworkApiMethod networkApi = null);
         string ProverPassword(SecureString password, int version);
-        Task<string> Profile(SecureString identifier, SecureString password);
-        Task<IEnumerable<string>> WalletList();
-        Task<IEnumerable<BlanceSheetDto>> TransactionHistory(SecureString identifier, SecureString password);
+        IEnumerable<string> WalletList();
+        IEnumerable<BlanceSheetDto> TransactionHistory(SecureString identifier, SecureString password);
+        IEnumerable<string> ListAddresses(SecureString secret, string identifier);
     }
 }

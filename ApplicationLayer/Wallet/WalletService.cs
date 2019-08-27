@@ -10,45 +10,33 @@ using System;
 using System.Linq;
 using System.Collections.Generic;
 using System.Security;
-using System.Threading.Tasks;
 using MurrayGrant.ReadablePassphrase;
-using TangramCypher.ApplicationLayer.Vault;
+using SimpleBase;
 using TangramCypher.Helper;
 using TangramCypher.Helper.LibSodium;
-using TangramCypher.ApplicationLayer.Coin;
 using TangramCypher.ApplicationLayer.Actor;
 using System.Text;
 using TangramCypher.ApplicationLayer.Helper.ZeroKP;
 using Microsoft.Extensions.Configuration;
 using Dawn;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
 using TangramCypher.Model;
-using Tangram.Address;
-
+using System.IO;
 
 namespace TangramCypher.ApplicationLayer.Wallet
 {
     public class WalletService : IWalletService
     {
-        private readonly IVaultServiceClient vaultServiceClient;
-        private readonly ICoinService coinService;
         private readonly IConfigurationSection apiNetworkSection;
         private readonly ILogger logger;
         private readonly string environment;
-        private readonly IUnitOfWork unitOfWork;
 
-        public WalletService(IVaultServiceClient vaultServiceClient, ICoinService coinService, IConfiguration configuration, ILogger logger, IUnitOfWork unitOfWork)
+        public WalletService(IConfiguration configuration, ILogger logger)
         {
-            this.vaultServiceClient = vaultServiceClient;
-            this.coinService = coinService;
-
             apiNetworkSection = configuration.GetSection(Constant.ApiNetwork);
             environment = apiNetworkSection.GetValue<string>(Constant.Environment);
 
             this.logger = logger;
-
-            this.unitOfWork = unitOfWork;
         }
 
         /// <summary>
@@ -57,7 +45,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <returns>The balance.</returns>
         /// <param name="identifier">Identifier.</param>
         /// <param name="password">Password.</param>
-        public async Task<TaskResult<ulong>> AvailableBalance(SecureString identifier, SecureString password)
+        public TaskResult<ulong> AvailableBalance(SecureString identifier, SecureString password)
         {
             Guard.Argument(identifier, nameof(identifier)).NotNull();
             Guard.Argument(password, nameof(password)).NotNull();
@@ -66,14 +54,16 @@ namespace TangramCypher.ApplicationLayer.Wallet
 
             try
             {
-                var txns = await unitOfWork.GetTransactionRepository().All(new Session(identifier, password));
-
-                if (txns.Result?.Any() != true)
+                using (var db = Util.LiteRepositoryFactory(password, identifier.ToUnSecureString()))
                 {
-                    return TaskResult<ulong>.CreateSuccess(0);
-                }
+                    var txns = db.Fetch<TransactionDto>();
+                    if (txns?.Any() != true)
+                    {
+                        return TaskResult<ulong>.CreateSuccess(0);
+                    }
 
-                balance = Balance(txns.Result);
+                    balance = Balance(txns);
+                }
             }
             catch (Exception ex)
             {
@@ -82,6 +72,23 @@ namespace TangramCypher.ApplicationLayer.Wallet
             }
 
             return TaskResult<ulong>.CreateSuccess(balance);
+        }
+
+        public void AddKeySet(SecureString secret, string identifier)
+        {
+            try
+            {
+                using (var db = Util.LiteRepositoryFactory(secret, identifier))
+                {
+                    var keySet = CreateKeySet();
+                    db.Insert(keySet);
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex.Message);
+                throw new Exception(ex.Message);
+            }
         }
 
         /// <summary>
@@ -104,36 +111,28 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// Create new wallet.
         /// </summary>
         /// <returns>The wallet.</returns>
-        public async Task<CredentialsDto> CreateWallet()
+        public CredentialsDto CreateWallet()
         {
             var walletId = NewID(16);
             var passphrase = Passphrase();
-            var pkSk = CreateKeySet();
+            var keySet = CreateKeySet();
 
             walletId.MakeReadOnly();
             passphrase.MakeReadOnly();
 
             try
             {
-                await vaultServiceClient.CreateUserAsync(walletId, passphrase);
-
-                var dic = new Dictionary<string, object>
+                using (var db = Util.LiteRepositoryFactory(passphrase, walletId.ToUnSecureString()))
                 {
-                    { "storeKeys", new List<KeySetDto> { pkSk } }
-                };
-
-                await vaultServiceClient.SaveDataAsync(
-                    walletId,
-                    passphrase,
-                            $"wallets/{walletId.ToUnSecureString()}/wallet",
-                    dic);
+                    db.Insert(keySet);
+                }
 
                 return new CredentialsDto { Identifier = walletId.ToUnSecureString(), Password = passphrase.ToUnSecureString() };
             }
             catch (Exception ex)
             {
                 logger.LogError(ex.Message);
-                throw new Exception("Failed to create wallet. Is the vault unsealed?");
+                throw new Exception("Failed to create wallet.");
             }
             finally
             {
@@ -179,22 +178,25 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <param name="identifier">Identifier.</param>
         /// <param name="password">Password.</param>
         /// <param name="stamp">Stamp.</param>
-        public async Task<ulong> TotalTransactionAmount(SecureString identifier, SecureString password, string stamp)
+        public ulong TotalTransactionAmount(SecureString identifier, SecureString password, string stamp)
         {
             Guard.Argument(identifier, nameof(identifier)).NotNull();
             Guard.Argument(password, nameof(password)).NotNull();
             Guard.Argument(stamp, nameof(stamp)).NotNull().NotEmpty();
 
-            var txnRepo = unitOfWork.GetTransactionRepository();
-            var txns = await txnRepo.All(new Session(identifier, password));
+            ulong total;
 
-            if (txns.Result?.Any() != true)
+            using (var db = Util.LiteRepositoryFactory(password, identifier.ToUnSecureString()))
             {
-                return 0;
-            }
+                var txns = db.Fetch<TransactionDto>();
+                if (txns?.Any() != true)
+                {
+                    return 0;
+                }
 
-            var amounts = txns.Result.Where(tx => tx.Stamp.Equals(stamp)).Select(a => a.Amount);
-            var total = txnRepo.Sum(amounts);
+                var amounts = txns.Where(tx => tx.Stamp.Equals(stamp)).Select(a => a.Amount);
+                total = Util.Sum(amounts);
+            }
 
             return total;
         }
@@ -205,19 +207,24 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <returns>The transaction amount.</returns>
         /// <param name="identifier">Identifier.</param>
         /// <param name="password">Password.</param>
-        public async Task<TransactionDto> LastTransaction(SecureString identifier, SecureString password, TransactionType transactionType)
+        public TransactionDto LastTransaction(SecureString identifier, SecureString password, TransactionType transactionType)
         {
             Guard.Argument(identifier, nameof(identifier)).NotNull();
             Guard.Argument(password, nameof(password)).NotNull();
 
-            var txns = await unitOfWork.GetTransactionRepository().All(new Session(identifier, password));
+            TransactionDto transaction;
 
-            if (txns.Result?.Any() != true)
+            using (var db = Util.LiteRepositoryFactory(password, identifier.ToUnSecureString()))
             {
-                return null;
+                var txns = db.Fetch<TransactionDto>();
+                if (txns?.Any() != true)
+                {
+                    return null;
+                }
+
+                transaction = txns.Last(tx => tx.TransactionType.Equals(transactionType));
             }
 
-            var transaction = txns.Result.Last(tx => tx.TransactionType.Equals(transactionType));
             return transaction;
         }
 
@@ -226,22 +233,26 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// </summary>
         /// <param name="session"></param>
         /// <returns></returns>
-        public async Task<TaskResult<PurchaseDto>> SortChange(Session session)
+        public TaskResult<PurchaseDto> SortChange(Session session)
         {
             Guard.Argument(session, nameof(session)).NotNull();
 
-            var txns = await unitOfWork.GetTransactionRepository().All(session);
+            List<TransactionDto> txns;
 
-            if (txns.Result?.Any() != true)
+            using (var db = Util.LiteRepositoryFactory(session.MasterKey, session.Identifier.ToUnSecureString()))
             {
-                return null;
+                txns = db.Fetch<TransactionDto>();
+                if (txns?.Any() != true)
+                {
+                    return null;
+                }
             }
 
             PurchaseDto purchase = null;
 
             try
             {
-                TransactionDto[] txsIn = txns.Result.Where(tx => tx.TransactionType == TransactionType.Receive).OrderBy(tx => tx.Version).ToArray();
+                TransactionDto[] txsIn = txns.Where(tx => tx.TransactionType == TransactionType.Receive).OrderBy(tx => tx.Version).ToArray();
                 TransactionDto[] target = new TransactionDto[txsIn.Length];
 
                 Array.Copy(txsIn, target, txsIn.Length);
@@ -249,7 +260,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
                 for (int i = 0, targetLength = target.Length; i < targetLength; i++)
                 {
                     (TransactionDto transaction, double amountFor) = CalculateChange(session.Amount, txsIn);
-                    var balance = Balance(txns.Result.Where(tx => tx.Stamp == transaction.Stamp).ToList());
+                    var balance = Balance(txns.Where(tx => tx.Stamp == transaction.Stamp).ToList());
 
                     if (balance >= amountFor)
                     {
@@ -263,8 +274,8 @@ namespace TangramCypher.ApplicationLayer.Wallet
                             TransactionId = session.SessionId
                         };
 
-                        purchase.Chain = txns.Result.Where(tx => tx.Stamp.Equals(transaction.Stamp)).Select(tx => Guid.Parse(tx.TransactionId)).ToHashSet();
-                        purchase.Version = txns.Result.Last(tx => tx.Stamp.Equals(transaction.Stamp) && tx.TransactionId.Equals(purchase.Chain.Last().ToString())).Version;
+                        purchase.Chain = txns.Where(tx => tx.Stamp.Equals(transaction.Stamp)).Select(tx => Guid.Parse(tx.TransactionId)).ToHashSet();
+                        purchase.Version = txns.Last(tx => tx.Stamp.Equals(transaction.Stamp) && tx.TransactionId.Equals(purchase.Chain.Last().ToString())).Version;
 
                         if (purchase.Output.Equals(0))
                             purchase.Spent = true;
@@ -286,41 +297,34 @@ namespace TangramCypher.ApplicationLayer.Wallet
         }
 
         /// <summary>
-        /// Wallet profile Profile.
-        /// </summary>
-        /// <returns>The profile.</returns>
-        /// <param name="identifier">Identifier.</param>
-        /// <param name="password">Password.</param>
-        public async Task<string> Profile(SecureString identifier, SecureString password)
-        {
-            string profile = null;
-
-            try
-            {
-                using (var id = identifier.Insecure())
-                {
-                    var data = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{id.Value}/wallet");
-                    profile = JsonConvert.SerializeObject(data);
-                }
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex.Message);
-                throw;
-            }
-
-            return profile;
-        }
-
-        /// <summary>
         /// Lists the wallets available.
         /// </summary>
         /// <returns>The identifier list.</returns>
-        public async Task<IEnumerable<string>> WalletList()
+        public IEnumerable<string> WalletList()
         {
-            var data = await vaultServiceClient.GetListAsync($"wallets/");
-            var keys = data.Data?.Keys;
-            return keys;
+            var wallets = Path.Combine(Path.GetDirectoryName(AppDomain.CurrentDomain.BaseDirectory), "wallets");
+            string[] files = Directory.GetFiles(wallets, "*.db");
+
+            if (files?.Any() != true)
+            {
+                return Enumerable.Empty<string>();
+            }
+
+            return files;
+        }
+
+        public IEnumerable<string> ListAddresses(SecureString secret, string identifier)
+        {
+            using (var db = Util.LiteRepositoryFactory(secret, identifier))
+            {
+                var keys = db.Fetch<KeySetDto>();
+                if (keys?.Any() != true)
+                {
+                    return Enumerable.Empty<string>();
+                }
+
+                return keys.Select(k => k.Address);
+            }
         }
 
         /// <summary>
@@ -337,12 +341,10 @@ namespace TangramCypher.ApplicationLayer.Wallet
                 ulong? pocket = null;
                 ulong? burnt = null;
 
-                var txnRepo = unitOfWork.GetTransactionRepository();
-
                 try
                 {
-                    pocket = txnRepo.Sum(source, TransactionType.Receive);
-                    burnt = txnRepo.Sum(source, TransactionType.Send);
+                    pocket = Util.Sum(source, TransactionType.Receive);
+                    burnt = Util.Sum(source, TransactionType.Send);
                 }
                 catch (Exception ex)
                 {
@@ -379,7 +381,6 @@ namespace TangramCypher.ApplicationLayer.Wallet
             Guard.Argument(transactions, nameof(transactions)).NotNull();
 
             int count;
-            var txnRepo = unitOfWork.GetTransactionRepository();
             var tempTxs = new List<TransactionDto>();
 
             for (var i = 0; i < transactions.Length; i++)
@@ -391,7 +392,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
                 amount %= transactions[i].Amount;
             }
 
-            var sum = txnRepo.Sum(tempTxs.Select(s => s.Amount));
+            var sum = Util.Sum(tempTxs.Select(s => s.Amount));
             var remainder = amount - sum;
             var closest = transactions.Select(x => x.Amount).Aggregate((x, y) => x - remainder < y - remainder ? x : y);
             var tx = transactions.FirstOrDefault(a => a.Amount.Equals(closest));
@@ -405,20 +406,36 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <returns>The address.</returns>
         /// <param name="coin">Coin.</param>
         /// <param name="networkApi">Network API.</param>
-        public byte[] NetworkAddress(CoinDto coin, NetworkApiMethod networkApi = null)
+        public byte[] NetworkAddress(ICoinDto coin, NetworkApiMethod networkApi = null)
         {
             Guard.Argument(coin, nameof(coin)).NotNull();
 
             //TODO: Will remove the need to format to and from base64..
-            try
-            { coin = coin.FormatCoinFromBase64(); }
-            catch (FormatException) { }
+            //try
+            //{ coin = coin.FormatCoinFromBase64(); }
+            //catch (FormatException) { }
 
-            var hash = coinService.HashWithKey(coin);
+            byte[] address = new byte[33];
 
-            string address = AddressBuilderFactory.Global.EncodeFromBody(hash, CurrentAddressVersion.Get(environment, networkApi));
+            string env = networkApi == null ? environment : networkApi.ToString();
+            address[0] = env == Constant.Mainnet ? (byte)0x1 : (byte)74;
 
-            return Encoding.UTF8.GetBytes(address);
+            var hash = Cryptography.GenericHashWithKey(
+                $"{coin.Envelope.Commitment}" +
+                $" {coin.Envelope.Proof}" +
+                $" {coin.Envelope.PublicKey}" +
+                $" {coin.Envelope.Signature}" +
+                $" {coin.Hash}" +
+                $" {coin.Hint}" +
+                $" {coin.Keeper}" +
+                $" {coin.Principle}" +
+                $" {coin.Stamp}" +
+                $" {coin.Version}",
+                coin.Principle.FromHex());
+
+            Array.Copy(hash, 0, address, 1, 32);
+
+            return Encoding.UTF8.GetBytes(Base58.Bitcoin.Encode(address));
         }
 
         /// <summary>
@@ -429,9 +446,15 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <param name="networkApi">Network API.</param>
         public byte[] NetworkAddress(byte[] pk, NetworkApiMethod networkApi = null)
         {
-            string address = AddressBuilderFactory.Global.EncodeFromPublicKey(pk, CurrentAddressVersion.Get(environment, networkApi));
+            Guard.Argument(pk, nameof(pk)).NotNull().MaxCount(32);
+            byte[] address = new byte[33];
 
-            return Encoding.UTF8.GetBytes(address);
+            string env = networkApi == null ? environment : networkApi.ToString();
+            address[0] = env == Constant.Mainnet ? (byte)0x1 : (byte)74;
+
+            Array.Copy(pk, 0, address, 1, 32);
+
+            return Encoding.UTF8.GetBytes(Base58.Bitcoin.Encode(address));
         }
 
         /// <summary>
@@ -452,23 +475,28 @@ namespace TangramCypher.ApplicationLayer.Wallet
             }
         }
 
-        public async Task<IEnumerable<BlanceSheetDto>> TransactionHistory(SecureString identifier, SecureString password)
+        public IEnumerable<BlanceSheetDto> TransactionHistory(SecureString identifier, SecureString password)
         {
             ulong credit = 0;
             var session = new Session(identifier, password);
-            var txns = await unitOfWork.GetTransactionRepository().All(session);
 
-            if (txns.Result?.Any() != true)
+            List<TransactionDto> txns;
+
+            using (var db = Util.LiteRepositoryFactory(session.MasterKey, session.Identifier.ToUnSecureString()))
             {
-                return Enumerable.Empty<BlanceSheetDto>();
+                txns = db.Fetch<TransactionDto>();
+                if (txns?.Any() != true)
+                {
+                    return null;
+                }
             }
 
-            var final = txns.Result.Select(tx => new BlanceSheetDto
+            var final = txns.OrderBy(f => f.DateTime).Select(tx => new BlanceSheetDto
             {
                 DateTime = tx.DateTime.ToUniversalTime(),
                 Memo = tx.Memo,
-                Debit = tx.TransactionType == TransactionType.Send ? tx.Amount.DivWithNaT().ToString("F9") : "",
-                Credit = tx.TransactionType == TransactionType.Receive ? tx.Amount.DivWithNaT().ToString("F9") : "",
+                MoneyOut = tx.TransactionType == TransactionType.Send ? $"-{tx.Amount.DivWithNaT().ToString("F9")}" : "",
+                MoneyIn = tx.TransactionType == TransactionType.Receive ? tx.Amount.DivWithNaT().ToString("F9") : "",
                 Balance = tx.TransactionType == TransactionType.Send ? (credit -= tx.Amount).DivWithNaT().ToString("F9") : (credit += tx.Amount).DivWithNaT().ToString("F9")
             });
 

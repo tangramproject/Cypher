@@ -54,17 +54,18 @@
     <PackageReference Include="Microsoft.AspNetCore.Mvc" Version="2.2.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="4.0.1" />
     <PackageReference Include="ConsoleTables" Version="2.3.0" />
+    <PackageReference Include="LiteDB" Version="4.1.4" />
+    <PackageReference Include="protobuf-net" Version="2.4.0" />
+    <PackageReference Include="Microsoft.AspNet.WebApi.Client" Version="5.2.7" />
   </ItemGroup>
   <ItemGroup>
     <None Update="appsettings.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="vault.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
   </ItemGroup>
   <ItemGroup>
     <Folder Include="ApplicationLayer\Controllers\" />
+    <Folder Include="ApplicationLayer\Send\" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="Address\Address.csproj" />

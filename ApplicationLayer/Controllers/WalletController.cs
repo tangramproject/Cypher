@@ -11,6 +11,7 @@ using Newtonsoft.Json;
 using System;
 using System.Threading.Tasks;
 using TangramCypher.ApplicationLayer.Actor;
+using TangramCypher.ApplicationLayer.Send;
 using TangramCypher.ApplicationLayer.Vault;
 using TangramCypher.ApplicationLayer.Wallet;
 using TangramCypher.Helper;
@@ -25,54 +26,61 @@ namespace TangramCypher.ApplicationLayer.Controllers
         private readonly IActorService actorService;
         private readonly IWalletService walletService;
         private readonly IVaultServiceClient vaultServiceClient;
-        private readonly IUnitOfWork unitOfWork;
+        private readonly ISendService sendService;
 
-        public WalletController(IActorService actorService, IWalletService walletService, IVaultServiceClient vaultServiceClient, IUnitOfWork unitOfWork)
+
+        public WalletController(IActorService actorService, IWalletService walletService, IVaultServiceClient vaultServiceClient, ISendService sendService)
         {
             this.actorService = actorService;
             this.walletService = walletService;
             this.vaultServiceClient = vaultServiceClient;
-            this.unitOfWork = unitOfWork;
+            this.sendService = sendService;
         }
 
         [HttpPost("address", Name = "CreateWalletAddress")]
-        public async Task<IActionResult> CreateWalletAddress([FromBody] CredentialsDto credentials)
+        public IActionResult CreateWalletAddress([FromBody] CredentialsDto credentials)
         {
             var session = new Session(credentials.Identifier.ToSecureString(), credentials.Password.ToSecureString());
             var keySet = walletService.CreateKeySet();
-            var addKeySet = await unitOfWork.GetKeySetRepository().Put(session, keySet);
 
-            if (addKeySet.Success)
-                return new CreatedResult("httpWallet", new { success = addKeySet.Result });
+            using (var db = Util.LiteRepositoryFactory(session.MasterKey, session.Identifier.ToUnSecureString()))
+            {
+                var addKeySet = db.Insert(keySet);
+
+                if (addKeySet)
+                    return new CreatedResult("httpWallet", new { success = addKeySet });
+            }
 
             return new BadRequestResult();
         }
 
         [HttpPost("balance", Name = "WalletBalance")]
-        public async Task<IActionResult> WalletBalance([FromBody] CredentialsDto credentials)
+        public IActionResult WalletBalance([FromBody] CredentialsDto credentials)
         {
-            var total = await walletService.AvailableBalance(credentials.Identifier.ToSecureString(), credentials.Password.ToSecureString());
+            var total = walletService.AvailableBalance(credentials.Identifier.ToSecureString(), credentials.Password.ToSecureString());
             return new OkObjectResult(new { balance = total });
         }
 
         [HttpGet("create", Name = "CreateWallet")]
-        public async Task<IActionResult> CreateWallet()
+        public IActionResult CreateWallet()
         {
-            var creds = await walletService.CreateWallet();
+            var creds = walletService.CreateWallet();
             return new OkObjectResult(creds);
         }
 
         [HttpPost("profile", Name = "WalletProfile")]
-        public async Task<IActionResult> WalletProfile([FromBody] CredentialsDto credentials)
+        public IActionResult WalletProfile([FromBody] CredentialsDto credentials)
         {
-            var profile = await walletService.Profile(credentials.Identifier.ToSecureString(), credentials.Password.ToSecureString());
-            return new OkObjectResult(JsonConvert.DeserializeObject(profile));
+            //var profile = await walletService.Profile(credentials.Identifier.ToSecureString(), credentials.Password.ToSecureString());
+            //return new OkObjectResult(JsonConvert.DeserializeObject(profile));
+
+            return new OkResult();
         }
 
         [HttpGet("list", Name = "WalletList")]
-        public async Task<IActionResult> WalletList()
+        public IActionResult WalletList()
         {
-            var list = await walletService.WalletList();
+            var list = walletService.WalletList();
             return new OkObjectResult(list);
         }
 
@@ -98,11 +106,11 @@ namespace TangramCypher.ApplicationLayer.Controllers
                     await actorService.ReceivePayment(session);
                 }
 
-                availBalance = await walletService.AvailableBalance(session.Identifier, session.MasterKey);
+                availBalance = walletService.AvailableBalance(session.Identifier, session.MasterKey);
             }
             catch (Exception ex)
             {
-                availBalance = await walletService.AvailableBalance(session.Identifier, session.MasterKey);
+                availBalance = walletService.AvailableBalance(session.Identifier, session.MasterKey);
                 return new ObjectResult(new { error = ex.Message, statusCode = 500, balance = availBalance.Result });
             }
 
@@ -124,9 +132,9 @@ namespace TangramCypher.ApplicationLayer.Controllers
 
             try
             {
-                await actorService.Tansfer(session);
+                await sendService.Tansfer(session);
 
-                if (actorService.State != State.Committed)
+                if (sendService.State != State.Committed)
                 {
                     session = actorService.GetSession(session.SessionId);
                     var failedMessage = JsonConvert.SerializeObject(session.LastError.GetValue("message"));
@@ -135,18 +143,20 @@ namespace TangramCypher.ApplicationLayer.Controllers
 
                 session = actorService.GetSession(session.SessionId);
 
-                var messageStore = await unitOfWork
-                                            .GetRedemptionRepository()
-                                            .Get(session, StoreKey.TransactionIdKey, session.SessionId.ToString());
+                using (var db = Util.LiteRepositoryFactory(session.MasterKey, session.Identifier.ToUnSecureString()))
+                {
+                    var messageStore = db.Query<MessageStoreDto>().Where(m => m.Equals(session.SessionId)).FirstOrDefault();
 
-                availBalance = await walletService.AvailableBalance(session.Identifier, session.MasterKey);
+                    availBalance = walletService.AvailableBalance(session.Identifier, session.MasterKey);
 
-                if (sendPaymentDto.CreateRedemptionKey)
-                    return new OkObjectResult(new { message = messageStore.Result.Message });
+                    if (sendPaymentDto.CreateRedemptionKey)
+                        return new OkObjectResult(new { message = messageStore.Message });
+                }
+
             }
             catch (Exception ex)
             {
-                availBalance = await walletService.AvailableBalance(session.Identifier, session.MasterKey);
+                availBalance = walletService.AvailableBalance(session.Identifier, session.MasterKey);
                 return new ObjectResult(new { error = ex.Message, statusCode = 500, balance = availBalance.Result });
             }
 
@@ -154,11 +164,14 @@ namespace TangramCypher.ApplicationLayer.Controllers
         }
 
         [HttpPost("transactions", Name = "WalletTransactions")]
-        public async Task<IActionResult> WalletTransactions([FromBody] CredentialsDto credentials)
+        public IActionResult WalletTransactions([FromBody] CredentialsDto credentials)
         {
             var session = new Session(credentials.Identifier.ToSecureString(), credentials.Password.ToSecureString());
-            var txns = await unitOfWork.GetTransactionRepository().All(session);
-            return new OkObjectResult(txns);
+            using (var db = Util.LiteRepositoryFactory(session.MasterKey, session.Identifier.ToUnSecureString()))
+            {
+                var txns = db.Fetch<TransactionDto>();
+                return new OkObjectResult(txns);
+            }
         }
 
         [HttpPost("vaultunseal", Name = "VaultUnseal")]

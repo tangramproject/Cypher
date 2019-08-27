@@ -1,3 +1,4 @@
+﻿
 // Cypher (c) by Tangram Inc
 // 
 // Cypher is licensed under a
@@ -6,16 +7,14 @@
 // You should have received a copy of the license along with this
 // work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
 
-using LiteDB;
+using ProtoBuf;
 
 namespace TangramCypher.Model
 {
-    public class TrackDto
+    [ProtoContract]
+    public class MessageCountDto
     {
-
-        [BsonId]
-        public string PublicKey { get; set; }
-        public int Skip { get; set; }
-        public int Take { get; set; }
+        [ProtoMember(1)]
+        public int Count { get; set; }
     }
 }

@@ -8,18 +8,16 @@
 
 using System;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
 using McMaster.Extensions.CommandLineUtils;
-using TangramCypher.ApplicationLayer.Vault;
 using Microsoft.Extensions.DependencyInjection;
 using TangramCypher.ApplicationLayer.Actor;
 using TangramCypher.Helper;
 using TangramCypher.ApplicationLayer.Wallet;
 using TangramCypher.ApplicationLayer.Coin;
 using Kurukuru;
-using System.Security;
 using Microsoft.Extensions.Logging;
 using TangramCypher.Model;
+using TangramCypher.ApplicationLayer.Send;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
 {
@@ -30,7 +28,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
         readonly ICoinService coinService;
         readonly IConsole console;
         readonly ILogger logger;
-
+        readonly ISendService sendService;
         private Spinner spinner;
 
         public WalletPrintCommand(IServiceProvider serviceProvider)
@@ -40,6 +38,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
             coinService = serviceProvider.GetService<ICoinService>();
             console = serviceProvider.GetService<IConsole>();
             logger = serviceProvider.GetService<ILogger>();
+            sendService = serviceProvider.GetService<ISendService>();
 
             actorService.MessagePump += ActorService_MessagePump;
         }
@@ -74,7 +73,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                                 RecipientAddress = address
                             };
 
-                            await actorService.Tansfer(session);
+                            await sendService.Tansfer(session);
 
                         }
                         catch (Exception ex)
@@ -90,28 +89,6 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                     });
                 }
             }
-        }
-
-        private CoinDto SendCoin(CoinDto coin)
-        {
-            spinner.Text = "Sending printed coin ;)";
-
-            var coinResult = actorService.Client.AddAsync(coin.FormatCoinToBase64(), RestApiMethod.PostCoin).GetAwaiter().GetResult();
-            if (coinResult == null)
-            {
-                for (int i = 0; i < 10; i++)
-                {
-                    spinner.Text = $"Retrying sending coin {i} of 10";
-                    coinResult = actorService.Client.AddAsync(coin.FormatCoinToBase64(), RestApiMethod.PostCoin).GetAwaiter().GetResult();
-
-                    Task.Delay(100).Wait();
-
-                    if (coinResult != null)
-                        break;
-                }
-            }
-
-            return coinResult.Result;
         }
 
         private void ActorService_MessagePump(object sender, MessagePumpEventArgs e)
