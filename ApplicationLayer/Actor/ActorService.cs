@@ -175,8 +175,8 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             UpdateMessagePump("Downloading messages ...");
 
-            var countResult = await Client.GetAsync(msgAddress, RestApiMethod.MessageCount);
-            int countValue = countResult.Success ? Convert.ToInt32(Encoding.UTF8.GetString(countResult.Result)) : 1;
+            var countResult = await Client.GetAsync<MessageCountDto>(msgAddress, RestApiMethod.MessageCount);
+            int countValue = countResult.Success ? countResult.Result.Count : 1;
 
             var messages = track.Result == null
                 ? await Client.GetRangeAsync<MessageDto>(msgAddress, 0, countValue, RestApiMethod.MessageRange)
@@ -412,13 +412,12 @@ namespace TangramCypher.ApplicationLayer.Actor
             try
             {
                 var redemptionKey = JsonConvert.DeserializeObject<RedemptionKeyDto>(message);
-                var coinResult = await Client.GetAsync(redemptionKey.Stamp, RestApiMethod.Coin, new string[] { redemptionKey.Hash });
+                var coinResult = await Client.GetAsync<BlockIDDto>(redemptionKey.Stamp, RestApiMethod.Coin, new string[] { redemptionKey.Hash });
 
                 if (coinResult.Result == null)
                     return false;
 
-                var blockId = Util.DeserializeProto<BlockIDDto>(coinResult.Result);
-                var coin = blockId.SignedBlock.Coin.Cast<ReceiverCoinDto>();
+                var coin = coinResult.Result.SignedBlock.Coin.Cast<ReceiverCoinDto>();
 
                 var session = GetSession(sessionId);
                 var (swap1, swap2) = coinService.CoinSwap(session.SecretKey, redemptionKey.Salt.ToSecureString(), coin, redemptionKey);
@@ -968,7 +967,7 @@ namespace TangramCypher.ApplicationLayer.Actor
             Task.Delay(100);
         }
 
-        public async Task<TaskResult<byte[]>> PostArticle<T>(T payload, RestApiMethod api) where T : class
+        public async Task<TaskResult<T>> PostArticle<T>(T payload, RestApiMethod api) where T : class
         {
             var result = await Util.TriesUntilCompleted(async () => { return await Client.AddAsync(payload, api); }, 10, 100);
             return result;
@@ -976,8 +975,6 @@ namespace TangramCypher.ApplicationLayer.Actor
 
         private async Task Test()         {             try             {                 var session = new Session("id_09c9870522f3f49803a929fdf80262bd".ToSecureString(), "Venezuela abounds on behalf of the amateur archive but not a limited overcoat".ToSecureString())                 {                     Amount = 20000000000000                 };                  session = SessionAddOrUpdate(session);                  coinService.Receiver(session.MasterKey, session.Amount, out ReceiverCoinDto coin, out byte[] blind, out byte[] salt);                  coin.Hash = coinService.Hash(coin).ToHex();                 coin.Network = walletService.NetworkAddress(coin).ToHex();                  var coinResult = await PostArticle(coin.Cast<BaseCoinDto>(), RestApiMethod.PostCoin);                  if (coinResult.Success.Equals(false))                 {                     throw new Exception(JsonConvert.SerializeObject(coinResult.NonSuccessMessage));                 }
 
-                var blockId = Util.DeserializeProto<BlockIDDto>(coinResult.Result);
-
-                coin = blockId.SignedBlock.Coin.Cast<ReceiverCoinDto>();                  var added = AddWalletTransaction(session.SessionId, coin, session.Amount, "Check running total..", blind, salt, TransactionType.Receive);                  if (added.Equals(false))                 {                     throw new Exception("Transaction wallet failed to add!");                 }             }             catch (Exception ex)             {                 throw ex;             }          }
+                coin = coinResult.Result.Cast<ReceiverCoinDto>();                  var added = AddWalletTransaction(session.SessionId, coin, session.Amount, "Check running total..", blind, salt, TransactionType.Receive);                  if (added.Equals(false))                 {                     throw new Exception("Transaction wallet failed to add!");                 }             }             catch (Exception ex)             {                 throw ex;             }          }
     }
 }

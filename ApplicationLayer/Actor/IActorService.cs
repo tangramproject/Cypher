@@ -28,7 +28,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         TaskResult<bool> CommitReceiver(Guid sessionId);
         TaskResult<bool> PublicKeyAgreementMessage(Guid sessionId);
         TaskResult<bool> RedemptionKeyMessage(Guid sessionId);
-        Task<TaskResult<byte[]>> PostArticle<T>(T payload, RestApiMethod api) where T : class;
+        Task<TaskResult<T>> PostArticle<T>(T payload, RestApiMethod api) where T : class;
         void UpdateMessagePump(string message);
     }
 }
