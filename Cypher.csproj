@@ -57,11 +57,9 @@
     <None Update="appsettings.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="vault.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
   </ItemGroup>
   <ItemGroup>
     <Folder Include="ApplicationLayer\Controllers\" />
+    <Folder Include="ApplicationLayer\Send\" />
   </ItemGroup>
 </Project>
