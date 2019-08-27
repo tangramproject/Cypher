@@ -372,6 +372,29 @@ namespace TangramCypher.Helper
             }
         }
 
+        public static IEnumerable<T> DeserializeListProto<T>(byte[] data) where T : class
+        {
+            List<T> list = new List<T>();
+
+            try
+            {
+                using (var ms = new MemoryStream(data))
+                {
+                    T item;
+                    while ((item = Serializer.DeserializeWithLengthPrefix<T>(ms, PrefixStyle.Base128, fieldNumber: 1)) != null)
+                    {
+                        list.Add(item);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+
+            return list.AsEnumerable();
+        }
+
         public static byte[] SerializeCompressProto<T>(T data)
         {
             try
