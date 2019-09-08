@@ -11,7 +11,6 @@ using System.Linq;
 using System.Collections.Generic;
 using System.Security;
 using MurrayGrant.ReadablePassphrase;
-using SimpleBase;
 using TangramCypher.Helper;
 using TangramCypher.Helper.LibSodium;
 using TangramCypher.ApplicationLayer.Actor;
@@ -22,6 +21,7 @@ using Dawn;
 using Microsoft.Extensions.Logging;
 using TangramCypher.Model;
 using System.IO;
+using Tangram.Address;
 
 namespace TangramCypher.ApplicationLayer.Wallet
 {
@@ -410,32 +410,22 @@ namespace TangramCypher.ApplicationLayer.Wallet
         {
             Guard.Argument(coin, nameof(coin)).NotNull();
 
-            //TODO: Will remove the need to format to and from base64..
-            //try
-            //{ coin = coin.FormatCoinFromBase64(); }
-            //catch (FormatException) { }
+            byte[] byteAddress = null;
 
-            byte[] address = new byte[33];
+            try
+            {
+                var hash = Util.Hash(coin);
+                string address = AddressBuilderFactory.Global.EncodeFromBody(hash, CurrentAddressVersion.Get(environment, networkApi));
 
-            string env = networkApi == null ? environment : networkApi.ToString();
-            address[0] = env == Constant.Mainnet ? (byte)0x1 : (byte)74;
+                byteAddress = address.ToBytes();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex.Message);
+            }
 
-            var hash = Cryptography.GenericHashWithKey(
-                $"{coin.Envelope.Commitment}" +
-                $" {coin.Envelope.Proof}" +
-                $" {coin.Envelope.PublicKey}" +
-                $" {coin.Envelope.Signature}" +
-                $" {coin.Hash}" +
-                $" {coin.Hint}" +
-                $" {coin.Keeper}" +
-                $" {coin.Principle}" +
-                $" {coin.Stamp}" +
-                $" {coin.Version}",
-                coin.Principle.FromHex());
+            return byteAddress;
 
-            Array.Copy(hash, 0, address, 1, 32);
-
-            return Encoding.UTF8.GetBytes(Base58.Bitcoin.Encode(address));
         }
 
         /// <summary>
@@ -446,15 +436,22 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <param name="networkApi">Network API.</param>
         public byte[] NetworkAddress(byte[] pk, NetworkApiMethod networkApi = null)
         {
-            Guard.Argument(pk, nameof(pk)).NotNull().MaxCount(32);
-            byte[] address = new byte[33];
+            Guard.Argument(pk, nameof(pk)).NotNull();
 
-            string env = networkApi == null ? environment : networkApi.ToString();
-            address[0] = env == Constant.Mainnet ? (byte)0x1 : (byte)74;
+            byte[] byteAddress = null;
 
-            Array.Copy(pk, 0, address, 1, 32);
+            try
+            {
+                var address = AddressBuilderFactory.Global.EncodeFromPublicKey(pk, CurrentAddressVersion.Get(environment, networkApi));
 
-            return Encoding.UTF8.GetBytes(Base58.Bitcoin.Encode(address));
+                byteAddress = address.ToBytes();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex.Message);
+            }
+
+            return byteAddress;
         }
 
         /// <summary>
@@ -475,6 +472,12 @@ namespace TangramCypher.ApplicationLayer.Wallet
             }
         }
 
+        /// <summary>
+        /// Returns balance sheet for the calling wallet.
+        /// </summary>
+        /// <param name="identifier"></param>
+        /// <param name="password"></param>
+        /// <returns></returns>
         public IEnumerable<BlanceSheetDto> TransactionHistory(SecureString identifier, SecureString password)
         {
             ulong credit = 0;
