@@ -41,15 +41,15 @@ namespace TangramCypher.ApplicationLayer.Actor
         private readonly IConfigurationSection apiNetworkSection;
         private readonly string environment;
         private ConcurrentDictionary<Guid, Session> Sessions { get; }
+        private Action<MessagePumpEventArgs> MessagePump;
 
-        public event MessagePumpEventHandler MessagePump;
         protected void OnMessagePump(MessagePumpEventArgs e)
         {
             if (MessagePump != null)
             {
                 try
                 {
-                    MessagePump.Invoke(this, e);
+                    MessagePump(e);
                 }
                 catch (Exception ex)
                 {
@@ -74,7 +74,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             Sessions = new ConcurrentDictionary<Guid, Session>();
 
-            //Test().GetAwaiter().GetResult();
+            Test().GetAwaiter().GetResult();
         }
 
         /// <summary>
@@ -425,10 +425,11 @@ namespace TangramCypher.ApplicationLayer.Actor
                 if (coinResult.Result == null)
                     return false;
 
-                var coin = coinResult.Result.SignedBlock.Coin.Cast<ReceiverCoinDto>();
+                //var blockId = Util.DeserializeProto<BlockIDDto>(coinResult.Result);
+                // var coin = Util.DeserializeProto<BaseCoinDto>(coinResult.Result.SignedBlock.Coin);
 
                 var session = GetSession(sessionId);
-                var (swap1, swap2) = coinService.CoinSwap(session.SecretKey, redemptionKey.Salt.ToSecureString(), coin, redemptionKey);
+                var (swap1, swap2) = coinService.CoinSwap(session.SecretKey, redemptionKey.Salt.ToSecureString(), coinResult.Result.SignedBlock.Coin.Cast<ReceiverCoinDto>(), redemptionKey);
 
                 var keeperPass = await CoinPass(session.SecretKey, redemptionKey.Salt.ToSecureString(), swap1, 3);
                 if (keeperPass.Equals(false))
@@ -440,7 +441,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                     return false;
 
                 // TODO: Could possibility fail.. need recovery..
-                var added = AddWalletTransaction(session.SessionId, coin, redemptionKey.Amount, redemptionKey.Memo, redemptionKey.Blind.FromHex(), redemptionKey.Salt.FromHex(), TransactionType.Receive);
+                var added = AddWalletTransaction(session.SessionId, coinResult.Result.SignedBlock.Coin.Cast<ReceiverCoinDto>(), redemptionKey.Amount, redemptionKey.Memo, redemptionKey.Blind.FromHex(), redemptionKey.Salt.FromHex(), TransactionType.Receive);
                 if (added.Equals(false))
                     return false;
 
@@ -473,15 +474,15 @@ namespace TangramCypher.ApplicationLayer.Actor
             var coin = coinService.DeriveCoin(swap, secret, salt);
             var status = coinService.VerifyCoin(swap, coin);
 
-            coin.Hash = coinService.Hash(coin).ToHex();
+            coin.Hash = Util.Hash(coin).ToHex();
 
             //TODO.... remove
-            coin.Network = walletService.NetworkAddress(coin).ToHex();
-            coin.Envelope.RangeProof = walletService.NetworkAddress(coin).ToHex();
+            //coin.Network = walletService.NetworkAddress(coin).ToHex();
+            //coin.Envelope.RangeProof = walletService.NetworkAddress(coin).ToHex();
 
             if (status.Equals(mode))
             {
-                var returnCoin = await Client.AddAsync(coin, RestApiMethod.PostCoin);
+                var returnCoin = await Client.PostAsync(coin, RestApiMethod.PostCoin);
                 if (returnCoin.Result != null)
                     canPass = true;
             }
@@ -915,6 +916,39 @@ namespace TangramCypher.ApplicationLayer.Actor
         }
 
         /// <summary>
+        /// Callback for handling messages.
+        /// </summary>
+        /// <param name="messagePump"></param>
+        public void SetMessagePump(Action<MessagePumpEventArgs> messagePump)
+        {
+            MessagePump = messagePump;
+        }
+
+        /// <summary>
+        /// Updates the message pump.
+        /// </summary>
+        /// <param name="message">Message.</param>
+        public void UpdateMessagePump(string message)
+        {
+            Guard.Argument(message, nameof(message)).NotNull().NotEmpty();
+            OnMessagePump(new MessagePumpEventArgs { Message = message });
+            Task.Delay(100);
+        }
+
+        /// <summary>
+        /// Post payload. 
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="payload"></param>
+        /// <param name="api"></param>
+        /// <returns></returns>
+        public async Task<TaskResult<byte[]>> PostArticle<T>(T payload, RestApiMethod api) where T : class
+        {
+            var result = await Util.TriesUntilCompleted(async () => { return await Client.PostAsync(payload, api); }, 10, 100);
+            return result;
+        }
+
+        /// <summary>
         /// Add the Wallet transaction.
         /// </summary>
         /// <returns>The Wallet transaction.</returns>
@@ -936,7 +970,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                 TransactionId = Guid.NewGuid().ToString(),
                 Amount = total,
                 Blind = blind == null ? string.Empty : blind.ToHex(),
-                Commitment = coin.Envelope.Commitment,
+                Commitment = coin.Commitment,
                 Hash = coin.Hash,
                 Salt = salt == null ? string.Empty : salt.ToHex(),
                 Stamp = coin.Stamp,
@@ -987,25 +1021,8 @@ namespace TangramCypher.ApplicationLayer.Actor
             return unpadded;
         }
 
-        /// <summary>
-        /// Updates the message pump.
-        /// </summary>
-        /// <param name="message">Message.</param>
-        public void UpdateMessagePump(string message)
-        {
-            Guard.Argument(message, nameof(message)).NotNull().NotEmpty();
-            OnMessagePump(new MessagePumpEventArgs { Message = message });
-            Task.Delay(100);
-        }
+        private async Task Test()         {             try             {                 var session = new Session("id_c92e89aacd6eba5bc83c6d5ec2c2a468".ToSecureString(), "Hensley controlled in front of this widowed tide because of the red patron".ToSecureString())                 {                     Amount = 20000000000000                 };                  session = SessionAddOrUpdate(session);                  coinService.Receiver(session.MasterKey, session.Amount, out ReceiverCoinDto coin, out byte[] blind, out byte[] salt);                  var post = await PostArticle(coin.Cast<BaseCoinDto>(), RestApiMethod.PostCoin);                  if (post.Success.Equals(false))                 {                     throw new Exception(JsonConvert.SerializeObject(post.NonSuccessMessage));                 }
 
-        public async Task<TaskResult<T>> PostArticle<T>(T payload, RestApiMethod api) where T : class
-        {
-            var result = await Util.TriesUntilCompleted(async () => { return await Client.AddAsync(payload, api); }, 10, 100);
-            return result;
-        }
-
-        private async Task Test()         {             try             {                 var session = new Session("id_09c9870522f3f49803a929fdf80262bd".ToSecureString(), "Venezuela abounds on behalf of the amateur archive but not a limited overcoat".ToSecureString())                 {                     Amount = 20000000000000                 };                  session = SessionAddOrUpdate(session);                  coinService.Receiver(session.MasterKey, session.Amount, out ReceiverCoinDto coin, out byte[] blind, out byte[] salt);                  coin.Hash = coinService.Hash(coin).ToHex();                 coin.Network = walletService.NetworkAddress(coin).ToHex();                  var coinResult = await PostArticle(coin.Cast<BaseCoinDto>(), RestApiMethod.PostCoin);                  if (coinResult.Success.Equals(false))                 {                     throw new Exception(JsonConvert.SerializeObject(coinResult.NonSuccessMessage));                 }
-
-                coin = coinResult.Result.Cast<ReceiverCoinDto>();                  var added = AddWalletTransaction(session.SessionId, coin, session.Amount, "Check running total..", blind, salt, TransactionType.Receive);                  if (added.Equals(false))                 {                     throw new Exception("Transaction wallet failed to add!");                 }             }             catch (Exception ex)             {                 throw ex;             }          }
+                var blockId = Util.DeserializeProto<BlockIDDto>(post.Result);                 var added = AddWalletTransaction(session.SessionId, blockId.SignedBlock.Coin.Cast<ReceiverCoinDto>(), session.Amount, "Check running total..", blind, salt, TransactionType.Receive);                  if (added.Equals(false))                 {                     throw new Exception("Transaction wallet failed to add!");                 }             }             catch (Exception ex)             {                 throw ex;             }          }
     }
 }

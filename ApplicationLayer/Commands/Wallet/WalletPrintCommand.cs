@@ -40,7 +40,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
             logger = serviceProvider.GetService<ILogger>();
             sendService = serviceProvider.GetService<ISendService>();
 
-            actorService.MessagePump += ActorService_MessagePump;
+            actorService.SetMessagePump(ActorService_MessagePump);
         }
 
         public override async Task Execute()
@@ -91,7 +91,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
             }
         }
 
-        private void ActorService_MessagePump(object sender, MessagePumpEventArgs e)
+        private void ActorService_MessagePump(MessagePumpEventArgs e)
         {
             spinner.Text = e.Message;
         }

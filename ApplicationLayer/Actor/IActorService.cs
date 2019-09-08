@@ -15,7 +15,6 @@ namespace TangramCypher.ApplicationLayer.Actor
 {
     public interface IActorService
     {
-        event MessagePumpEventHandler MessagePump;
         Session GetSession(Guid sessionId);
         Client Client { get; }
 
@@ -28,7 +27,8 @@ namespace TangramCypher.ApplicationLayer.Actor
         TaskResult<bool> CommitReceiver(Guid sessionId);
         TaskResult<bool> PublicKeyAgreementMessage(Guid sessionId);
         TaskResult<bool> RedemptionKeyMessage(Guid sessionId);
-        Task<TaskResult<T>> PostArticle<T>(T payload, RestApiMethod api) where T : class;
+        Task<TaskResult<byte[]>> PostArticle<T>(T payload, RestApiMethod api) where T : class;
         void UpdateMessagePump(string message);
+        void SetMessagePump(Action<MessagePumpEventArgs> messagePump);
     }
 }
