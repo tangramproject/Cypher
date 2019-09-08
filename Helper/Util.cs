@@ -28,6 +28,7 @@ using System.Reflection;
 using LiteDB;
 using ProtoBuf;
 using System.IO.Compression;
+using TangramCypher.Helper.LibSodium;
 
 namespace TangramCypher.Helper
 {
@@ -380,6 +381,26 @@ namespace TangramCypher.Helper
             {
                 return new string(new Span<char>(p, bytes.Length / sizeof(char)));
             }
+        }
+
+        /// <summary>
+        /// Hash the specified coin.
+        /// </summary>
+        /// <returns>The hash.</returns>
+        /// <param name="coin">Coin.</param>
+        public static byte[] Hash(ICoinDto coin)
+        {
+            if (coin == null) throw new ArgumentNullException(nameof(coin));
+
+            return Cryptography.GenericHashNoKey(
+                string.Format("{0} {1} {2} {3} {4} {5} {6}",
+                    coin.Commitment,
+                    coin.Hint,
+                    coin.Keeper,
+                    coin.Network,
+                    coin.Principle,
+                    coin.Stamp,
+                    coin.RangeProof));
         }
     }
 }

@@ -154,5 +154,7 @@ namespace TangramCypher.Helper
 
             return amount;
         }
+
+        public static byte[] ToBytes<T>(this T arg) => Encoding.UTF8.GetBytes(arg.ToString());
     }
 }
