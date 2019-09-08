@@ -74,7 +74,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             Sessions = new ConcurrentDictionary<Guid, Session>();
 
-            Test().GetAwaiter().GetResult();
+            // Test().GetAwaiter().GetResult();
         }
 
         /// <summary>
