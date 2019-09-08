@@ -15,11 +15,12 @@ namespace TangramCypher.Model
 {
     public interface ICoinDto
     {
-        EnvelopeDto Envelope { get; set; }
+        string Commitment { get; set; }
         string Hash { get; set; }
         string Hint { get; set; }
         string Keeper { get; set; }
         string Principle { get; set; }
+        string RangeProof { get; set; }
         string Stamp { get; set; }
         string Network { get; set; }
         Guid TransactionId { get; set; }
@@ -32,7 +33,7 @@ namespace TangramCypher.Model
     public class BaseCoinDto : ICoinDto
     {
         [ProtoMember(1)]
-        public EnvelopeDto Envelope { get; set; }
+        public string Commitment { get; set; }
         [ProtoMember(2)]
         public string Hash { get; set; }
         [ProtoMember(3)]
@@ -42,12 +43,14 @@ namespace TangramCypher.Model
         [ProtoMember(5)]
         public string Principle { get; set; }
         [ProtoMember(6)]
-        public string Stamp { get; set; }
+        public string RangeProof { get; set; }
         [ProtoMember(7)]
+        public string Stamp { get; set; }
+        [ProtoMember(8)]
         public string Network { get; set; }
         [BsonId]
         public Guid TransactionId { get; set; }
-        [ProtoMember(8)]
+        [ProtoMember(9)]
         public int Version { get; set; }
 
         public D Cast<D>()

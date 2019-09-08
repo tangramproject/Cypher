@@ -19,15 +19,18 @@ using System.Text;
 using Dawn;
 using Microsoft.Extensions.Logging;
 using TangramCypher.Model;
+using TangramCypher.ApplicationLayer.Wallet;
 
 namespace TangramCypher.ApplicationLayer.Coin
 {
     public class CoinService : ICoinService
     {
+        private readonly IWalletService walletService;
         private readonly ILogger logger;
 
-        public CoinService(ILogger logger)
+        public CoinService(IWalletService walletService, ILogger logger)
         {
+            this.walletService = walletService;
             this.logger = logger;
         }
 
@@ -51,7 +54,7 @@ namespace TangramCypher.ApplicationLayer.Coin
                     var commitPos = pedersen.Commit(input, blind);
                     var commitSum = pedersen.CommitSum(new List<byte[]> { commitPos }, new List<byte[]> { });
 
-                    AttachEnvelope(blindSum, commitSum, input, secret, salt.ToHex().ToSecureString(), coin);
+                    BulletProof(blindSum, commitSum, input, coin);
 
                     receiverCoin = coin.Cast<ReceiverCoinDto>();
 
@@ -111,7 +114,7 @@ namespace TangramCypher.ApplicationLayer.Coin
                     var blindSum = pedersen.BlindSum(new List<byte[]> { received.Blind.FromHex() }, blindNegSums);
                     var commitSum = pedersen.CommitSum(new List<byte[]> { received.Commitment.FromHex() }, commitNegs);
 
-                    AttachEnvelope(blindSum, commitSum, purchase.Output, session.MasterKey, received.Salt.ToSecureString(), coin);
+                    BulletProof(blindSum, commitSum, purchase.Output, coin);
 
                     senderCoin = coin.Cast<SenderCoinDto>();
 
@@ -146,8 +149,10 @@ namespace TangramCypher.ApplicationLayer.Coin
                 Version = v0,
                 Principle = DeriveKey(v0, coin.Stamp, secret, salt),
                 Stamp = coin.Stamp,
-                Envelope = coin.Envelope,
-                Hint = DeriveKey(v1, coin.Stamp, DeriveKey(v1, coin.Stamp, secret, salt).ToSecureString(), salt)
+                Hint = DeriveKey(v1, coin.Stamp, DeriveKey(v1, coin.Stamp, secret, salt).ToSecureString(), salt),
+                Commitment = coin.Commitment,
+                RangeProof = coin.RangeProof,
+                Network = coin.Network
             };
 
             return c;
@@ -185,28 +190,6 @@ namespace TangramCypher.ApplicationLayer.Coin
             {
                 return ArgonHash(Cryptography.GenericHashNoKey($"{amount} {stamp} {version} {insecureSecret.Value}", 32).ToHex(), salt);
             }
-        }
-
-        /// <summary>
-        /// Hash the specified coin.
-        /// </summary>
-        /// <returns>The hash.</returns>
-        /// <param name="coin">Coin.</param>
-        public byte[] Hash(ICoinDto coin)
-        {
-            Guard.Argument(coin, nameof(coin)).NotNull();
-
-            return Cryptography.GenericHashNoKey(
-                string.Format("{0} {1} {2} {3} {4} {5} {6} {7} {8}",
-                    coin.Envelope.Commitment,
-                    coin.Envelope.Proof,
-                    coin.Envelope.PublicKey,
-                    coin.Envelope.RangeProof,
-                    coin.Envelope.Signature,
-                    coin.Hint,
-                    coin.Keeper,
-                    coin.Principle,
-                    coin.Stamp));
         }
 
         /// <summary>
@@ -261,11 +244,13 @@ namespace TangramCypher.ApplicationLayer.Coin
                 Version = v1,
                 Principle = redemptionKey.Key1,
                 Stamp = redemptionKey.Stamp,
-                Envelope = coin.Envelope,
-                Hint = DeriveKey(v2, redemptionKey.Stamp, redemptionKey.Key2.ToSecureString(), salt)
+                Hint = DeriveKey(v2, redemptionKey.Stamp, redemptionKey.Key2.ToSecureString(), salt),
+                Commitment = coin.Commitment,
+                RangeProof = coin.RangeProof,
+                Network = coin.Network
             };
 
-            c1.Hash = Hash(c1).ToHex();
+            c1.Hash = Util.Hash(c1).ToHex();
 
             var c2 = new BaseCoinDto
             {
@@ -273,11 +258,13 @@ namespace TangramCypher.ApplicationLayer.Coin
                 Version = v2,
                 Principle = redemptionKey.Key2,
                 Stamp = redemptionKey.Stamp,
-                Envelope = coin.Envelope,
-                Hint = DeriveKey(v3, redemptionKey.Stamp, DeriveKey(v3, redemptionKey.Stamp, secret, salt).ToSecureString(), salt)
+                Hint = DeriveKey(v3, redemptionKey.Stamp, DeriveKey(v3, redemptionKey.Stamp, secret, salt).ToSecureString(), salt),
+                Commitment = coin.Commitment,
+                RangeProof = coin.RangeProof,
+                Network = coin.Network
             };
 
-            c2.Hash = Hash(c2).ToHex();
+            c2.Hash = Util.Hash(c2).ToHex();
 
             return (c1, c2);
         }
@@ -302,8 +289,6 @@ namespace TangramCypher.ApplicationLayer.Coin
             coin.Keeper = DeriveKey(v2, coin.Stamp, DeriveKey(v3, coin.Stamp, DeriveKey(v3, coin.Stamp, secret, salt).ToSecureString(), salt).ToSecureString(), salt);
             coin.Version = v1;
             coin.Principle = redemptionKey.Key1;
-            coin.Stamp = coin.Stamp;
-            coin.Envelope = coin.Envelope;
             coin.Hint = redemptionKey.Key2;
 
             return coin;
@@ -351,36 +336,6 @@ namespace TangramCypher.ApplicationLayer.Coin
             }
         }
 
-        //TODO.. possibly remove?
-        /// <summary>
-        /// Split coin.
-        /// </summary>
-        /// <returns>The split.</returns>
-        /// <param name="blinding">Blinding.</param>
-        public (byte[], byte[]) Split(byte[] blinding, SecureString secret, SecureString salt, string stamp, int version)
-        {
-            Guard.Argument(blinding, nameof(blinding)).NotNull().MaxCount(32);
-
-            using (var pedersen = new Pedersen())
-            {
-                var skey1 = DeriveKey(0, stamp, version, secret, salt);
-
-                byte[] skey2 = new byte[32];
-
-                try
-                {
-                    skey2 = pedersen.BlindSum(new List<byte[]> { blinding }, new List<byte[]> { skey1 });
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
-                    throw ex;
-                }
-
-                return (skey1, skey2);
-            }
-        }
-
         /// <summary>
         /// Makes the single coin.
         /// </summary>
@@ -393,8 +348,7 @@ namespace TangramCypher.ApplicationLayer.Coin
             return DeriveCoin(new BaseCoinDto
             {
                 Version = version + 1,
-                Stamp = stamp,
-                Envelope = new EnvelopeDto()
+                Stamp = stamp
             }, secret, salt);
         }
 
@@ -437,35 +391,28 @@ namespace TangramCypher.ApplicationLayer.Coin
         }
 
         /// <summary>
-        /// Attachs the envelope.
+        /// Bulletproof commitment.
         /// </summary>
         /// <param name="blindSum">Blind sum.</param>
         /// <param name="commitSum">Commit sum.</param>
         /// <param name="balance">Balance.</param>
-        /// <param name="secret">Secret.</param>
         /// <param name="coin">Coin.</param>
-        private void AttachEnvelope(byte[] blindSum, byte[] commitSum, ulong balance, SecureString secret, SecureString salt, ICoinDto coin)
+        private void BulletProof(byte[] blindSum, byte[] commitSum, ulong balance, ICoinDto coin)
         {
-
-            var (k1, k2) = Split(blindSum, secret, salt, coin.Stamp, coin.Version);
-
             using (var secp256k1 = new Secp256k1())
             using (var pedersen = new Pedersen())
             using (var bulletProof = new BulletProof())
             {
-                coin.Envelope.Commitment = commitSum.ToHex();
-                coin.Envelope.Proof = k2.ToHex();
-                coin.Envelope.PublicKey = pedersen.ToPublicKey(pedersen.Commit(0, k1)).ToHex();
-                coin.Hash = Hash(coin).ToHex();
-                coin.Envelope.Signature = secp256k1.Sign(coin.Hash.FromHex(), k1).ToHex();
-
                 var @struct = bulletProof.ProofSingle(balance, blindSum, Cryptography.RandomBytes(), null, null, null);
                 var success = bulletProof.Verify(commitSum, @struct.proof, null);
 
                 if (!success)
                     throw new ArgumentOutOfRangeException(nameof(success), "Bullet proof failed.");
 
-                coin.Envelope.RangeProof = @struct.proof.ToHex();
+                coin.Commitment = commitSum.ToHex();
+                coin.RangeProof = @struct.proof.ToHex();
+                coin.Network = walletService.NetworkAddress(coin).ToHex();
+                coin.Hash = Util.Hash(coin).ToHex();
             }
         }
 
