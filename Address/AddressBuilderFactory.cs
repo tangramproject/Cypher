@@ -6,7 +6,7 @@ namespace Tangram.Address
     public class AddressBuilderFactory
     {
         private readonly static object GlobalLock = new object();
-        public static AddressBuilderFactory _Global;
+        private static AddressBuilderFactory _Global;
         public static AddressBuilderFactory Global
         {
             get
@@ -16,7 +16,7 @@ namespace Tangram.Address
                     if (_Global == null)
                         _Global = new AddressBuilderFactory();
 
-                    return Global;
+                    return _Global;
                 }
             }
         }
