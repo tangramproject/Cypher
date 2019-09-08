@@ -14,12 +14,12 @@ namespace TangramCypher.Model
     public class BlockIDDto
     {
         [ProtoMember(1)]
-        public string Hash;
+        public string Hash { get; set; }
         [ProtoMember(2)]
-        public ulong Node;
+        public ulong Node { get; set; }
         [ProtoMember(3)]
-        public ulong Round;
+        public ulong Round { get; set; }
         [ProtoMember(4)]
-        public BlockDto SignedBlock;
+        public BlockDto SignedBlock { get; set; }
     }
 }

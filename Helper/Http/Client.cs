@@ -50,11 +50,11 @@ namespace TangramCypher.Helper.Http
         /// <param name="payload">Payload.</param>
         /// <param name="apiMethod">API method.</param>
         /// <typeparam name="T">The 1st type parameter.</typeparam>
-        public async Task<TaskResult<T>> AddAsync<T>(T payload, RestApiMethod apiMethod) where T : class
+        public async Task<TaskResult<byte[]>> PostAsync<T>(T payload, RestApiMethod apiMethod) where T : class
         {
             Guard.Argument(payload, nameof(payload)).Equals(null);
 
-            T result = default;
+            byte[] result = null;
 
             using (var cts = new CancellationTokenSource())
             {
@@ -64,11 +64,11 @@ namespace TangramCypher.Helper.Http
                     var path = apiRestSection.GetSection(Constant.Routing).GetValue<string>(apiMethod.ToString());
 
                     cts.CancelAfter(60000);
-                    result = await PostAsync<T>(payload, baseAddress, path, cts.Token);
+                    result = await PostAsync(payload, baseAddress, path, cts.Token);
 
                     if (result == null)
                     {
-                        return TaskResult<T>.CreateFailure(JObject.FromObject(new
+                        return TaskResult<byte[]>.CreateFailure(JObject.FromObject(new
                         {
                             success = false,
                             message = ErrorMessage
@@ -78,16 +78,16 @@ namespace TangramCypher.Helper.Http
                 catch (OperationCanceledException ex)
                 {
                     logger.LogWarning(ex.Message);
-                    return TaskResult<T>.CreateFailure(ex);
+                    return TaskResult<byte[]>.CreateFailure(ex);
                 }
                 catch (Exception ex)
                 {
                     logger.LogWarning(ex.Message);
-                    return TaskResult<T>.CreateFailure(ex);
+                    return TaskResult<byte[]>.CreateFailure(ex);
                 }
             }
 
-            return TaskResult<T>.CreateSuccess(result);
+            return TaskResult<byte[]>.CreateSuccess(result);
         }
 
         /// <summary>
@@ -290,12 +290,12 @@ namespace TangramCypher.Helper.Http
         /// <param name="path"></param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
-        private async Task<T> PostAsync<T>(T payload, Uri baseAddress, string path, CancellationToken cancellationToken)
+        private async Task<byte[]> PostAsync<T>(T payload, Uri baseAddress, string path, CancellationToken cancellationToken)
         {
             Guard.Argument(baseAddress, nameof(baseAddress)).NotNull();
             Guard.Argument(path, nameof(path)).NotNull().NotEmpty();
 
-            T result = default;
+            byte[] result = null;
 
             using (var client = socksPortHandler == null ? new HttpClient() : new HttpClient(socksPortHandler))
             {
@@ -315,7 +315,7 @@ namespace TangramCypher.Helper.Http
                         var byteArray = Convert.FromBase64String(jToken.Value<string>());
 
                         if (response.IsSuccessStatusCode)
-                            result = Util.DeserializeProto<T>(byteArray);
+                            result = byteArray;
                         else
                         {
                             var content = await response.Content.ReadAsStringAsync();

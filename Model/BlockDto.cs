@@ -14,16 +14,12 @@ namespace TangramCypher.Model
     public class BlockDto
     {
         [ProtoMember(1)]
-        public string Address { get; set; }
+        public string Key { get; set; }
         [ProtoMember(2)]
-        public string BlockHash { get; set; }
-        [ProtoMember(3)]
         public BaseCoinDto Coin { get; set; }
-        [ProtoMember(4)]
-        public string CoinHash { get; set; }
-        [ProtoMember(5)]
+        [ProtoMember(3)]
         public string PublicKey { get; set; }
-        [ProtoMember(6)]
+        [ProtoMember(4)]
         public string Signature { get; set; }
     }
 }
