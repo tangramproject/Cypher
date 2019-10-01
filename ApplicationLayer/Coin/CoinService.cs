@@ -45,8 +45,8 @@ namespace TangramCypher.ApplicationLayer.Coin
             using (var pedersen = new Pedersen())
             {
                 salt = Cryptography.RandomBytes(16);
-                var coin = MakeSingleCoin(secret, salt.ToHex().ToSecureString(), NewStamp(), -1);
-                blind = DeriveKey(input, coin.Stamp, coin.Version, secret, salt.ToHex().ToSecureString());
+                var coin = MakeSingleCoin(secret, salt.ToHexString().ToSecureString(), NewStamp(), -1);
+                blind = DeriveKey(input, coin.Stamp, coin.Version, secret, salt.ToHexString().ToSecureString());
 
                 try
                 {
@@ -111,8 +111,8 @@ namespace TangramCypher.ApplicationLayer.Coin
 
                     blindNegSums.Add(blindNeg);
 
-                    var blindSum = pedersen.BlindSum(new List<byte[]> { received.Blind.FromHex() }, blindNegSums);
-                    var commitSum = pedersen.CommitSum(new List<byte[]> { received.Commitment.FromHex() }, commitNegs);
+                    var blindSum = pedersen.BlindSum(new List<byte[]> { received.Blind.FromHexString() }, blindNegSums);
+                    var commitSum = pedersen.CommitSum(new List<byte[]> { received.Commitment.FromHexString() }, commitNegs);
 
                     BulletProof(blindSum, commitSum, purchase.Output, coin);
 
@@ -174,7 +174,7 @@ namespace TangramCypher.ApplicationLayer.Coin
 
             using (var insecureSecret = secret.Insecure())
             {
-                return ArgonHash(Cryptography.GenericHashNoKey($"{version} {stamp} {insecureSecret.Value}", bytes).ToHex(), salt).ToHex();
+                return ArgonHash(Cryptography.GenericHashNoKey($"{version} {stamp} {insecureSecret.Value}", bytes).ToHexString(), salt).ToHexString();
             }
         }
 
@@ -188,7 +188,7 @@ namespace TangramCypher.ApplicationLayer.Coin
             using (var insecureSecret = secret.Insecure())
             using (var insecureSalt = salt.Insecure())
             {
-                return ArgonHash(Cryptography.GenericHashNoKey($"{amount} {stamp} {version} {insecureSecret.Value}", 32).ToHex(), salt);
+                return ArgonHash(Cryptography.GenericHashNoKey($"{amount} {stamp} {version} {insecureSecret.Value}", 32).ToHexString(), salt);
             }
         }
 
@@ -250,7 +250,7 @@ namespace TangramCypher.ApplicationLayer.Coin
                 Network = coin.Network
             };
 
-            c1.Hash = Util.Hash(c1).ToHex();
+            c1.Hash = Util.Hash(c1).ToHexString();
 
             var c2 = new BaseCoinDto
             {
@@ -264,7 +264,7 @@ namespace TangramCypher.ApplicationLayer.Coin
                 Network = coin.Network
             };
 
-            c2.Hash = Util.Hash(c2).ToHex();
+            c2.Hash = Util.Hash(c2).ToHexString();
 
             return (c1, c2);
         }
@@ -311,7 +311,7 @@ namespace TangramCypher.ApplicationLayer.Coin
 
             using (var secp256k1 = new Secp256k1())
             {
-                var blind = DeriveKey(version, stamp, secret, salt).FromHex();
+                var blind = DeriveKey(version, stamp, secret, salt).FromHexString();
                 var sig = secp256k1.Sign(msg, blind);
 
                 return sig;
@@ -409,10 +409,10 @@ namespace TangramCypher.ApplicationLayer.Coin
                 if (!success)
                     throw new ArgumentOutOfRangeException(nameof(success), "Bullet proof failed.");
 
-                coin.Commitment = commitSum.ToHex();
-                coin.RangeProof = @struct.proof.ToHex();
-                coin.Network = walletService.NetworkAddress(coin).ToHex();
-                coin.Hash = Util.Hash(coin).ToHex();
+                coin.Commitment = commitSum.ToHexString();
+                coin.RangeProof = @struct.proof.ToHexString();
+                coin.Network = walletService.NetworkAddress(coin).ToHexString();
+                coin.Hash = Util.Hash(coin).ToHexString();
             }
         }
 
@@ -422,7 +422,7 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// <returns>The new stamp.</returns>
         private string NewStamp()
         {
-            return Cryptography.GenericHashNoKey(Cryptography.RandomKey()).ToHex();
+            return Cryptography.GenericHashNoKey(Cryptography.RandomKey()).ToHexString();
         }
 
         /// <summary>
@@ -432,7 +432,7 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// <returns></returns>
         private byte[] ArgonHash(string hash, SecureString salt)
         {
-            return Cryptography.ArgonHashBinary(Encoding.UTF8.GetBytes(hash).ToHex().ToSecureString(), salt);
+            return Cryptography.ArgonHashBinary(Encoding.UTF8.GetBytes(hash).ToHexString().ToSecureString(), salt);
         }
     }
 }

@@ -101,8 +101,8 @@ namespace TangramCypher.ApplicationLayer.Wallet
 
             return new KeySetDto
             {
-                PublicKey = kp.PublicKey.ToHex(),
-                SecretKey = kp.SecretKey.ToHex(),
+                PublicKey = kp.PublicKey.ToHexString(),
+                SecretKey = kp.SecretKey.ToHexString(),
                 Address = Encoding.UTF8.GetString(NetworkAddress(kp.PublicKey))
             };
         }
@@ -149,7 +149,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
         public SecureString NewID(int bytes = 32)
         {
             var secureString = new SecureString();
-            foreach (var c in $"id_{Cryptography.RandomBytes(bytes).ToHex()}") secureString.AppendChar(c);
+            foreach (var c in $"id_{Cryptography.RandomBytes(bytes).ToHexString()}") secureString.AppendChar(c);
             return secureString;
         }
 
@@ -468,7 +468,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
             using (var insecurePassword = password.Insecure())
             {
                 var hash = Cryptography.GenericHashNoKey($"{version} {insecurePassword.Value}");
-                return Prover.GetHashStringNumber(hash).ToByteArray().ToHex();
+                return Prover.GetHashStringNumber(hash).ToByteArray().ToHexString();
             }
         }
 

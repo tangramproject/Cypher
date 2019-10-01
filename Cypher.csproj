@@ -57,6 +57,7 @@
     <PackageReference Include="LiteDB" Version="4.1.4" />
     <PackageReference Include="protobuf-net" Version="2.4.0" />
     <PackageReference Include="Microsoft.AspNet.WebApi.Client" Version="5.2.7" />
+    <PackageReference Include="Polly" Version="7.1.1" />
   </ItemGroup>
   <ItemGroup>
     <None Update="appsettings.json">

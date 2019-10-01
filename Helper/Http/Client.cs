@@ -299,12 +299,13 @@ namespace TangramCypher.Helper.Http
 
             using (var client = socksPortHandler == null ? new HttpClient() : new HttpClient(socksPortHandler))
             {
+                
                 client.BaseAddress = baseAddress;
                 client.DefaultRequestHeaders.Accept.Clear();
                 client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
                 try
-                {
+                {   
                     var proto = Util.SerializeProto(payload);
 
                     using (var response = await client.PostAsJsonAsync(path, proto, cancellationToken))

@@ -78,7 +78,7 @@ namespace TangramCypher.Helper.LibSodium
 
             using (var insecurePassword = password.Insecure())
             {
-                hash = PasswordHash.ArgonHashString(insecurePassword.Value, 4, 64000000).FromHex();
+                hash = PasswordHash.ArgonHashString(insecurePassword.Value, 4, 64000000).FromHexString();
             }
 
             return hash;
@@ -94,7 +94,7 @@ namespace TangramCypher.Helper.LibSodium
             using (var insecurePassword = password.Insecure())
             using (var insecureSalt = salt.Insecure())
             {
-                hash = PasswordHash.ArgonHashBinary(insecurePassword.Value.FromHex(), insecureSalt.Value.FromHex(), PasswordHash.StrengthArgon.Moderate, 32);
+                hash = PasswordHash.ArgonHashBinary(insecurePassword.Value.FromHexString(), insecureSalt.Value.FromHexString(), PasswordHash.StrengthArgon.Moderate, 32);
             }
 
             return hash;
