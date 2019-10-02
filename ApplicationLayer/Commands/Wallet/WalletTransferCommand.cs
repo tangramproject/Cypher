@@ -9,24 +9,25 @@
 using System;
 using System.Threading.Tasks;
 using McMaster.Extensions.CommandLineUtils;
-using TangramCypher.ApplicationLayer.Vault;
 using Microsoft.Extensions.DependencyInjection;
 using TangramCypher.ApplicationLayer.Actor;
 using TangramCypher.Helper;
 using Newtonsoft.Json;
 using System.IO;
 using Kurukuru;
-using Newtonsoft.Json.Linq;
 using TangramCypher.ApplicationLayer.Wallet;
-using System.Security;
 using Microsoft.Extensions.Logging;
+using TangramCypher.Model;
+using TangramCypher.ApplicationLayer.Send;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
 {
-    [CommandDescriptor(new string[] { "wallet", "transfer" }, "Transfer funds")]
+    [CommandDescriptor(new string[] { "wallet", "send" }, "Send funds")]
     public class WalletTransferCommand : Command
     {
         readonly IActorService actorService;
+        readonly IWalletService walletService;
+        readonly ISendService sendService;
         readonly IConsole console;
         readonly ILogger logger;
 
@@ -37,12 +38,13 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
         public WalletTransferCommand(IServiceProvider serviceProvider)
         {
             actorService = serviceProvider.GetService<IActorService>();
+            walletService = serviceProvider.GetService<IWalletService>();
+            sendService = serviceProvider.GetService<ISendService>();
             console = serviceProvider.GetService<IConsole>();
             logger = serviceProvider.GetService<ILogger>();
 
-            actorService.MessagePump += ActorService_MessagePump;
+            actorService.SetMessagePump(ActorService_MessagePump);
         }
-
         public override async Task Execute()
         {
 
@@ -54,7 +56,6 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                 var memo = Prompt.GetString("Memo:", null, ConsoleColor.Green);
                 var yesNo = Prompt.GetYesNo("Send redemption key to message pool?", true, ConsoleColor.Yellow);
 
-
                 if (double.TryParse(amount, out double t))
                 {
                     await Spinner.StartAsync("Processing payment ...", async spinner =>
@@ -63,39 +64,28 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
 
                         try
                         {
-                            var sent = await actorService
-                                      .MasterKey(password)
-                                      .Identifier(identifier)
-                                      .Amount(t)
-                                      .ToAddress(address)
-                                      .Memo(memo)
-                                      .SendPayment();
-
-                            if (sent.Equals(false))
+                            var session = new Session(identifier, password)
                             {
-                                var failedMessage = JsonConvert.SerializeObject(actorService.GetLastError().GetValue("message"));
+                                Amount = t.ConvertToUInt64(),
+                                ForwardMessage = yesNo,
+                                Memo = memo,
+                                RecipientAddress = address
+                            };
+
+                            await sendService.Tansfer(session);
+                            session = actorService.GetSession(session.SessionId);
+
+                            if (sendService.State != State.Completed)
+                            {
+                                var failedMessage = JsonConvert.SerializeObject(session.LastError.GetValue("message"));
                                 logger.LogCritical(failedMessage);
                                 spinner.Fail(failedMessage);
                                 return;
                             }
 
-                            switch (yesNo)
+                            if (session.ForwardMessage.Equals(false))
                             {
-                                case true:
-                                    var networkMessage = await actorService.SendPaymentMessage(true);
-                                    var success = networkMessage.GetValue("success").ToObject<bool>();
-
-                                    if (success.Equals(false))
-                                        spinner.Fail(JsonConvert.SerializeObject(networkMessage.GetValue("message")));
-
-                                    break;
-
-                                case false:
-                                    var localMessage = await actorService.SendPaymentMessage(false);
-
-                                    SaveRedemptionKeyLocal(localMessage);
-
-                                    break;
+                                SaveRedemptionKeyLocal(session.SessionId);
                             }
                         }
                         catch (Exception ex)
@@ -105,16 +95,26 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                         }
                         finally
                         {
-                            spinner.Text = $"Available Balance: {Convert.ToString(await actorService.CheckBalance())}";
+                            var balance = walletService.AvailableBalance(identifier, password);
+                            spinner.Text = $"Available Balance: {balance.Result.DivWithNaT().ToString("F9")}";
                         }
-                    });
+                    }, Patterns.Toggle3);
                 }
             }
         }
 
-        private void SaveRedemptionKeyLocal(JObject message)
+        private void SaveRedemptionKeyLocal(Guid sessionId)
         {
-            var notification = message.GetValue("message").ToObject<NotificationDto>();
+            spinner.Text = string.Empty;
+            spinner.Stop();
+
+            MessageStoreDto messageStore;
+
+            var session = actorService.GetSession(sessionId);
+            using (var db = Util.LiteRepositoryFactory(session.MasterKey, session.Identifier.ToUnSecureString()))
+            {
+                messageStore = db.Query<MessageStoreDto>().Where(m => m.TransactionId.Equals(session.SessionId)).FirstOrDefault();
+            }
 
             console.ForegroundColor = ConsoleColor.Magenta;
             console.WriteLine("\nOptions:");
@@ -125,24 +125,33 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
 
             console.ForegroundColor = ConsoleColor.White;
 
-            var content =
-                "--------------Begin Redemption Key--------------" +
-                Environment.NewLine +
-                JsonConvert.SerializeObject(notification) +
-                Environment.NewLine +
-                "--------------End Redemption Key----------------";
-
-            if (option.Equals(1))
+            try
             {
-                var path = $"{tangramDirectory}redem{DateTime.Now.GetHashCode()}.rdkey";
-                File.WriteAllText(path, content);
-                console.WriteLine($"\nSaved path: {path}\n");
+                var content =
+                    "--------------Begin Redemption Key--------------" +
+                    Environment.NewLine +
+                    JsonConvert.SerializeObject(messageStore.Message) +
+                    Environment.NewLine +
+                    "--------------End Redemption Key----------------";
+
+                if (option.Equals(1))
+                {
+                    var path = $"{tangramDirectory}redem{DateTime.Now.GetHashCode()}.rdkey";
+                    File.WriteAllText(path, content);
+                    console.WriteLine($"\nSaved path: {path}\n");
+                }
+                else
+                    console.WriteLine($"\n{content}\n");
             }
-            else
-                console.WriteLine($"\n{content}\n");
+            catch (Exception ex)
+            {
+                logger.LogError(ex.StackTrace);
+                throw ex;
+            }
+
         }
 
-        private void ActorService_MessagePump(object sender, MessagePumpEventArgs e)
+        private void ActorService_MessagePump(MessagePumpEventArgs e)
         {
             spinner.Text = e.Message;
         }

@@ -7,20 +7,20 @@
 // work. If not, see <http://creativecommons.org/licenses/by-nc-nd/4.0/>.
 
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using McMaster.Extensions.CommandLineUtils;
 using TangramCypher.ApplicationLayer.Wallet;
 using Microsoft.Extensions.DependencyInjection;
 using ConsoleTables;
-using System.Linq;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
 {
     [CommandDescriptor(new string[] { "wallet", "transactions" }, "List wallet transactions")]
-    public class WalletTxHistoryCommand: Command
+    public class WalletTxHistoryCommand : Command
     {
-        readonly IConsole console;
-        readonly IWalletService walletService;
+        private readonly IConsole console;
+        private readonly IWalletService walletService;
 
         public WalletTxHistoryCommand(IServiceProvider serviceProvider)
         {
@@ -28,26 +28,38 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
             walletService = serviceProvider.GetService<IWalletService>();
         }
 
-        public async override Task Execute()
+        public override Task Execute()
         {
             using (var identifier = Prompt.GetPasswordAsSecureString("Identifier:", ConsoleColor.Yellow))
             using (var password = Prompt.GetPasswordAsSecureString("Password:", ConsoleColor.Yellow))
             {
                 try
                 {
-                    var transactions = await walletService.Transactions(identifier, password);
-                    var txs = transactions.Select(tx => new { tx.Amount, tx.Memo, tx.TransactionType, tx.DateTime, tx.Hash }).ToList();
-                    var table = ConsoleTable.From(txs).ToString();
+                    var final = walletService.TransactionHistory(identifier, password).ToList();
 
-                    console.WriteLine(table);
+                    if (final?.Any() == true)
+                    {
+                        var table = ConsoleTable.From(final).ToString();
+                        console.WriteLine(table);
+                        return Task.CompletedTask;
+                    }
+
+                    NoTxn();
                 }
                 catch (Exception)
                 {
-                    console.ForegroundColor = ConsoleColor.Red;
-                    console.WriteLine($"\nWallet has no transactions.\n");
-                    console.ForegroundColor = ConsoleColor.White;
+                    NoTxn();
                 }
             }
+
+            return Task.CompletedTask;
+        }
+
+        private void NoTxn()
+        {
+            console.ForegroundColor = ConsoleColor.Red;
+            console.WriteLine($"\nWallet has no transactions.\n");
+            console.ForegroundColor = ConsoleColor.White;
         }
     }
 }

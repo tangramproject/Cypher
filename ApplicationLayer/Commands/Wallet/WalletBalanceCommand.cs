@@ -27,17 +27,17 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
             console = serviceProvider.GetService<IConsole>();
         }
 
-        public override async Task Execute()
+        public override Task Execute()
         {
             try
             {
                 using (var identifier = Prompt.GetPasswordAsSecureString("Identifier:", ConsoleColor.Yellow))
                 using (var password = Prompt.GetPasswordAsSecureString("Password:", ConsoleColor.Yellow))
                 {
-                    var total = await walletService.AvailableBalance(identifier, password);
+                    var total = walletService.AvailableBalance(identifier, password);
 
                     console.ForegroundColor = ConsoleColor.Magenta;
-                    console.WriteLine($"\nWallet balance: {total}\n");
+                    console.WriteLine($"\nWallet balance: {total.Result.DivWithNaT().ToString("F9")}\n");
                     console.ForegroundColor = ConsoleColor.White;
                 }
             }
@@ -45,6 +45,8 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
             {
                 throw ex;
             }
+
+            return Task.CompletedTask;
         }
     }
 }

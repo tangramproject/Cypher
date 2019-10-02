@@ -10,35 +10,29 @@ using System;
 using System.Linq;
 using System.Collections.Generic;
 using System.Security;
-using System.Threading.Tasks;
 using MurrayGrant.ReadablePassphrase;
-using Newtonsoft.Json.Linq;
-using SimpleBase;
-using TangramCypher.ApplicationLayer.Vault;
 using TangramCypher.Helper;
 using TangramCypher.Helper.LibSodium;
-using TangramCypher.ApplicationLayer.Coin;
 using TangramCypher.ApplicationLayer.Actor;
 using System.Text;
 using TangramCypher.ApplicationLayer.Helper.ZeroKP;
 using Microsoft.Extensions.Configuration;
 using Dawn;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
+using TangramCypher.Model;
+using System.IO;
+using Tangram.Address;
 
 namespace TangramCypher.ApplicationLayer.Wallet
 {
     public class WalletService : IWalletService
     {
-        private readonly IVaultServiceClient vaultServiceClient;
         private readonly IConfigurationSection apiNetworkSection;
         private readonly ILogger logger;
         private readonly string environment;
 
-        public WalletService(IVaultServiceClient vaultServiceClient, IConfiguration configuration, ILogger logger)
+        public WalletService(IConfiguration configuration, ILogger logger)
         {
-            this.vaultServiceClient = vaultServiceClient;
-
             apiNetworkSection = configuration.GetSection(Constant.ApiNetwork);
             environment = apiNetworkSection.GetValue<string>(Constant.Environment);
 
@@ -51,67 +45,60 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <returns>The balance.</returns>
         /// <param name="identifier">Identifier.</param>
         /// <param name="password">Password.</param>
-        public async Task<double> AvailableBalance(SecureString identifier, SecureString password)
+        public TaskResult<ulong> AvailableBalance(SecureString identifier, SecureString password)
         {
             Guard.Argument(identifier, nameof(identifier)).NotNull();
             Guard.Argument(password, nameof(password)).NotNull();
 
-            var transactions = await Transactions(identifier, password);
+            ulong balance;
 
-            return Balance(identifier, password, transactions);
-        }
-
-        /// <summary>
-        /// Adds the keys.
-        /// </summary>
-        /// <returns>The keys.</returns>
-        /// <param name="identifier">Identifier.</param>
-        /// <param name="password">Password.</param>
-        /// <param name="pkSk">Pk sk.</param>
-        public async Task<bool> AddKey(SecureString identifier, SecureString password, PkSkDto pkSk)
-        {
-            Guard.Argument(identifier, nameof(identifier)).NotNull();
-            Guard.Argument(password, nameof(password)).NotNull();
-            Guard.Argument(pkSk, nameof(pkSk)).NotNull();
-
-            bool added = false;
-
-            using (var insecureIdentifier = identifier.Insecure())
+            try
             {
-                try
+                using var db = Util.LiteRepositoryFactory(password, identifier.ToUnSecureString());
+                var txns = db.Fetch<TransactionDto>();
+                if (txns?.Any() != true)
                 {
-                    var data = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
-
-                    if (data.Data.TryGetValue("storeKeys", out object keys))
-                    {
-                        ((JArray)keys).Add(JObject.FromObject(pkSk));
-
-                        await vaultServiceClient.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", data.Data);
-
-                        added = true;
-                    }
+                    return TaskResult<ulong>.CreateSuccess(0);
                 }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex.Message);
-                }
+
+                balance = Balance(txns);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex.Message);
+                return TaskResult<ulong>.CreateFailure(ex);
             }
 
-            return added;
+            return TaskResult<ulong>.CreateSuccess(balance);
+        }
+
+        public void AddKeySet(SecureString secret, string identifier)
+        {
+            try
+            {
+                using var db = Util.LiteRepositoryFactory(secret, identifier);
+                var keySet = CreateKeySet();
+                db.Insert(keySet);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex.Message);
+                throw new Exception(ex.Message);
+            }
         }
 
         /// <summary>
         /// Creates new secret/public address key.
         /// </summary>
         /// <returns>The pk sk.</returns>
-        public PkSkDto CreatePkSk()
+        public KeySetDto CreateKeySet()
         {
             var kp = Cryptography.KeyPair();
 
-            return new PkSkDto()
+            return new KeySetDto
             {
-                PublicKey = kp.PublicKey.ToHex(),
-                SecretKey = kp.SecretKey.ToHex(),
+                PublicKey = kp.PublicKey.ToHexString(),
+                SecretKey = kp.SecretKey.ToHexString(),
                 Address = Encoding.UTF8.GetString(NetworkAddress(kp.PublicKey))
             };
         }
@@ -120,36 +107,28 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// Create new wallet.
         /// </summary>
         /// <returns>The wallet.</returns>
-        public async Task<CredentialsDto> CreateWallet()
+        public CredentialsDto CreateWallet()
         {
             var walletId = NewID(16);
             var passphrase = Passphrase();
-            var pkSk = CreatePkSk();
+            var keySet = CreateKeySet();
 
             walletId.MakeReadOnly();
             passphrase.MakeReadOnly();
 
             try
             {
-                await vaultServiceClient.CreateUserAsync(walletId, passphrase);
-
-                var dic = new Dictionary<string, object>
+                using (var db = Util.LiteRepositoryFactory(passphrase, walletId.ToUnSecureString()))
                 {
-                    { "storeKeys", new List<PkSkDto> { pkSk } }
-                };
-
-                await vaultServiceClient.SaveDataAsync(
-                    walletId,
-                    passphrase,
-                            $"wallets/{walletId.ToUnSecureString()}/wallet",
-                    dic);
+                    db.Insert(keySet);
+                }
 
                 return new CredentialsDto { Identifier = walletId.ToUnSecureString(), Password = passphrase.ToUnSecureString() };
             }
             catch (Exception ex)
             {
                 logger.LogError(ex.Message);
-                throw new Exception("Failed to create wallet. Is the vault unsealed?");
+                throw new Exception("Failed to create wallet.");
             }
             finally
             {
@@ -166,7 +145,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
         public SecureString NewID(int bytes = 32)
         {
             var secureString = new SecureString();
-            foreach (var c in $"id_{Cryptography.RandomBytes(bytes).ToHex()}") secureString.AppendChar(c);
+            foreach (var c in $"id_{Cryptography.RandomBytes(bytes).ToHexString()}") secureString.AppendChar(c);
             return secureString;
         }
 
@@ -176,7 +155,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <returns>The passphrase.</returns>
         public SecureString Passphrase()
         {
-            var defaultDict = MurrayGrant.ReadablePassphrase.Dictionaries.Default.Load();
+            _ = MurrayGrant.ReadablePassphrase.Dictionaries.Default.Load();
             var easyCreatedGenerator = Generator.Create();
             return easyCreatedGenerator.GenerateAsSecure(PhraseStrength.RandomForever);
         }
@@ -186,191 +165,36 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// </summary>
         /// <returns>The password.</returns>
         /// <param name="passphrase">Passphrase.</param>
-        public byte[] HashPassword(SecureString passphrase) => Cryptography.ArgonHashPassword(passphrase);
-
-
-        /// <summary>
-        /// Adds the transaction.
-        /// </summary>
-        /// <returns>The transaction.</returns>
-        /// <param name="identifier">Identifier.</param>
-        /// <param name="password">Password.</param>
-        /// <param name="transaction">Transaction.</param>
-        public async Task<bool> AddTransaction(SecureString identifier, SecureString password, TransactionDto transaction)
-        {
-            Guard.Argument(identifier, nameof(identifier)).NotNull();
-            Guard.Argument(password, nameof(password)).NotNull();
-            Guard.Argument(transaction, nameof(transaction)).NotNull();
-
-            bool added = false;
-
-            using (var insecureIdentifier = identifier.Insecure())
-            {
-                try
-                {
-                    var found = false;
-                    var data = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
-
-                    if (data.Data.TryGetValue("transactions", out object txs))
-                    {
-                        foreach (JObject item in ((JArray)txs).Children().ToList())
-                        {
-                            var hash = item.GetValue("Hash");
-                            found = hash.Value<string>().Equals(transaction.Hash);
-                        }
-                        if (!found)
-                            ((JArray)txs).Add(JObject.FromObject(transaction));
-                    }
-                    else
-                        data.Data.Add("transactions", new List<TransactionDto> { transaction });
-
-                    await vaultServiceClient.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", data.Data);
-
-                    added = true;
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex.Message);
-                }
-            }
-
-            return added;
-        }
+        public byte[] HashPassword(SecureString passphrase) => Cryptography.ArgonHashString(passphrase);
 
         /// <summary>
-        /// Adds message tracking.
-        /// </summary>
-        /// <returns>The message tracking.</returns>
-        /// <param name="identifier">Identifier.</param>
-        /// <param name="password">Password.</param>
-        /// <param name="messageTrack">Message track.</param>
-        public async Task<bool> AddMessageTracking(SecureString identifier, SecureString password, MessageTrackDto messageTrack)
-        {
-            Guard.Argument(identifier, nameof(identifier)).NotNull();
-            Guard.Argument(password, nameof(password)).NotNull();
-            Guard.Argument(messageTrack, nameof(messageTrack)).NotNull();
-
-            bool added = false;
-
-            using (var insecureIdentifier = identifier.Insecure())
-            {
-                try
-                {
-                    var found = false;
-                    var data = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
-
-                    if (data.Data.TryGetValue("messages", out object msgs))
-                    {
-                        foreach (JObject item in ((JArray)msgs).Children().ToList())
-                        {
-                            var pk = item.GetValue("PublicKey");
-                            found = pk.Value<string>().Equals(messageTrack.PublicKey);
-                        }
-
-                        if (!found)
-                            ((JArray)msgs).Add(JObject.FromObject(messageTrack));
-                        else
-                            ((JArray)msgs).Replace(JObject.FromObject(messageTrack));
-                    }
-                    else
-                        data.Data.Add("messages", new List<MessageTrackDto> { messageTrack });
-
-                    await vaultServiceClient.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", data.Data);
-
-                    added = true;
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex.Message);
-                }
-            }
-
-            return added;
-        }
-
-        /// <summary>
-        /// Gets the stored message track.
-        /// </summary>
-        /// <returns>The track.</returns>
-        /// <param name="identifier">Identifier.</param>
-        /// <param name="password">Password.</param>
-        /// <param name="pk">Pk.</param>
-        public async Task<MessageTrackDto> MessageTrack(SecureString identifier, SecureString password, string pk)
-        {
-            Guard.Argument(identifier, nameof(identifier)).NotNull();
-            Guard.Argument(password, nameof(password)).NotNull();
-
-            MessageTrackDto messageTrack = null;
-
-            using (var insecureIdentifier = identifier.Insecure())
-            {
-                try
-                {
-                    var data = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
-                    if (data.Data.TryGetValue("messages", out object msgs))
-                    {
-                        messageTrack = ((JArray)msgs).ToObject<List<MessageTrackDto>>().FirstOrDefault(msg => msg.PublicKey.Equals(pk));
-                    }
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex.Message);
-                }
-            }
-
-            return messageTrack;
-        }
-
-        /// <summary>
-        /// Gets the transaction.
-        /// </summary>
-        /// <returns>The transaction.</returns>
-        /// <param name="identifier">Identifier.</param>
-        /// <param name="password">Password.</param>
-        /// <param name="hash">Hash.</param>
-        public async Task<TransactionDto> Transaction(SecureString identifier, SecureString password, string hash)
-        {
-            Guard.Argument(identifier, nameof(identifier)).NotNull();
-            Guard.Argument(password, nameof(password)).NotNull();
-            Guard.Argument(hash, nameof(hash)).NotNull().NotEmpty();
-
-            var transactions = await Transactions(identifier, password);
-
-            if (transactions == null)
-                return null;
-
-            return transactions.FirstOrDefault(t => t.Hash.Equals(hash));
-        }
-
-        /// <summary>
-        /// Gets the transaction amount.
+        /// Gets the total transaction amount.
         /// </summary>
         /// <returns>The transaction amount.</returns>
         /// <param name="identifier">Identifier.</param>
         /// <param name="password">Password.</param>
         /// <param name="stamp">Stamp.</param>
-        public async Task<double> TransactionAmount(SecureString identifier, SecureString password, string stamp)
+        public ulong TotalTransactionAmount(SecureString identifier, SecureString password, string stamp)
         {
             Guard.Argument(identifier, nameof(identifier)).NotNull();
             Guard.Argument(password, nameof(password)).NotNull();
             Guard.Argument(stamp, nameof(stamp)).NotNull().NotEmpty();
 
-            var total = 0.0D;
-            var transactions = await Transactions(identifier, password);
+            ulong total;
 
-            if (transactions == null)
-                return -1;
-
-            var transaction = transactions.Select(tx =>
+            using (var db = Util.LiteRepositoryFactory(password, identifier.ToUnSecureString()))
             {
-                if (tx.Stamp.Equals(stamp))
-                    if (double.TryParse(tx.Amount.ToString(), out double t))
-                        total = t;
+                var txns = db.Fetch<TransactionDto>();
+                if (txns?.Any() != true)
+                {
+                    return 0;
+                }
 
-                return total;
-            });
+                var amounts = txns.Where(tx => tx.Stamp.Equals(stamp)).Select(a => a.Amount);
+                total = Util.Sum(amounts);
+            }
 
-            return transaction.FirstOrDefault();
+            return total;
         }
 
         /// <summary>
@@ -379,286 +203,147 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <returns>The transaction amount.</returns>
         /// <param name="identifier">Identifier.</param>
         /// <param name="password">Password.</param>
-        public async Task<double> LastTransactionAmount(SecureString identifier, SecureString password, TransactionType transactionType)
+        public TransactionDto LastTransaction(SecureString identifier, SecureString password, TransactionType transactionType)
         {
             Guard.Argument(identifier, nameof(identifier)).NotNull();
             Guard.Argument(password, nameof(password)).NotNull();
 
-            var transactions = await Transactions(identifier, password);
+            TransactionDto transaction;
 
-            if (transactions == null)
-                return 0;
-
-            return transactions.Last(tx => tx.TransactionType.Equals(transactionType)).Amount;
-        }
-
-        /// <summary>
-        /// Gets the envelope.
-        /// </summary>
-        /// <returns>The envelope.</returns>
-        /// <param name="identifier">Identifier.</param>
-        /// <param name="password">Password.</param>
-        public async Task<List<TransactionDto>> Transactions(SecureString identifier, SecureString password)
-        {
-            Guard.Argument(identifier, nameof(identifier)).NotNull();
-            Guard.Argument(password, nameof(password)).NotNull();
-
-            List<TransactionDto> transactions = null;
-
-            using (var insecureIdentifier = identifier.Insecure())
+            using (var db = Util.LiteRepositoryFactory(password, identifier.ToUnSecureString()))
             {
-                try
+                var txns = db.Fetch<TransactionDto>();
+                if (txns?.Any() != true)
                 {
-                    var data = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
-                    if (data.Data.TryGetValue("transactions", out object txs))
-                    {
-                        transactions = ((JArray)txs).ToObject<List<TransactionDto>>();
-                    }
+                    return null;
                 }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex.Message);
-                }
+
+                transaction = txns.Last(tx => tx.TransactionType.Equals(transactionType));
             }
 
-            return transactions;
-        }
-
-        /// <summary>
-        /// Gets the store key.
-        /// </summary>
-        /// <returns>The store key.</returns>
-        /// <param name="identifier">Identifier.</param>
-        /// <param name="password">Password.</param>
-        /// <param name="storeKey">Store key.</param>
-        public async Task<SecureString> StoreKey(SecureString identifier, SecureString password, string storeKey)
-        {
-            Guard.Argument(identifier, nameof(identifier)).NotNull();
-            Guard.Argument(password, nameof(password)).NotNull();
-            Guard.Argument(storeKey, nameof(storeKey)).NotNull().NotEmpty();
-
-            var secureString = new SecureString();
-
-            using (var insecureIdentifier = identifier.Insecure())
-            {
-                try
-                {
-                    var data = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
-                    var storeKeys = JObject.FromObject(data.Data["storeKeys"]);
-                    var key = storeKeys.GetValue(storeKey).Value<string>();
-
-                    foreach (var c in key) secureString.AppendChar(Convert.ToChar(c));
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex.Message);
-                    throw ex;
-                }
-            }
-
-            return secureString;
-        }
-
-        /// <summary>
-        ///  Gets the store key from the address.
-        /// </summary>
-        /// <returns>The key.</returns>
-        /// <param name="identifier">Identifier.</param>
-        /// <param name="password">Password.</param>
-        /// <param name="storeKeyApi">Store key API.</param>
-        /// <param name="address">Address.</param>
-        public async Task<SecureString> StoreKey(SecureString identifier, SecureString password, StoreKeyApiMethod storeKeyApi, string address)
-        {
-            Guard.Argument(identifier, nameof(identifier)).NotNull();
-            Guard.Argument(password, nameof(password)).NotNull();
-            Guard.Argument(address, nameof(address)).NotNull().NotEmpty();
-
-            SecureString secureString = null;
-
-            using (var insecureIdentifier = identifier.Insecure())
-            {
-                try
-                {
-                    var data = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
-
-                    if (data.Data.TryGetValue("storeKeys", out object keys))
-                    {
-                        foreach (JObject item in ((JArray)keys).Children().ToList())
-                        {
-                            var addressKey = item.GetValue("Address");
-                            if (addressKey.Value<string>().Equals(address))
-                            {
-                                var key = item.GetValue(storeKeyApi.ToString()).Value<string>();
-
-                                secureString = new SecureString();
-
-                                foreach (var c in key) secureString.AppendChar(Convert.ToChar(c));
-                            }
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex.Message);
-                }
-            }
-
-            return secureString;
-        }
-
-        /// <summary>
-        /// Select random address.
-        /// </summary>
-        /// <returns>The address.</returns>
-        /// <param name="identifier">Identifier.</param>
-        /// <param name="password">Password.</param>
-        public async Task<string> RandomAddress(SecureString identifier, SecureString password)
-        {
-            Guard.Argument(identifier, nameof(identifier)).NotNull();
-            Guard.Argument(password, nameof(password)).NotNull();
-
-            string address = null;
-
-            using (var insecureIdentifier = identifier.Insecure())
-            {
-                try
-                {
-                    var data = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
-
-                    if (data.Data.TryGetValue("storeKeys", out object keys))
-                    {
-                        var rnd = new Random();
-                        var pkSks = ((JArray)keys).ToObject<List<PkSkDto>>();
-
-                        address = pkSks[rnd.Next(pkSks.Count())].Address;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex.Message);
-                    throw ex;
-                }
-            }
-
-            return address;
+            return transaction;
         }
 
         /// <summary>
         /// Sorts the change.
         /// </summary>
-        /// <returns>The change.</returns>
-        /// <param name="identifier">Identifier.</param>
-        /// <param name="password">Password.</param>
-        /// <param name="amount">Amount.</param>
-        public async Task<TransactionCoin> SortChange(SecureString identifier, SecureString password, double amount)
+        /// <param name="session"></param>
+        /// <returns></returns>
+        public TaskResult<PurchaseDto> SortChange(Session session)
         {
-            Guard.Argument(identifier, nameof(identifier)).NotNull();
-            Guard.Argument(password, nameof(password)).NotNull();
-            Guard.Argument(amount, nameof(amount)).NotNaN().NotNegative();
+            Guard.Argument(session, nameof(session)).NotNull();
 
-            var transactions = await Transactions(identifier, password);
+            List<TransactionDto> txns;
 
-            if (transactions == null)
-                return null;
-
-            TransactionCoin transactionCoin = null;
-            TransactionDto[] txsIn = transactions.Where(tx => tx.TransactionType == TransactionType.Receive).OrderBy(tx => tx.Version).ToArray();
-            TransactionDto[] target = new TransactionDto[txsIn.Length];
-
-            Array.Copy(txsIn, target, txsIn.Length);
-            for (int i = 0, targetLength = target.Length; i < targetLength; i++)
+            using (var db = Util.LiteRepositoryFactory(session.MasterKey, session.Identifier.ToUnSecureString()))
             {
-                (TransactionDto transaction, double amountFor) = CalculateChange(amount, txsIn);
-                var balance = Balance(identifier, password, transactions.Where(tx => tx.Stamp == transaction.Stamp).ToList());
-
-                if (balance >= amountFor)
+                txns = db.Fetch<TransactionDto>();
+                if (txns?.Any() != true)
                 {
-                    transactionCoin = new TransactionCoin
-                    {
-                        Balance = balance,
-                        Input = amount,
-                        Output = balance - amount,
-                        Stamp = transaction.Stamp
-                    };
-
-                    transactionCoin.Chain = transactions.Where(tx => tx.Stamp.Equals(transaction.Stamp)).ToList();
-                    transactionCoin.Version = transactionCoin.Chain.Last().Version;
-
-                    if (transactionCoin.Output.Equals(0))
-                        transactionCoin.Spent = true;
-
-                    break;
+                    return null;
                 }
-
-                var idx = Array.FindIndex(txsIn, t => t.Stamp.Equals(transaction.Stamp));
-                txsIn = txsIn.Where((source, index) => index != idx).ToArray();
             }
 
-            return transactionCoin;
-        }
-
-        /// <summary>
-        /// Wallet profile Profile.
-        /// </summary>
-        /// <returns>The profile.</returns>
-        /// <param name="identifier">Identifier.</param>
-        /// <param name="password">Password.</param>
-        public async Task<string> Profile(SecureString identifier, SecureString password)
-        {
-            string profile = null;
+            PurchaseDto purchase = null;
 
             try
             {
-                using (var id = identifier.Insecure())
+                TransactionDto[] txsIn = txns.Where(tx => tx.TransactionType == TransactionType.Receive).OrderBy(tx => tx.Version).ToArray();
+                TransactionDto[] target = new TransactionDto[txsIn.Length];
+
+                Array.Copy(txsIn, target, txsIn.Length);
+
+                for (int i = 0, targetLength = target.Length; i < targetLength; i++)
                 {
-                    var data = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{id.Value}/wallet");
-                    profile = JsonConvert.SerializeObject(data);
+                    (TransactionDto transaction, double amountFor) = CalculateChange(session.Amount, txsIn);
+                    var balance = Balance(txns.Where(tx => tx.Stamp == transaction.Stamp).ToList());
+
+                    if (balance >= amountFor)
+                    {
+                        purchase = new PurchaseDto
+                        {
+                            Balance = balance,
+                            DateTime = DateTime.Now,
+                            Input = session.Amount,
+                            Output = balance - session.Amount,
+                            Stamp = transaction.Stamp,
+                            TransactionId = session.SessionId
+                        };
+
+                        purchase.Chain = txns.Where(tx => tx.Stamp.Equals(transaction.Stamp)).Select(tx => Guid.Parse(tx.TransactionId)).ToHashSet();
+                        purchase.Version = txns.Last(tx => tx.Stamp.Equals(transaction.Stamp) && tx.TransactionId.Equals(purchase.Chain.Last().ToString())).Version;
+
+                        if (purchase.Output.Equals(0))
+                            purchase.Spent = true;
+
+                        break;
+                    }
+
+                    var idx = Array.FindIndex(txsIn, t => t.Stamp.Equals(transaction.Stamp));
+                    txsIn = txsIn.Where((source, index) => index != idx).ToArray();
                 }
             }
             catch (Exception ex)
             {
                 logger.LogError(ex.Message);
-                throw;
+                return TaskResult<PurchaseDto>.CreateFailure(ex);
             }
 
-            return profile;
+            return TaskResult<PurchaseDto>.CreateSuccess(purchase);
         }
 
         /// <summary>
         /// Lists the wallets available.
         /// </summary>
         /// <returns>The identifier list.</returns>
-        public async Task<IEnumerable<string>> WalletList()
+        public IEnumerable<string> WalletList()
         {
-            var data = await vaultServiceClient.GetListAsync($"wallets/");
-            var keys = data.Data?.Keys;
-            return keys;
+            var wallets = Path.Combine(Path.GetDirectoryName(AppDomain.CurrentDomain.BaseDirectory), "wallets");
+            string[] files = Directory.GetFiles(wallets, "*.db");
+
+            if (files?.Any() != true)
+            {
+                return Enumerable.Empty<string>();
+            }
+
+            return files;
+        }
+
+        public IEnumerable<string> ListAddresses(SecureString secret, string identifier)
+        {
+            using var db = Util.LiteRepositoryFactory(secret, identifier);
+            var keys = db.Fetch<KeySetDto>();
+            if (keys?.Any() != true)
+            {
+                return Enumerable.Empty<string>();
+            }
+
+            return keys.Select(k => k.Address);
         }
 
         /// <summary>
         /// Calculate balance from transactions.
         /// </summary>
-        /// <returns>The balance.</returns>
-        /// <param name="identifier">Identifier.</param>
-        /// <param name="password">Password.</param>
-        /// <param name="transactions">Transactions.</param>
-        private double Balance(SecureString identifier, SecureString password, List<TransactionDto> transactions)
+        /// <param name="source"></param>
+        /// <returns></returns>
+        private ulong Balance(IEnumerable<TransactionDto> source)
         {
-            var total = 0.0d;
+            var total = 0UL;
 
-            if (transactions != null)
+            if (source != null)
             {
-                double? pocket = null;
-                double? burnt = null;
+                ulong? pocket = null;
+                ulong? burnt = null;
 
                 try
                 {
-                    pocket = transactions.Where(tx => tx.TransactionType == TransactionType.Receive).Sum(p => p.Amount);
-                    burnt = transactions.Where(tx => tx.TransactionType == TransactionType.Send).Sum(p => p.Amount);
+                    pocket = Util.Sum(source, TransactionType.Receive);
+                    burnt = Util.Sum(source, TransactionType.Send);
                 }
                 catch (Exception ex)
                 {
                     logger.LogError(ex.Message);
+                    throw ex;
                 }
                 finally
                 {
@@ -685,9 +370,8 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <returns>The change.</returns>
         /// <param name="amount">Amount.</param>
         /// <param name="transactions">Transactions.</param>
-        private (TransactionDto, double) CalculateChange(double amount, TransactionDto[] transactions)
+        private (TransactionDto, ulong) CalculateChange(ulong amount, TransactionDto[] transactions)
         {
-            Guard.Argument(amount, nameof(amount)).NotNaN().NotNegative();
             Guard.Argument(transactions, nameof(transactions)).NotNull();
 
             int count;
@@ -695,16 +379,16 @@ namespace TangramCypher.ApplicationLayer.Wallet
 
             for (var i = 0; i < transactions.Length; i++)
             {
-                count = (int)(amount / Math.Abs(transactions[i].Amount));
+                count = (int)(amount / transactions[i].Amount);
                 if (count != 0)
                     for (int k = 0; k < count; k++) tempTxs.Add(transactions[i]);
 
                 amount %= transactions[i].Amount;
             }
 
-            var sum = tempTxs.Sum(s => Math.Abs(s.Amount));
-            var remainder = Math.Abs(amount - sum);
-            var closest = transactions.Select(x => Math.Abs(x.Amount)).Aggregate((x, y) => Math.Abs(x - remainder) < Math.Abs(y - remainder) ? x : y);
+            var sum = Util.Sum(tempTxs.Select(s => s.Amount));
+            var remainder = amount - sum;
+            var closest = transactions.Select(x => x.Amount).Aggregate((x, y) => x - remainder < y - remainder ? x : y);
             var tx = transactions.FirstOrDefault(a => a.Amount.Equals(closest));
 
             return (tx, remainder);
@@ -716,32 +400,26 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <returns>The address.</returns>
         /// <param name="coin">Coin.</param>
         /// <param name="networkApi">Network API.</param>
-        public byte[] NetworkAddress(CoinDto coin, NetworkApiMethod networkApi = null)
+        public byte[] NetworkAddress(ICoinDto coin, NetworkApiMethod networkApi = null)
         {
             Guard.Argument(coin, nameof(coin)).NotNull();
 
-            string env = string.Empty;
-            byte[] address = new byte[33];
+            byte[] byteAddress = null;
 
-            env = networkApi == null ? environment : networkApi.ToString();
-            address[0] = env == Constant.Mainnet ? (byte)0x1 : (byte)74;
+            try
+            {
+                var hash = Util.Hash(coin);
+                string address = AddressBuilderFactory.Global.EncodeFromBody(hash, CurrentAddressVersion.Get(environment, networkApi));
 
-            var hash = Cryptography.GenericHashWithKey(
-                $"{coin.Envelope.Commitment}" +
-                $" {coin.Envelope.Proof}" +
-                $" {coin.Envelope.PublicKey}" +
-                $" {coin.Envelope.Signature}" +
-                $" {coin.Hash}" +
-                $" {coin.Hint}" +
-                $" {coin.Keeper}" +
-                $" {coin.Principle}" +
-                $" {coin.Stamp}" +
-                $" {coin.Version}",
-                Encoding.UTF8.GetBytes(coin.Principle));
+                byteAddress = address.ToBytes();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex.Message);
+            }
 
-            Array.Copy(hash, 0, address, 1, 32);
+            return byteAddress;
 
-            return Encoding.UTF8.GetBytes(Base58.Bitcoin.Encode(address));
         }
 
         /// <summary>
@@ -752,17 +430,22 @@ namespace TangramCypher.ApplicationLayer.Wallet
         /// <param name="networkApi">Network API.</param>
         public byte[] NetworkAddress(byte[] pk, NetworkApiMethod networkApi = null)
         {
-            Guard.Argument(pk, nameof(pk)).NotNull().MaxCount(32);
+            Guard.Argument(pk, nameof(pk)).NotNull();
 
-            string env = string.Empty;
-            byte[] address = new byte[33];
+            byte[] byteAddress = null;
 
-            env = networkApi == null ? environment : networkApi.ToString();
-            address[0] = env == Constant.Mainnet ? (byte)0x1 : (byte)74;
+            try
+            {
+                var address = AddressBuilderFactory.Global.EncodeFromPublicKey(pk, CurrentAddressVersion.Get(environment, networkApi));
 
-            Array.Copy(pk, 0, address, 1, 32);
+                byteAddress = address.ToBytes();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex.Message);
+            }
 
-            return Encoding.UTF8.GetBytes(Base58.Bitcoin.Encode(address));
+            return byteAddress;
         }
 
         /// <summary>
@@ -776,42 +459,43 @@ namespace TangramCypher.ApplicationLayer.Wallet
             Guard.Argument(password, nameof(password)).NotNull();
             Guard.Argument(version, nameof(version)).NotNegative();
 
-            using (var insecurePassword = password.Insecure())
-            {
-                var hash = Cryptography.GenericHashNoKey($"{version} {insecurePassword.Value}");
-                return Prover.GetHashStringNumber(hash).ToByteArray().ToHex();
-            }
+            using var insecurePassword = password.Insecure();
+            var hash = Cryptography.GenericHashNoKey($"{version} {insecurePassword.Value}");
+            return Prover.GetHashStringNumber(hash).ToByteArray().ToHexString();
         }
 
-        public async Task<bool> ClearTransactions(SecureString identifier, SecureString password)
+        /// <summary>
+        /// Returns balance sheet for the calling wallet.
+        /// </summary>
+        /// <param name="identifier"></param>
+        /// <param name="password"></param>
+        /// <returns></returns>
+        public IEnumerable<BlanceSheetDto> TransactionHistory(SecureString identifier, SecureString password)
         {
-            Guard.Argument(identifier, nameof(identifier)).NotNull();
-            Guard.Argument(password, nameof(password)).NotNull();
+            ulong credit = 0;
+            var session = new Session(identifier, password);
 
-            bool cleared = false;
+            List<TransactionDto> txns;
 
-            using (var insecureIdentifier = identifier.Insecure())
+            using (var db = Util.LiteRepositoryFactory(session.MasterKey, session.Identifier.ToUnSecureString()))
             {
-                try
+                txns = db.Fetch<TransactionDto>();
+                if (txns?.Any() != true)
                 {
-                    var data = await vaultServiceClient.GetDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet");
-
-                    if (data.Data.TryGetValue("transactions", out object txs))
-                    {
-                        data.Data.Add("transactions", new List<TransactionDto>());
-                    }
-
-                    await vaultServiceClient.SaveDataAsync(identifier, password, $"wallets/{insecureIdentifier.Value}/wallet", data.Data);
-
-                    cleared = true;
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex.Message);
+                    return null;
                 }
             }
 
-            return cleared;
+            var final = txns.OrderBy(f => f.DateTime).Select(tx => new BlanceSheetDto
+            {
+                DateTime = tx.DateTime.ToUniversalTime(),
+                Memo = tx.Memo,
+                MoneyOut = tx.TransactionType == TransactionType.Send ? $"-{tx.Amount.DivWithNaT().ToString("F9")}" : "",
+                MoneyIn = tx.TransactionType == TransactionType.Receive ? tx.Amount.DivWithNaT().ToString("F9") : "",
+                Balance = tx.TransactionType == TransactionType.Send ? (credit -= tx.Amount).DivWithNaT().ToString("F9") : (credit += tx.Amount).DivWithNaT().ToString("F9")
+            });
+
+            return final;
         }
     }
 }

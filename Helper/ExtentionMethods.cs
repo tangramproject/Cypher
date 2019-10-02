@@ -14,9 +14,12 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Security;
 using System.Text;
+using Dawn;
 using Newtonsoft.Json;
 using Sodium;
+using TangramCypher.ApplicationLayer.Actor;
 using TangramCypher.ApplicationLayer.Coin;
+using TangramCypher.Model;
 
 namespace TangramCypher.Helper
 {
@@ -24,8 +27,8 @@ namespace TangramCypher.Helper
     {
         public static StringContent AsJson(this object o)
           => new StringContent(JsonConvert.SerializeObject(o), Encoding.UTF8, "application/json");
-        public static string ToHex(this byte[] data) => Utilities.BinaryToHex(data);
-        public static byte[] FromHex(this string hex) => Utilities.HexToBinary(hex);
+        public static string ToHexString(this byte[] data) => Utilities.BinaryToHex(data);
+        public static byte[] FromHexString(this string hex) => Utilities.HexToBinary(hex);
         public static string ToBase64(this byte[] data) => Convert.ToBase64String(Encoding.UTF8.GetBytes(Utilities.BinaryToHex(data)));
         public static byte[] ToByteArrayWithPadding(this string str)
         {
@@ -60,6 +63,13 @@ namespace TangramCypher.Helper
             secureString.MakeReadOnly();
             return secureString;
         }
+        public static SecureString ToSecureString(this byte[] value)
+        {
+            var secureString = new SecureString();
+            Array.ForEach(Encoding.UTF8.GetString(value).ToArray(), secureString.AppendChar);
+            secureString.MakeReadOnly();
+            return secureString;
+        }
         public static string ToUnSecureString(this SecureString secureString)
         {
             IntPtr unmanagedString = IntPtr.Zero;
@@ -73,7 +83,7 @@ namespace TangramCypher.Helper
                 Marshal.ZeroFreeGlobalAllocUnicode(unmanagedString);
             }
         }
-        public static byte[] ToArray(this SecureString s)
+        internal static byte[] ToArray(this SecureString s)
         {
             if (s == null)
                 throw new NullReferenceException();
@@ -98,49 +108,53 @@ namespace TangramCypher.Helper
             }
             return result.ToArray();
         }
-        public static CoinDto FormatCoinToBase64(this CoinDto coin)
-        {
-            var formattedCoin = new CoinDto
-            {
-                Envelope = new EnvelopeDto()
-                {
-                    Commitment = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Envelope.Commitment)),
-                    Proof = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Envelope.Proof)),
-                    PublicKey = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Envelope.PublicKey)),
-                    Signature = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Envelope.Signature))
-                }
-            };
-            formattedCoin.Hash = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Hash));
-            formattedCoin.Hint = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Hint));
-            formattedCoin.Keeper = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Keeper));
-            formattedCoin.Network = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Network));
-            formattedCoin.Principle = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Principle));
-            formattedCoin.Stamp = Convert.ToBase64String(Encoding.UTF8.GetBytes(coin.Stamp));
-            formattedCoin.Version = coin.Version;
 
-            return formattedCoin;
-        }
-        public static CoinDto FormatCoinFromBase64(this CoinDto coin)
+        internal static void ZeroString(this string value)
         {
-            var formattedCoin = new CoinDto
+            var handle = GCHandle.Alloc(value, GCHandleType.Pinned);
+            unsafe
             {
-                Envelope = new EnvelopeDto()
+                var pValue = (char*)handle.AddrOfPinnedObject();
+                for (int index = 0; index < value.Length; index++)
                 {
-                    Commitment = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Envelope.Commitment)),
-                    Proof = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Envelope.Proof)),
-                    PublicKey = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Envelope.PublicKey)),
-                    Signature = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Envelope.Signature))
+                    pValue[index] = char.MinValue;
                 }
-            };
-            formattedCoin.Hash = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Hash));
-            formattedCoin.Hint = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Hint));
-            formattedCoin.Keeper = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Keeper));
-            // formattedCoin.Network = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Network));
-            formattedCoin.Principle = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Principle));
-            formattedCoin.Stamp = Encoding.UTF8.GetString(Convert.FromBase64String(coin.Stamp));
-            formattedCoin.Version = coin.Version;
+            }
 
-            return formattedCoin;
+            handle.Free();
         }
+
+        public static ulong MulWithNaT(this ulong value) => (ulong)(value * Constant.NanoTan);
+
+        public static double DivWithNaT(this ulong value) => Convert.ToDouble(value) / Constant.NanoTan;
+
+        public static ulong ConvertToUInt64(this double value)
+        {
+            Guard.Argument(value, nameof(value)).NotZero().NotNegative();
+
+            ulong amount;
+
+            try
+            {
+                var parts = value.ToString().Split(new char[] { '.', ',' });
+                var part1 = (ulong)System.Math.Truncate(value);
+
+                if (parts.Length.Equals(1))
+                    amount = part1.MulWithNaT();
+                else
+                {
+                    var part2 = (ulong)((value - part1) * ulong.Parse("1".PadRight(parts[1].Length + 1, '0')) + 0.5);
+                    amount = part1.MulWithNaT() + ulong.Parse(part2.ToString());
+                }
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+
+            return amount;
+        }
+
+        public static byte[] ToBytes<T>(this T arg) => Encoding.UTF8.GetBytes(arg.ToString());
     }
 }

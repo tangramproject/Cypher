@@ -13,20 +13,13 @@ namespace TangramCypher.ApplicationLayer.Actor
         private readonly string name;
         private readonly int value;
 
-        public static readonly RestApiMethod PostBlock = new RestApiMethod(1, Constant.PostBlock);
-        public static readonly RestApiMethod BlockMerkle = new RestApiMethod(2, Constant.GetBlockMerkle);
-        public static readonly RestApiMethod PostCoin = new RestApiMethod(3, Constant.PostCoin);
-        public static readonly RestApiMethod Coin = new RestApiMethod(4, Constant.GetCoin);
-        public static readonly RestApiMethod Coins = new RestApiMethod(5, Constant.GetCoins);
-        public static readonly RestApiMethod Transaction = new RestApiMethod(6, Constant.GetTransaction);
-        public static readonly RestApiMethod TransactionCount = new RestApiMethod(7, Constant.GetTransactionCount);
-        public static readonly RestApiMethod TransactionRange = new RestApiMethod(8, Constant.GetTransactionRange);
-        public static readonly RestApiMethod VerifiyShortTransactions = new RestApiMethod(9, Constant.GetVerifiyShortTransactions);
-        public static readonly RestApiMethod Message = new RestApiMethod(10, Constant.GetMessage);
-        public static readonly RestApiMethod PostMessage = new RestApiMethod(11, Constant.PostMessage);
-        public static readonly RestApiMethod Messages = new RestApiMethod(12, Constant.GetMessages);
-        public static readonly RestApiMethod MessageRange = new RestApiMethod(13, Constant.GetMessageRange);
-        public static readonly RestApiMethod MessageCount = new RestApiMethod(14, Constant.GetMessageCount);
+        public static readonly RestApiMethod PostCoin = new RestApiMethod(1, Constant.PostCoin);
+        public static readonly RestApiMethod Coin = new RestApiMethod(2, Constant.GetCoin);
+        public static readonly RestApiMethod Message = new RestApiMethod(3, Constant.GetMessage);
+        public static readonly RestApiMethod PostMessage = new RestApiMethod(4, Constant.PostMessage);
+        public static readonly RestApiMethod Messages = new RestApiMethod(5, Constant.GetMessages);
+        public static readonly RestApiMethod MessageRange = new RestApiMethod(6, Constant.GetMessageRange);
+        public static readonly RestApiMethod MessageCount = new RestApiMethod(7, Constant.GetMessageCount);
 
         private RestApiMethod(int value, string name)
         {

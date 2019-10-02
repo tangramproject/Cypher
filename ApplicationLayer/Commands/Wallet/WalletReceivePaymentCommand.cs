@@ -17,6 +17,7 @@ using TangramCypher.ApplicationLayer.Wallet;
 using Kurukuru;
 using System.Security;
 using Microsoft.Extensions.Logging;
+using TangramCypher.Model;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
 {
@@ -37,7 +38,7 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
             console = serviceProvider.GetService<IConsole>();
             logger = serviceProvider.GetService<ILogger>();
 
-            actorService.MessagePump += ActorService_MessagePump;
+            actorService.SetMessagePump(ActorService_MessagePump);
         }
 
         public override async Task Execute()
@@ -58,11 +59,8 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
 
                         try
                         {
-                            await actorService
-                                  .MasterKey(password)
-                                  .Identifier(identifier)
-                                  .FromAddress(address)
-                                  .ReceivePayment();
+                            var session = new Session(identifier, password) { SenderAddress = address };
+                            await actorService.ReceivePayment(session);
                         }
                         catch (Exception ex)
                         {
@@ -71,17 +69,19 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                         }
                         finally
                         {
-                            var lastAmount = Convert.ToString(await walletService.LastTransactionAmount(identifier, password, TransactionType.Receive));
-                            var balance = Convert.ToString(await actorService.CheckBalance());
+                            var transaction = walletService.LastTransaction(identifier, password, TransactionType.Receive);
+                            var txnReceivedAmount = transaction == null ? 0.ToString() : transaction.Amount.DivWithNaT().ToString("F9");
+                            var txnMemo = transaction == null ? "" : transaction.Memo;
+                            var balance = walletService.AvailableBalance(identifier, password);
 
-                            spinner.Text = $"Received:{lastAmount }  Available Balance: {balance}";
+                            spinner.Text = $"Memo: {txnMemo}  Received: {txnReceivedAmount}  Available Balance: {balance.Result.DivWithNaT().ToString("F9")}";
                         }
-                    });
+                    }, Patterns.Toggle3);
                 }
             }
         }
 
-        private void ActorService_MessagePump(object sender, MessagePumpEventArgs e)
+        private void ActorService_MessagePump(MessagePumpEventArgs e)
         {
             spinner.Text = e.Message;
         }

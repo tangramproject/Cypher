@@ -49,13 +49,10 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
 
                     line = option == 1 ? LocalFile(path) : await WebFile(path);
 
-                    var message = await actorService
-                        .MasterKey(password)
-                        .Identifier(identifier)
-                        .FromAddress(address)
-                        .ReceivePaymentRedemptionKey(line);
+                    var session = new Session(identifier, password) { SenderAddress = address };
+                    var message = await actorService.ReceivePaymentRedemptionKey(session, line);
 
-                    console.WriteLine(JsonConvert.SerializeObject(message));
+                    console.WriteLine(JsonConvert.SerializeObject(message.Result));
                 }
             }
             catch (Exception ex)

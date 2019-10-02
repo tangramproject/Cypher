@@ -23,6 +23,12 @@ using System.Dynamic;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Logging;
 using Sodium;
+using TangramCypher.Model;
+using System.Reflection;
+using LiteDB;
+using ProtoBuf;
+using System.IO.Compression;
+using TangramCypher.Helper.LibSodium;
 
 namespace TangramCypher.Helper
 {
@@ -34,16 +40,6 @@ namespace TangramCypher.Helper
         {
             var stack = new Stack<string>(value.Split(new string[] { delimiter }, StringSplitOptions.None));
             return stack.Pop();
-        }
-
-        public static RedemptionKeyDto FreeCommitmentKey(string base58Key)
-        {
-            var base58 = Base58.Bitcoin.Decode(base58Key);
-            var proof = Encoding.UTF8.GetString(base58).Substring(0, 64);
-            var key1 = Encoding.UTF8.GetString(base58).Substring(64, 128);
-            var key2 = Encoding.UTF8.GetString(base58).Substring(128, 192);
-
-            return new RedemptionKeyDto() { Key1 = key1, Key2 = key1, Stamp = proof };
         }
 
         public static IEnumerable<string> Split(string str, int chunkSize)
@@ -84,6 +80,31 @@ namespace TangramCypher.Helper
             return AppDomain.CurrentDomain.BaseDirectory;
         }
 
+        public static Stream TangramData(string id)
+        {
+            var wallets = Path.Combine(Path.GetDirectoryName(AppDomain.CurrentDomain.BaseDirectory), "wallets");
+            var wallet = Path.Combine(wallets, $"{id}.db");
+
+            if (!Directory.Exists(wallets))
+            {
+                try
+                {
+                    Directory.CreateDirectory(wallets);
+                }
+                catch (Exception ex)
+                {
+                    throw new Exception(ex.Message);
+                }
+            }
+
+            return File.Open(wallet, System.IO.FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite);
+        }
+
+        public static LiteRepository LiteRepositoryFactory(SecureString secret, string identifier)
+        {
+            return new LiteRepository(TangramData(identifier), null, secret.ToUnSecureString());
+        }
+
         public static string ToPlainString(SecureString secure)
         {
             return new NetworkCredential(string.Empty, secure).Password;
@@ -99,7 +120,7 @@ namespace TangramCypher.Helper
             {
                 try
                 {
-                    var js = new JsonSerializer();
+                    var js = new Newtonsoft.Json.JsonSerializer();
                     var searchResult = js.Deserialize<T>(jtr);
                     return searchResult;
                 }
@@ -121,7 +142,7 @@ namespace TangramCypher.Helper
             {
                 try
                 {
-                    var js = new JsonSerializer();
+                    var js = new Newtonsoft.Json.JsonSerializer();
                     var searchResult = js.Deserialize<IEnumerable<T>>(jtr);
                     return searchResult;
                 }
@@ -166,18 +187,9 @@ namespace TangramCypher.Helper
         {
             var intH = new BigInteger(hash);
             var subString = BigInteger.Parse(intH.ToString().Substring(0, bytes));
-            var result = Maths.Mod(subString, prime);
+            var result = Math.Mod(subString, prime);
 
             return result;
-        }
-
-        public static void AddProperty(ExpandoObject expando, string propertyName, object propertyValue)
-        {
-            var expandoDict = expando as IDictionary<string, object>;
-            if (expandoDict.ContainsKey(propertyName))
-                expandoDict[propertyName] = propertyValue;
-            else
-                expandoDict.Add(propertyName, propertyValue);
         }
 
         public static void LogException(IConsole console, ILogger logger, Exception e)
@@ -197,19 +209,198 @@ namespace TangramCypher.Helper
             logger.LogWarning(message);
         }
 
-        public static byte[] FormatNetworkAddress(byte[] networkAddress)
+        public async static Task<T> TriesUntilCompleted<T>(Func<Task<T>> action, int tries, int delay, T expected)
+        {
+            var result = default(T);
+
+            for (int i = 0; i < tries; i++)
+            {
+                try
+                {
+                    result = await action();
+                    if (result.Equals(expected))
+                        break;
+                }
+                finally
+                {
+                    await Task.Delay(delay);
+                }
+            }
+
+            return result;
+        }
+
+        public async static Task<TaskResult<T>> TriesUntilCompleted<T>(Func<Task<TaskResult<T>>> action, int tries, int delay) where T: class
+        {
+            var result = default(TaskResult<T>);
+
+            for (int i = 0; i < tries; i++)
+            {
+                try
+                {
+                    result = await action();
+                    if (result.Result != null)
+                        break;
+                }
+                finally
+                {
+                    await Task.Delay(delay);
+                }
+            }
+
+            return result;
+        }
+
+        public static string GetPrimaryKeyName(object obj)
+        {
+            string pkName = null;
+            var props = obj.GetType().GetProperties();
+
+            foreach (PropertyInfo prop in props)
+            {
+                object[] attrs = prop.GetCustomAttributes(true);
+                foreach (object attr in attrs)
+                {
+                    if (attr is PrimaryKey primaryKey)
+                        pkName = prop.Name;
+                }
+            }
+
+            return pkName;
+        }
+
+        public static T GetPropertyValue<T>(object obj, string propName)
+        {
+            return (T)obj.GetType().GetProperty(propName).GetValue(obj, null);
+        }
+
+        public static string GetPropertyValue(object obj, string propName)
+        {
+            return obj.GetType().GetProperty(propName).GetValue(obj, null).ToString();
+        }
+
+        public static void SetPropertyValue(object obj, string propName, ulong value)
+        {
+            obj.GetType().GetProperty(propName).SetValue(obj, value);
+        }
+
+        public static ulong Sum(IEnumerable<ulong> source)
+        {
+            var sum = 0UL;
+            foreach (var number in source)
+            {
+                sum += number;
+            }
+            return sum;
+        }
+
+        public static ulong Sum(IEnumerable<TransactionDto> source, TransactionType transactionType)
+        {
+            var amounts = source.Where(tx => tx.TransactionType == transactionType).Select(p => p.Amount);
+            var sum = 0UL;
+
+            foreach (var amount in amounts)
+            {
+                sum += amount;
+            }
+            return sum;
+        }
+
+        public static byte[] SerializeProto<T>(T data)
         {
             try
             {
-                byte[] pk = new byte[32];
-                Array.Copy(networkAddress, 1, pk, 0, 32);
-                return pk;
+                using (var ms = new MemoryStream())
+                {
+                    Serializer.Serialize(ms, data);
+                    return ms.ToArray();
+                }
             }
-            catch
+            catch (Exception ex)
             {
+                throw ex;
+            }
+        }
+
+        public static T DeserializeProto<T>(byte[] data)
+        {
+            try
+            {
+                using (var ms = new MemoryStream(data))
+                {
+                    return Serializer.Deserialize<T>(ms);
+                }
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+
+        public static IEnumerable<T> DeserializeListProto<T>(byte[] data) where T : class
+        {
+            List<T> list = new List<T>();
+
+            try
+            {
+                using (var ms = new MemoryStream(data))
+                {
+                    T item;
+                    while ((item = Serializer.DeserializeWithLengthPrefix<T>(ms, PrefixStyle.Base128, fieldNumber: 1)) != null)
+                    {
+                        list.Add(item);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                throw ex;
             }
 
-            return networkAddress;
+            return list.AsEnumerable();
+        }
+
+        public static unsafe byte[] GetBytes(string str)
+        {
+            if (str == null) throw new ArgumentNullException(nameof(str));
+            if (str.Length == 0) return new byte[0];
+
+            fixed (char* p = str)
+            {
+                return new Span<byte>(p, str.Length * sizeof(char)).ToArray();
+            }
+        }
+
+        public static unsafe string GetString(byte[] bytes)
+        {
+            if (bytes == null) throw new ArgumentNullException(nameof(bytes));
+            if (bytes.Length % sizeof(char) != 0) throw new ArgumentException($"Invalid {nameof(bytes)} length");
+            if (bytes.Length == 0) return string.Empty;
+
+            fixed (byte* p = bytes)
+            {
+                return new string(new Span<char>(p, bytes.Length / sizeof(char)));
+            }
+        }
+
+        /// <summary>
+        /// Hash the specified coin.
+        /// </summary>
+        /// <returns>The hash.</returns>
+        /// <param name="coin">Coin.</param>
+        public static byte[] Hash(ICoinDto coin)
+        {
+            if (coin == null) throw new ArgumentNullException(nameof(coin));
+
+            return Cryptography.GenericHashNoKey(
+                string.Format("{0} {1} {2} {3} {4} {5} {6}",
+                    coin.Commitment,
+                    coin.Hint,
+                    coin.Keeper,
+                    coin.Network,
+                    coin.Principle,
+                    coin.Stamp,
+                    coin.RangeProof));
         }
     }
 }

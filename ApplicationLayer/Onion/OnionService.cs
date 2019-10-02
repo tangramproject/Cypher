@@ -19,7 +19,6 @@ using System.Threading.Tasks;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using TangramCypher.ApplicationLayer;
 using TangramCypher.Helper;
 
 namespace TangramCypher.ApplicationLayer.Onion
@@ -267,7 +266,8 @@ namespace TangramCypher.ApplicationLayer.Onion
                 "CircuitBuildTimeout 2",
                 "KeepalivePeriod 2",
                 "NewCircuitPeriod 15",
-                "NumEntryGuards 8",
+                "NumEntryGuards 3",
+                $"SocksPort {SocksPort}",
                 $"ControlPort {ControlPort}",
                 "Log notice stdout",
                 "SafeSocks 1",
@@ -327,6 +327,15 @@ namespace TangramCypher.ApplicationLayer.Onion
                         if (e.Data.Contains("Bootstrapped 100%: Done"))
                         {
                             OnionStarted = true;
+
+                            try
+                            {
+                                File.Create($"{tangramDirectory.FullName}/tor{torId}.started", 1, FileOptions.None);
+                            }
+                            catch (Exception ex)
+                            {
+                                logger.LogError(ex.Message);
+                            }
                             console.ResetColor();
                             logger.LogInformation("tor Started!");
                         }
@@ -352,6 +361,15 @@ namespace TangramCypher.ApplicationLayer.Onion
                 {
                     if (tor.Id == torId)
                     {
+                        try
+                        {
+                            File.Delete($"{tangramDirectory.FullName}/tor{torId}.started");
+                        }
+                        catch (Exception ex)
+                        {
+                            logger.LogError(ex.Message);
+                        }
+
                         tor.Kill();
                         break;
                     }

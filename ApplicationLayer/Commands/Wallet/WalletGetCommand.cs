@@ -12,6 +12,8 @@ using Microsoft.Extensions.DependencyInjection;
 using McMaster.Extensions.CommandLineUtils;
 using TangramCypher.Helper;
 using TangramCypher.ApplicationLayer.Wallet;
+using ConsoleTables;
+using System.Linq;
 
 namespace TangramCypher.ApplicationLayer.Commands.Wallet
 {
@@ -27,16 +29,33 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
             console = serviceProvider.GetService<IConsole>();
         }
 
-        public override async Task Execute()
+        public override Task Execute()
         {
             using (var identifier = Prompt.GetPasswordAsSecureString("Identifier:", ConsoleColor.Yellow))
             using (var password = Prompt.GetPasswordAsSecureString("Password:", ConsoleColor.Yellow))
             {
                 using (var id = identifier.Insecure())
                 {
-                    var profile = await walletService.Profile(identifier, password);
-                    console.WriteLine(profile);
+                    var addresses = walletService.ListAddresses(password, identifier.ToUnSecureString());
+
+                    if (addresses?.Any() == true)
+                    {
+                        var table = new ConsoleTable("Address");
+
+                        foreach (var address in addresses)
+                            table.AddRow(address);
+
+                        console.WriteLine(table);
+                    }
+                    else
+                    {
+                        console.ForegroundColor = ConsoleColor.Red;
+                        console.WriteLine("No addresses have been created.");
+                        console.ForegroundColor = ConsoleColor.White;
+                    }
                 }
+
+                return Task.CompletedTask;
             }
         }
     }
