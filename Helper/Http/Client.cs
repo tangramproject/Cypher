@@ -192,39 +192,35 @@ namespace TangramCypher.Helper.Http
 
             T result = default;
 
-            using (var client = socksPortHandler == null ? new HttpClient() : new HttpClient(socksPortHandler))
+            using var client = socksPortHandler == null ? new HttpClient() : new HttpClient(socksPortHandler);
+            client.BaseAddress = baseAddress;
+            client.DefaultRequestHeaders.Accept.Clear();
+            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+            try
             {
-                client.BaseAddress = baseAddress;
-                client.DefaultRequestHeaders.Accept.Clear();
-                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                using var request = new HttpRequestMessage(HttpMethod.Get, path);
+                using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+                var read = response.Content.ReadAsStringAsync().Result;
+                var jObject = JObject.Parse(read);
+                var jToken = jObject.GetValue("protobuf");
+                var byteArray = Convert.FromBase64String(jToken.Value<string>());
 
-                try
+                if (response.IsSuccessStatusCode)
+                    result = Util.DeserializeProto<T>(byteArray);
+                else
                 {
-                    using (var request = new HttpRequestMessage(HttpMethod.Get, path))
-                    using (var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
-                    {
-                        var read = response.Content.ReadAsStringAsync().Result;
-                        var jObject = JObject.Parse(read);
-                        var jToken = jObject.GetValue("protobuf");
-                        var byteArray = Convert.FromBase64String(jToken.Value<string>());
-
-                        if (response.IsSuccessStatusCode)
-                            result = Util.DeserializeProto<T>(byteArray);
-                        else
-                        {
-                            var content = await response.Content.ReadAsStringAsync();
-                            logger.LogError($"Result: {content}\n StatusCode: {(int)response.StatusCode}");
-                            throw new Exception(content);
-                        }
-                    }
+                    var content = await response.Content.ReadAsStringAsync();
+                    logger.LogError($"Result: {content}\n StatusCode: {(int)response.StatusCode}");
+                    throw new Exception(content);
                 }
-                catch (Exception ex)
-                {
-                    logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
-                }
-
-                return Task.FromResult(result).Result;
             }
+            catch (Exception ex)
+            {
+                logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
+            }
+
+            return Task.FromResult(result).Result;
         }
 
         private Uri GetBaseAddress()
@@ -246,39 +242,35 @@ namespace TangramCypher.Helper.Http
 
             IEnumerable<T> results = null;
 
-            using (var client = socksPortHandler == null ? new HttpClient() : new HttpClient(socksPortHandler))
+            using var client = socksPortHandler == null ? new HttpClient() : new HttpClient(socksPortHandler);
+            client.BaseAddress = baseAddress;
+            client.DefaultRequestHeaders.Accept.Clear();
+            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+            try
             {
-                client.BaseAddress = baseAddress;
-                client.DefaultRequestHeaders.Accept.Clear();
-                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                using var request = new HttpRequestMessage(HttpMethod.Get, path);
+                using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+                var read = response.Content.ReadAsStringAsync().Result;
+                var jObject = JObject.Parse(read);
+                var jToken = jObject.GetValue("protobuf");
+                var byteArray = Convert.FromBase64String(jToken.Value<string>());
 
-                try
+                if (response.IsSuccessStatusCode)
+                    results = Util.DeserializeListProto<T>(byteArray);
+                else
                 {
-                    using (var request = new HttpRequestMessage(HttpMethod.Get, path))
-                    using (var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
-                    {
-                        var read = response.Content.ReadAsStringAsync().Result;
-                        var jObject = JObject.Parse(read);
-                        var jToken = jObject.GetValue("protobuf");
-                        var byteArray = Convert.FromBase64String(jToken.Value<string>());
-
-                        if (response.IsSuccessStatusCode)
-                            results = Util.DeserializeListProto<T>(byteArray);
-                        else
-                        {
-                            var content = await response.Content.ReadAsStringAsync();
-                            logger.LogError($"Result: {content}\n StatusCode: {(int)response.StatusCode}");
-                            throw new Exception(content);
-                        }
-                    }
+                    var content = await response.Content.ReadAsStringAsync();
+                    logger.LogError($"Result: {content}\n StatusCode: {(int)response.StatusCode}");
+                    throw new Exception(content);
                 }
-                catch (Exception ex)
-                {
-                    logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
-                }
-
-                return Task.FromResult(results).Result;
             }
+            catch (Exception ex)
+            {
+                logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
+            }
+
+            return Task.FromResult(results).Result;
         }
 
         /// <summary>
@@ -308,21 +300,19 @@ namespace TangramCypher.Helper.Http
                 {   
                     var proto = Util.SerializeProto(payload);
 
-                    using (var response = await client.PostAsJsonAsync(path, proto, cancellationToken))
-                    {
-                        var read = response.Content.ReadAsStringAsync().Result;
-                        var jObject = JObject.Parse(read);
-                        var jToken = jObject.GetValue("protobuf");
-                        var byteArray = Convert.FromBase64String(jToken.Value<string>());
+                    using var response = await client.PostAsJsonAsync(path, proto, cancellationToken);
+                    var read = response.Content.ReadAsStringAsync().Result;
+                    var jObject = JObject.Parse(read);
+                    var jToken = jObject.GetValue("protobuf");
+                    var byteArray = Convert.FromBase64String(jToken.Value<string>());
 
-                        if (response.IsSuccessStatusCode)
-                            result = byteArray;
-                        else
-                        {
-                            var content = await response.Content.ReadAsStringAsync();
-                            logger.LogError($"Result: {content}\n StatusCode: {(int)response.StatusCode}");
-                            throw new Exception(content);
-                        }
+                    if (response.IsSuccessStatusCode)
+                        result = byteArray;
+                    else
+                    {
+                        var content = await response.Content.ReadAsStringAsync();
+                        logger.LogError($"Result: {content}\n StatusCode: {(int)response.StatusCode}");
+                        throw new Exception(content);
                     }
                 }
                 catch (Exception ex)

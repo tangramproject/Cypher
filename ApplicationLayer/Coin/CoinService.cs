@@ -172,10 +172,8 @@ namespace TangramCypher.ApplicationLayer.Coin
             Guard.Argument(secret, nameof(secret)).NotNull();
             Guard.Argument(salt, nameof(salt)).NotNull();
 
-            using (var insecureSecret = secret.Insecure())
-            {
-                return ArgonHash(Cryptography.GenericHashNoKey($"{version} {stamp} {insecureSecret.Value}", bytes).ToHexString(), salt).ToHexString();
-            }
+            using var insecureSecret = secret.Insecure();
+            return ArgonHash(Cryptography.GenericHashNoKey($"{version} {stamp} {insecureSecret.Value}", bytes).ToHexString(), salt).ToHexString();
         }
 
         public byte[] DeriveKey(ulong amount, string stamp, int version, SecureString secret, SecureString salt)
@@ -185,11 +183,9 @@ namespace TangramCypher.ApplicationLayer.Coin
             Guard.Argument(secret, nameof(secret)).NotNull();
             Guard.Argument(salt, nameof(salt)).NotNull();
 
-            using (var insecureSecret = secret.Insecure())
-            using (var insecureSalt = salt.Insecure())
-            {
-                return ArgonHash(Cryptography.GenericHashNoKey($"{amount} {stamp} {version} {insecureSecret.Value}", 32).ToHexString(), salt);
-            }
+            using var insecureSecret = secret.Insecure();
+            using var insecureSalt = salt.Insecure();
+            return ArgonHash(Cryptography.GenericHashNoKey($"{amount} {stamp} {version} {insecureSecret.Value}", 32).ToHexString(), salt);
         }
 
         /// <summary>
@@ -309,13 +305,11 @@ namespace TangramCypher.ApplicationLayer.Coin
             Guard.Argument(secret, nameof(secret)).NotNull();
             Guard.Argument(msg, nameof(msg)).NotNull().MaxCount(32);
 
-            using (var secp256k1 = new Secp256k1())
-            {
-                var blind = DeriveKey(version, stamp, secret, salt).FromHexString();
-                var sig = secp256k1.Sign(msg, blind);
+            using var secp256k1 = new Secp256k1();
+            var blind = DeriveKey(version, stamp, secret, salt).FromHexString();
+            var sig = secp256k1.Sign(msg, blind);
 
-                return sig;
-            }
+            return sig;
         }
 
         /// <summary>
@@ -329,11 +323,10 @@ namespace TangramCypher.ApplicationLayer.Coin
             Guard.Argument(msg, nameof(msg)).NotNull().MaxCount(32);
             Guard.Argument(blinding, nameof(blinding)).NotNull().MaxCount(32);
 
-            using (var secp256k1 = new Secp256k1())
-            {
-                var msgHash = Cryptography.GenericHashNoKey(Encoding.UTF8.GetString(msg));
-                return secp256k1.Sign(msgHash, blinding);
-            }
+            using var secp256k1 = new Secp256k1();
+            var msgHash = Cryptography.GenericHashNoKey(Encoding.UTF8.GetString(msg));
+
+            return secp256k1.Sign(msgHash, blinding);
         }
 
         /// <summary>
@@ -399,21 +392,19 @@ namespace TangramCypher.ApplicationLayer.Coin
         /// <param name="coin">Coin.</param>
         private void BulletProof(byte[] blindSum, byte[] commitSum, ulong balance, ICoinDto coin)
         {
-            using (var secp256k1 = new Secp256k1())
-            using (var pedersen = new Pedersen())
-            using (var bulletProof = new BulletProof())
-            {
-                var @struct = bulletProof.ProofSingle(balance, blindSum, Cryptography.RandomBytes(), null, null, null);
-                var success = bulletProof.Verify(commitSum, @struct.proof, null);
+            using var secp256k1 = new Secp256k1();
+            using var pedersen = new Pedersen();
+            using var bulletProof = new BulletProof();
+            var @struct = bulletProof.ProofSingle(balance, blindSum, Cryptography.RandomBytes(), null, null, null);
+            var success = bulletProof.Verify(commitSum, @struct.proof, null);
 
-                if (!success)
-                    throw new ArgumentOutOfRangeException(nameof(success), "Bullet proof failed.");
+            if (!success)
+                throw new ArgumentOutOfRangeException(nameof(success), "Bullet proof failed.");
 
-                coin.Commitment = commitSum.ToHexString();
-                coin.RangeProof = @struct.proof.ToHexString();
-                coin.Network = walletService.NetworkAddress(coin).ToHexString();
-                coin.Hash = Util.Hash(coin).ToHexString();
-            }
+            coin.Commitment = commitSum.ToHexString();
+            coin.RangeProof = @struct.proof.ToHexString();
+            coin.Network = walletService.NetworkAddress(coin).ToHexString();
+            coin.Hash = Util.Hash(coin).ToHexString();
         }
 
         /// <summary>

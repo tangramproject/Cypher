@@ -54,16 +54,14 @@ namespace TangramCypher.ApplicationLayer.Wallet
 
             try
             {
-                using (var db = Util.LiteRepositoryFactory(password, identifier.ToUnSecureString()))
+                using var db = Util.LiteRepositoryFactory(password, identifier.ToUnSecureString());
+                var txns = db.Fetch<TransactionDto>();
+                if (txns?.Any() != true)
                 {
-                    var txns = db.Fetch<TransactionDto>();
-                    if (txns?.Any() != true)
-                    {
-                        return TaskResult<ulong>.CreateSuccess(0);
-                    }
-
-                    balance = Balance(txns);
+                    return TaskResult<ulong>.CreateSuccess(0);
                 }
+
+                balance = Balance(txns);
             }
             catch (Exception ex)
             {
@@ -78,11 +76,9 @@ namespace TangramCypher.ApplicationLayer.Wallet
         {
             try
             {
-                using (var db = Util.LiteRepositoryFactory(secret, identifier))
-                {
-                    var keySet = CreateKeySet();
-                    db.Insert(keySet);
-                }
+                using var db = Util.LiteRepositoryFactory(secret, identifier);
+                var keySet = CreateKeySet();
+                db.Insert(keySet);
             }
             catch (Exception ex)
             {
@@ -315,16 +311,14 @@ namespace TangramCypher.ApplicationLayer.Wallet
 
         public IEnumerable<string> ListAddresses(SecureString secret, string identifier)
         {
-            using (var db = Util.LiteRepositoryFactory(secret, identifier))
+            using var db = Util.LiteRepositoryFactory(secret, identifier);
+            var keys = db.Fetch<KeySetDto>();
+            if (keys?.Any() != true)
             {
-                var keys = db.Fetch<KeySetDto>();
-                if (keys?.Any() != true)
-                {
-                    return Enumerable.Empty<string>();
-                }
-
-                return keys.Select(k => k.Address);
+                return Enumerable.Empty<string>();
             }
+
+            return keys.Select(k => k.Address);
         }
 
         /// <summary>
@@ -465,11 +459,9 @@ namespace TangramCypher.ApplicationLayer.Wallet
             Guard.Argument(password, nameof(password)).NotNull();
             Guard.Argument(version, nameof(version)).NotNegative();
 
-            using (var insecurePassword = password.Insecure())
-            {
-                var hash = Cryptography.GenericHashNoKey($"{version} {insecurePassword.Value}");
-                return Prover.GetHashStringNumber(hash).ToByteArray().ToHexString();
-            }
+            using var insecurePassword = password.Insecure();
+            var hash = Cryptography.GenericHashNoKey($"{version} {insecurePassword.Value}");
+            return Prover.GetHashStringNumber(hash).ToByteArray().ToHexString();
         }
 
         /// <summary>
