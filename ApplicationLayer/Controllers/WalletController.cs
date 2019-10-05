@@ -71,10 +71,8 @@ namespace TangramCypher.ApplicationLayer.Controllers
         [HttpPost("profile", Name = "WalletProfile")]
         public IActionResult WalletProfile([FromBody] CredentialsDto credentials)
         {
-            //var profile = await walletService.Profile(credentials.Identifier.ToSecureString(), credentials.Password.ToSecureString());
-            //return new OkObjectResult(JsonConvert.DeserializeObject(profile));
-
-            return new OkResult();
+            var profile = walletService.ListKeySets(credentials.Password.ToSecureString(), credentials.Identifier);
+            return new OkObjectResult(profile);
         }
 
         [HttpGet("list", Name = "WalletList")]

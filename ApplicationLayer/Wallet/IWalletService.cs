@@ -32,5 +32,6 @@ namespace TangramCypher.ApplicationLayer.Wallet
         IEnumerable<string> WalletList();
         IEnumerable<BlanceSheetDto> TransactionHistory(SecureString identifier, SecureString password);
         IEnumerable<string> ListAddresses(SecureString secret, string identifier);
+        IEnumerable<KeySetDto> ListKeySets(SecureString secret, string identifier);
     }
 }
