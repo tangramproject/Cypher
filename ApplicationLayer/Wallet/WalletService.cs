@@ -309,10 +309,33 @@ namespace TangramCypher.ApplicationLayer.Wallet
             return files;
         }
 
-        public IEnumerable<string> ListAddresses(SecureString secret, string identifier)
+        /// <summary>
+        /// Lists all KeySets
+        /// </summary>
+        /// <param name="secret"></param>
+        /// <param name="identifier"></param>
+        /// <returns></returns>
+        public IEnumerable<KeySetDto> ListKeySets(SecureString secret, string identifier)
         {
             using var db = Util.LiteRepositoryFactory(secret, identifier);
             var keys = db.Fetch<KeySetDto>();
+            if (keys?.Any() != true)
+            {
+                return Enumerable.Empty<KeySetDto>();
+            }
+
+            return keys;
+        }
+
+        /// <summary>
+        /// Lists all addresses
+        /// </summary>
+        /// <param name="secret"></param>
+        /// <param name="identifier"></param>
+        /// <returns></returns>
+        public IEnumerable<string> ListAddresses(SecureString secret, string identifier)
+        {
+            var keys = ListKeySets(secret, identifier);
             if (keys?.Any() != true)
             {
                 return Enumerable.Empty<string>();
