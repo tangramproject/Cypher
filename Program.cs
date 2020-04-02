@@ -105,7 +105,10 @@ namespace TangramCypher
                                                                 provider => logger,
                                                                 ServiceLifetime.Singleton));
                 })
-                .UseSerilog()
+                .UseSerilog((context, configuration) => configuration
+                .Enrich.FromLogContext()
+                .MinimumLevel.Debug()
+                .WriteTo.File("Cypher.log", rollingInterval: RollingInterval.Day))
                 .UseConsoleLifetime();
 
             await builder.RunConsoleAsync();

@@ -41,16 +41,18 @@ namespace TangramCypher.ApplicationLayer.Actor
         private readonly ICoinService coinService;
         private readonly IConfigurationSection apiNetworkSection;
         private readonly string environment;
-        private ConcurrentDictionary<Guid, Session> Sessions { get; }
-        private Action<MessagePumpEventArgs> MessagePump;
+        private readonly Client client;
 
+        private ConcurrentDictionary<Guid, Session> Sessions { get; }
+
+        public event MessagePumpEventHandler MessagePump;
         protected void OnMessagePump(MessagePumpEventArgs e)
         {
             if (MessagePump != null)
             {
                 try
                 {
-                    MessagePump(e);
+                    MessagePump.Invoke(this, e);
                 }
                 catch (Exception ex)
                 {
@@ -68,20 +70,21 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             apiNetworkSection = configuration.GetSection(Constant.ApiNetwork);
             environment = apiNetworkSection.GetValue<string>(Constant.Environment);
-
-            Client = onionService.OnionEnabled.Equals(1) ?
-                new Client(configuration, logger, new DotNetTor.SocksPort.SocksPortHandler(onionService.SocksHost, onionService.SocksPort)) :
-                new Client(configuration, logger);
-
+            client = GetClient(configuration);
             Sessions = new ConcurrentDictionary<Guid, Session>();
 
-            Test().GetAwaiter().GetResult();
+            Test().GetAwaiter();
         }
 
         /// <summary>
         /// Get the client.
         /// </summary>
-        public Client Client { get; }
+        public Client GetClient(IConfiguration configuration)
+        {
+            return onionService.OnionEnabled.Equals(1) ?
+                new Client(configuration, logger, new DotNetTor.SocksPort.SocksPortHandler(onionService.SocksHost, onionService.SocksPort)) :
+                new Client(configuration, logger);
+        }
 
         /// <summary>
         /// Get the session.
@@ -175,19 +178,22 @@ namespace TangramCypher.ApplicationLayer.Actor
             {
                 pk = receiverPk;
             }
-    
+
             TaskResult<TrackDto> track;
             using (var db = Util.LiteRepositoryFactory(session.MasterKey, session.Identifier.ToUnSecureString()))
-            track = db.Query<TaskResult<TrackDto>>().Where(trk => trk.Result.PublicKey.Equals(pk.ToHexString())).FirstOrDefault();
+
+            track = db.Query<TaskResult<TrackDto>>()
+                    .Where(trk => trk.Result.PublicKey.Equals(pk.ToHexString()))
+                    .FirstOrDefault();
 
             UpdateMessagePump("Downloading messages ...");
 
-            var countResult = await Client.GetAsync<MessageCountDto>(msgAddress, RestApiMethod.MessageCount);
+            var countResult = await client.GetAsync<MessageCountDto>(msgAddress, RestApiMethod.MessageCount);
             int countValue = countResult.Success ? countResult.Result.Count : 1;
 
             var messages = track.Result == null
-                ? await Client.GetRangeAsync<MessageDto>(msgAddress, 0, countValue, RestApiMethod.MessageRange)
-                : await Client.GetRangeAsync<MessageDto>(msgAddress, track.Result.Skip, countValue, RestApiMethod.MessageRange);
+                ? await client.GetRangeAsync<MessageDto>(msgAddress, 0, countValue, RestApiMethod.MessageRange)
+                : await client.GetRangeAsync<MessageDto>(msgAddress, track.Result.Skip, countValue, RestApiMethod.MessageRange);
 
             switch (messages)
             {
@@ -417,13 +423,10 @@ namespace TangramCypher.ApplicationLayer.Actor
             try
             {
                 var redemptionKey = JsonConvert.DeserializeObject<RedemptionKeyDto>(message);
-                var coinResult = await Client.GetAsync<BlockIDDto>(redemptionKey.Stamp, RestApiMethod.Coin, new string[] { redemptionKey.Hash });
+                var coinResult = await client.GetAsync<BlockIDDto>(redemptionKey.Stamp, RestApiMethod.Coin, new string[] { redemptionKey.Hash });
 
                 if (coinResult.Result == null)
                     return false;
-
-                //var blockId = Util.DeserializeProto<BlockIDDto>(coinResult.Result);
-                // var coin = Util.DeserializeProto<BaseCoinDto>(coinResult.Result.SignedBlock.Coin);
 
                 var session = GetSession(sessionId);
                 var (swap1, swap2) = coinService.CoinSwap(session.SecretKey, redemptionKey.Salt.ToSecureString(), coinResult.Result.SignedBlock.Coin.Cast<ReceiverCoinDto>(), redemptionKey);
@@ -473,13 +476,9 @@ namespace TangramCypher.ApplicationLayer.Actor
 
             coin.Hash = Util.Hash(coin).ToHexString();
 
-            //TODO.... remove
-            //coin.Network = walletService.NetworkAddress(coin).ToHex();
-            //coin.Envelope.RangeProof = walletService.NetworkAddress(coin).ToHex();
-
             if (status.Equals(mode))
             {
-                var returnCoin = await Client.PostAsync(coin, RestApiMethod.PostCoin);
+                var returnCoin = await client.PostAsync(coin, RestApiMethod.PostCoin);
                 if (returnCoin.Result != null)
                     canPass = true;
             }
@@ -547,7 +546,7 @@ namespace TangramCypher.ApplicationLayer.Actor
 
                 if (pubKeyAgreementExists.Equals(false))
                 {
-                    var value = db.Insert(payload);
+                    db.Insert(payload);
                 }
             }
             catch (Exception ex)
@@ -704,7 +703,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         {
             var session = GetSession(sessionId);
             using var db = Util.LiteRepositoryFactory(session.MasterKey, session.Identifier.ToUnSecureString());
-            var keySets = db.Fetch<KeySetDto>();
+            var keySets = db.Query<KeySetDto>().ToList();
             var rnd = new Random();
             var address = keySets[rnd.Next(keySets.Count())].Address;
 
@@ -726,12 +725,23 @@ namespace TangramCypher.ApplicationLayer.Actor
         private void SetSecretKey(Guid sessionId)
         {
             var session = GetSession(sessionId);
-            using var db = Util.LiteRepositoryFactory(session.MasterKey, session.Identifier.ToUnSecureString());
-            var keySet = db.Query<KeySetDto>().Where(k => k.Address.Equals(session.SenderAddress)).FirstOrDefault();
+            var keySet = GetKeySet(session);
 
             session.SecretKey = keySet.SecretKey.ToSecureString();
             SessionAddOrUpdate(session);
             keySet.SecretKey.ZeroString();
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="session"></param>
+        /// <returns></returns>
+        private KeySetDto GetKeySet(Session session)
+        {
+            using var db = Util.LiteRepositoryFactory(session.MasterKey, session.Identifier.ToUnSecureString());
+            var keySet = db.Query<KeySetDto>().Where(k => k.Address.Equals(session.SenderAddress)).FirstOrDefault();
+            return keySet;
         }
 
         /// <summary>
@@ -741,8 +751,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         private void SetPublicKey(Guid sessionId)
         {
             var session = GetSession(sessionId);
-            using var db = Util.LiteRepositoryFactory(session.MasterKey, session.Identifier.ToUnSecureString());
-            var keySet = db.Query<KeySetDto>().Where(k => k.Address.Equals(session.SenderAddress)).FirstOrDefault();
+            var keySet = GetKeySet(session);
 
             session.PublicKey = keySet.PublicKey.ToSecureString();
             SessionAddOrUpdate(session);
@@ -750,7 +759,7 @@ namespace TangramCypher.ApplicationLayer.Actor
         }
 
         /// <summary>
-        /// Builds the redemption key message.
+        /// Builds the redemption key message.  
         /// </summary>
         /// <returns>The redemption key message.</returns>
         public TaskResult<bool> RedemptionKeyMessage(Guid sessionId)
@@ -911,15 +920,6 @@ namespace TangramCypher.ApplicationLayer.Actor
         }
 
         /// <summary>
-        /// Callback for handling messages.
-        /// </summary>
-        /// <param name="messagePump"></param>
-        public void SetMessagePump(Action<MessagePumpEventArgs> messagePump)
-        {
-            MessagePump = messagePump;
-        }
-
-        /// <summary>
         /// Updates the message pump.
         /// </summary>
         /// <param name="message">Message.</param>
@@ -945,7 +945,7 @@ namespace TangramCypher.ApplicationLayer.Actor
                 {
                     logger.LogWarning($"Request failed. Waiting {timeSpan} before next retry. Retry attempt {retryCount}");
                 })
-                .ExecuteAsync(() => Client.PostAsync(payload, api));
+                .ExecuteAsync(() => client.PostAsync(payload, api));
 
             return response;
         }
@@ -1023,7 +1023,9 @@ namespace TangramCypher.ApplicationLayer.Actor
             return unpadded;
         }
 
-        private async Task Test()         {             try             {                 var session = new Session("id_eac4c7a42db0ad0f402ad622d65b0767".ToSecureString(), "its decaf damsel brayed that finite prawn was wading onto that herdsman".ToSecureString())                 {                     Amount = 20000000000000                 };                  session = SessionAddOrUpdate(session);                  coinService.Receiver(session.MasterKey, session.Amount, out ReceiverCoinDto coin, out byte[] blind, out byte[] salt);                  var post = await PostArticle(coin.Cast<BaseCoinDto>(), RestApiMethod.PostCoin);                                  if (post.Success.Equals(false))                 {                     throw new Exception(JsonConvert.SerializeObject(post.NonSuccessMessage));                 }
+        private async Task Test()         {             try             {                 var session = new Session("id_912f0b64c94c0dbbcfe246323860536c".ToSecureString(), "Carly advised should stylish ones coast alongside a snowstop".ToSecureString())                 {                     Amount = 20000000000000                 };                  session = SessionAddOrUpdate(session);                  coinService.Receiver(session.MasterKey, session.Amount, out ReceiverCoinDto coin, out byte[] blind, out byte[] salt);                  var post = await PostArticle(coin.Cast<BaseCoinDto>(), RestApiMethod.PostCoin);
+
+                if (post.Success.Equals(false))                 {                     throw new Exception(JsonConvert.SerializeObject(post.NonSuccessMessage));                 }
 
                 var blockId = Util.DeserializeProto<BlockIDDto>(post.Result);                 var added = AddWalletTransaction(session.SessionId, blockId.SignedBlock.Coin.Cast<ReceiverCoinDto>(), session.Amount, "Check running total..", blind, salt, TransactionType.Receive);                  if (added.Equals(false))                 {                     throw new Exception("Transaction wallet failed to add!");                 }             }             catch (Exception ex)             {                 throw ex;             }          }
     }

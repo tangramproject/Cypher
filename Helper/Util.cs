@@ -100,9 +100,35 @@ namespace TangramCypher.Helper
             return File.Open(wallet, System.IO.FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite);
         }
 
+        public static string WalletPath(string id)
+        {
+            var wallets = Path.Combine(Path.GetDirectoryName(AppDomain.CurrentDomain.BaseDirectory), "wallets");
+            var wallet = Path.Combine(wallets, $"{id}.db");
+
+            if (!Directory.Exists(wallets))
+            {
+                try
+                {
+                    Directory.CreateDirectory(wallets);
+                }
+                catch (Exception ex)
+                {
+                    throw new Exception(ex.Message);
+                }
+            }
+
+            return wallet;
+        }
+
         public static LiteRepository LiteRepositoryFactory(SecureString secret, string identifier)
         {
-            return new LiteRepository(TangramData(identifier), null, secret.ToUnSecureString());
+            var connectionString = new ConnectionString
+            {
+                Filename = WalletPath(identifier),
+                Password = secret.ToUnSecureString()
+            };
+
+            return new LiteRepository(connectionString);
         }
 
         public static string ToPlainString(SecureString secure)

@@ -43,15 +43,17 @@ namespace TangramCypher.ApplicationLayer.Controllers
             var session = new Session(credentials.Identifier.ToSecureString(), credentials.Password.ToSecureString());
             var keySet = walletService.CreateKeySet();
 
-            using (var db = Util.LiteRepositoryFactory(session.MasterKey, session.Identifier.ToUnSecureString()))
+            using var db = Util.LiteRepositoryFactory(session.MasterKey, session.Identifier.ToUnSecureString());
+
+            try
             {
-                var addKeySet = db.Insert(keySet);
-
-                if (addKeySet)
-                    return new CreatedResult("httpWallet", new { success = addKeySet });
+                db.Insert(keySet);
+                return new CreatedResult("httpWallet", new { success = true });
             }
-
-            return new BadRequestResult();
+            catch (Exception)
+            {
+                return new BadRequestResult();
+            }
         }
 
         [HttpPost("balance", Name = "WalletBalance")]
@@ -141,15 +143,13 @@ namespace TangramCypher.ApplicationLayer.Controllers
 
                 session = actorService.GetSession(session.SessionId);
 
-                using (var db = Util.LiteRepositoryFactory(session.MasterKey, session.Identifier.ToUnSecureString()))
-                {
-                    var messageStore = db.Query<MessageStoreDto>().Where(m => m.Equals(session.SessionId)).FirstOrDefault();
+                using var db = Util.LiteRepositoryFactory(session.MasterKey, session.Identifier.ToUnSecureString());
+                var messageStore = db.Query<MessageStoreDto>().Where(m => m.Equals(session.SessionId)).FirstOrDefault();
 
-                    availBalance = walletService.AvailableBalance(session.Identifier, session.MasterKey);
+                availBalance = walletService.AvailableBalance(session.Identifier, session.MasterKey);
 
-                    if (sendPaymentDto.CreateRedemptionKey)
-                        return new OkObjectResult(new { message = messageStore.Message });
-                }
+                if (sendPaymentDto.CreateRedemptionKey)
+                    return new OkObjectResult(new { message = messageStore.Message });
 
             }
             catch (Exception ex)
@@ -165,18 +165,17 @@ namespace TangramCypher.ApplicationLayer.Controllers
         public IActionResult WalletTransactions([FromBody] CredentialsDto credentials)
         {
             var session = new Session(credentials.Identifier.ToSecureString(), credentials.Password.ToSecureString());
-            using (var db = Util.LiteRepositoryFactory(session.MasterKey, session.Identifier.ToUnSecureString()))
-            {
-                var txns = db.Fetch<TransactionDto>();
-                return new OkObjectResult(txns);
-            }
+            using var db = Util.LiteRepositoryFactory(session.MasterKey, session.Identifier.ToUnSecureString());
+            var txns = db.Query<TransactionDto>();
+
+            return new OkObjectResult(txns);
         }
 
         [HttpPost("vaultunseal", Name = "VaultUnseal")]
         public async Task<IActionResult> VaultUnseal([FromBody] ShardDto key)
         {
             var success = await vaultServiceClient.Unseal(key.Shard.ToSecureString());
-            return new OkObjectResult(new { success = success });
+            return new OkObjectResult(new { success });
         }
     }
 }

@@ -14,5 +14,6 @@ namespace TangramCypher.ApplicationLayer.Actor
     public class MessagePumpEventArgs : EventArgs
     {
         public string Message { get; set; }
+        public WalletCommandApiMethod WalletCommandApi { get; set; }
     }
 }

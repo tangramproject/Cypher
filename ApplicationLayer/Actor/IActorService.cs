@@ -8,6 +8,7 @@
 
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 using TangramCypher.Helper;
 using TangramCypher.Helper.Http;
 
@@ -15,8 +16,10 @@ namespace TangramCypher.ApplicationLayer.Actor
 {
     public interface IActorService
     {
+        event MessagePumpEventHandler MessagePump;
+
         Session GetSession(Guid sessionId);
-        Client Client { get; }
+        Client GetClient(IConfiguration configuration);
 
         Task ReceivePayment(Session session);
         Task<TaskResult<bool>> ReceivePaymentRedemptionKey(Session session, string cypher);
@@ -29,6 +32,5 @@ namespace TangramCypher.ApplicationLayer.Actor
         TaskResult<bool> RedemptionKeyMessage(Guid sessionId);
         Task<TaskResult<byte[]>> PostArticle<T>(T payload, RestApiMethod api) where T : class;
         void UpdateMessagePump(string message);
-        void SetMessagePump(Action<MessagePumpEventArgs> messagePump);
     }
 }

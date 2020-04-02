@@ -253,7 +253,7 @@ namespace TangramCypher.Helper.Http
                 using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
                 var read = response.Content.ReadAsStringAsync().Result;
                 var jObject = JObject.Parse(read);
-                var jToken = jObject.GetValue("protobuf");
+                var jToken = jObject.GetValue("protobufs");
                 var byteArray = Convert.FromBase64String(jToken.Value<string>());
 
                 if (response.IsSuccessStatusCode)

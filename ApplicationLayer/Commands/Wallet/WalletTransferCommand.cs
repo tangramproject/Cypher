@@ -42,64 +42,65 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
             sendService = serviceProvider.GetService<ISendService>();
             console = serviceProvider.GetService<IConsole>();
             logger = serviceProvider.GetService<ILogger>();
-
-            actorService.SetMessagePump(ActorService_MessagePump);
         }
+
         public override async Task Execute()
         {
+            actorService.MessagePump += ActorService_MessagePump;
 
-            using (var identifier = Prompt.GetPasswordAsSecureString("Identifier:", ConsoleColor.Yellow))
-            using (var password = Prompt.GetPasswordAsSecureString("Password:", ConsoleColor.Yellow))
+            using var identifier = Prompt.GetPasswordAsSecureString("Identifier:", ConsoleColor.Yellow);
+            using var password = Prompt.GetPasswordAsSecureString("Password:", ConsoleColor.Yellow);
+
+            var address = Prompt.GetString("To:", null, ConsoleColor.Red);
+            var amount = Prompt.GetString("Amount:", null, ConsoleColor.Red);
+            var memo = Prompt.GetString("Memo:", null, ConsoleColor.Green);
+            var yesNo = Prompt.GetYesNo("Send redemption key to message pool?", true, ConsoleColor.Yellow);
+
+            if (double.TryParse(amount, out double t))
             {
-                var address = Prompt.GetString("To:", null, ConsoleColor.Red);
-                var amount = Prompt.GetString("Amount:", null, ConsoleColor.Red);
-                var memo = Prompt.GetString("Memo:", null, ConsoleColor.Green);
-                var yesNo = Prompt.GetYesNo("Send redemption key to message pool?", true, ConsoleColor.Yellow);
-
-                if (double.TryParse(amount, out double t))
+                await Spinner.StartAsync("Processing payment ...", async spinner =>
                 {
-                    await Spinner.StartAsync("Processing payment ...", async spinner =>
+                    this.spinner = spinner;
+
+                    try
                     {
-                        this.spinner = spinner;
-
-                        try
+                        var session = new Session(identifier, password)
                         {
-                            var session = new Session(identifier, password)
-                            {
-                                Amount = t.ConvertToUInt64(),
-                                ForwardMessage = yesNo,
-                                Memo = memo,
-                                RecipientAddress = address
-                            };
+                            Amount = t.ConvertToUInt64(),
+                            ForwardMessage = yesNo,
+                            Memo = memo,
+                            RecipientAddress = address
+                        };
 
-                            await sendService.Tansfer(session);
-                            session = actorService.GetSession(session.SessionId);
+                        await sendService.Tansfer(session);
+                        session = actorService.GetSession(session.SessionId);
 
-                            if (sendService.State != State.Completed)
-                            {
-                                var failedMessage = JsonConvert.SerializeObject(session.LastError.GetValue("message"));
-                                logger.LogCritical(failedMessage);
-                                spinner.Fail(failedMessage);
-                                return;
-                            }
-
-                            if (session.ForwardMessage.Equals(false))
-                            {
-                                SaveRedemptionKeyLocal(session.SessionId);
-                            }
-                        }
-                        catch (Exception ex)
+                        if (sendService.State != State.Completed)
                         {
-                            logger.LogError(ex.StackTrace);
-                            throw ex;
+                            var failedMessage = JsonConvert.SerializeObject(session.LastError.GetValue("message"));
+                            logger.LogCritical(failedMessage);
+                            spinner.Fail(failedMessage);
+                            return;
                         }
-                        finally
+
+                        if (session.ForwardMessage.Equals(false))
                         {
-                            var balance = walletService.AvailableBalance(identifier, password);
-                            spinner.Text = $"Available Balance: {balance.Result.DivWithNaT().ToString("F9")}";
+                            SaveRedemptionKeyLocal(session.SessionId);
                         }
-                    }, Patterns.Toggle3);
-                }
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex.StackTrace);
+                        throw ex;
+                    }
+                    finally
+                    {
+                        var balance = walletService.AvailableBalance(identifier, password);
+
+                        spinner.Text = $"Available Balance: {balance.Result.DivWithNaT().ToString("F9")}";
+                        actorService.MessagePump -= ActorService_MessagePump;
+                    }
+                }, Patterns.Toggle3);
             }
         }
 
@@ -148,10 +149,9 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
                 logger.LogError(ex.StackTrace);
                 throw ex;
             }
-
         }
 
-        private void ActorService_MessagePump(MessagePumpEventArgs e)
+        private void ActorService_MessagePump(object sender, MessagePumpEventArgs e)
         {
             spinner.Text = e.Message;
         }

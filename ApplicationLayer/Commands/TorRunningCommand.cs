@@ -14,7 +14,7 @@ using TangramCypher.ApplicationLayer.Onion;
 
 namespace TangramCypher.ApplicationLayer.Commands.Tor
 {
-    [CommandDescriptor(new string[] { "tor", "running" }, "Check tor running state")]
+    //[CommandDescriptor(new string[] { "tor", "running" }, "Check tor running state")]
     public class TorRunningCommand : Command
     {
         readonly IOnionServiceClient onionServiceClient;

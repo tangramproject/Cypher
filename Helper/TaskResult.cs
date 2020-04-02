@@ -24,7 +24,7 @@ namespace TangramCypher.Helper
 
         public static TaskResult<T> CreateSuccess(T result)
         {
-            return new TaskResult<T> { Success = result != default, Result = result };
+            return new TaskResult<T> { Success = result != null, Result = result };
         }
 
         public static TaskResult<T> CreateSuccess(dynamic successMessage)

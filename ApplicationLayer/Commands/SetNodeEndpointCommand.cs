@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 
 namespace TangramCypher.ApplicationLayer.Commands.Vault
 {
-    [CommandDescriptor(new string[] { "setnodeendpoint" }, "Set contact endpoint")]
+    //[CommandDescriptor(new string[] { "setnodeendpoint" }, "Set contact endpoint")]
     public class SetNodeEndpointCommand : Command
     {
         public override Task Execute() => throw new NotImplementedException();

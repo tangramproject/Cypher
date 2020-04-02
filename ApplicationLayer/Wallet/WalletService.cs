@@ -55,7 +55,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
             try
             {
                 using var db = Util.LiteRepositoryFactory(password, identifier.ToUnSecureString());
-                var txns = db.Fetch<TransactionDto>();
+                var txns = db.Query<TransactionDto>().ToList();
                 if (txns?.Any() != true)
                 {
                     return TaskResult<ulong>.CreateSuccess(0);
@@ -184,7 +184,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
 
             using (var db = Util.LiteRepositoryFactory(password, identifier.ToUnSecureString()))
             {
-                var txns = db.Fetch<TransactionDto>();
+                var txns = db.Query<TransactionDto>().ToList();
                 if (txns?.Any() != true)
                 {
                     return 0;
@@ -212,7 +212,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
 
             using (var db = Util.LiteRepositoryFactory(password, identifier.ToUnSecureString()))
             {
-                var txns = db.Fetch<TransactionDto>();
+                var txns = db.Query<TransactionDto>().ToList();
                 if (txns?.Any() != true)
                 {
                     return null;
@@ -237,7 +237,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
 
             using (var db = Util.LiteRepositoryFactory(session.MasterKey, session.Identifier.ToUnSecureString()))
             {
-                txns = db.Fetch<TransactionDto>();
+                txns = db.Query<TransactionDto>().ToList();
                 if (txns?.Any() != true)
                 {
                     return null;
@@ -318,7 +318,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
         public IEnumerable<KeySetDto> ListKeySets(SecureString secret, string identifier)
         {
             using var db = Util.LiteRepositoryFactory(secret, identifier);
-            var keys = db.Fetch<KeySetDto>();
+            var keys = db.Query<KeySetDto>().ToList();
             if (keys?.Any() != true)
             {
                 return Enumerable.Empty<KeySetDto>();
@@ -502,7 +502,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
 
             using (var db = Util.LiteRepositoryFactory(session.MasterKey, session.Identifier.ToUnSecureString()))
             {
-                txns = db.Fetch<TransactionDto>();
+                txns = db.Query<TransactionDto>().ToList();
                 if (txns?.Any() != true)
                 {
                     return null;
@@ -513,7 +513,7 @@ namespace TangramCypher.ApplicationLayer.Wallet
             {
                 DateTime = tx.DateTime.ToUniversalTime(),
                 Memo = tx.Memo,
-                MoneyOut = tx.TransactionType == TransactionType.Send ? $"-{tx.Amount.DivWithNaT().ToString("F9")}" : "",
+                MoneyOut = tx.TransactionType == TransactionType.Send ? $"-{tx.Amount.DivWithNaT():F9}" : "",
                 MoneyIn = tx.TransactionType == TransactionType.Receive ? tx.Amount.DivWithNaT().ToString("F9") : "",
                 Balance = tx.TransactionType == TransactionType.Send ? (credit -= tx.Amount).DivWithNaT().ToString("F9") : (credit += tx.Amount).DivWithNaT().ToString("F9")
             });

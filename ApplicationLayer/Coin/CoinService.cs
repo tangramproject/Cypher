@@ -85,8 +85,7 @@ namespace TangramCypher.ApplicationLayer.Coin
 
                     using (var db = Util.LiteRepositoryFactory(session.MasterKey, session.Identifier.ToUnSecureString()))
                     {
-                        var txnsAll = db.Fetch<TransactionDto>();
-                        txns = txnsAll.Where(tx => purchase.Chain.Any(id => id == Guid.Parse(tx.TransactionId))).ToList();
+                        txns = db.Query<TransactionDto>().Where(tx => purchase.Chain.Any(id => id == Guid.Parse(tx.TransactionId))).ToList();
                     }
 
                     if (txns?.Any() != true)

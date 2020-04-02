@@ -219,8 +219,6 @@ namespace TangramCypher.ApplicationLayer.Send
         private void ConfigureStatePayment() => machine.Configure(State.Payment)
                 .OnEntryFromAsync(paymentTrgger, async (Guid sessionId) =>
                 {
-                    actorService.UpdateMessagePump("Busy committing payment agreement ...");
-
                     var session = actorService.GetSession(sessionId);
                     var que = new QueueDto { DateTime = DateTime.Now, TransactionId = session.SessionId };
                     var storeKey = StoreKey.TransactionIdKey;
@@ -228,55 +226,66 @@ namespace TangramCypher.ApplicationLayer.Send
 
                     try
                     {
-                        using (var db = Util.LiteRepositoryFactory(session.MasterKey, session.Identifier.ToUnSecureString()))
+                        using var db = Util.LiteRepositoryFactory(session.MasterKey, session.Identifier.ToUnSecureString());
+
+                        var sender = db.Query<SenderCoinDto>().Where(s => s.TransactionId.Equals(session.SessionId)).FirstOrDefault();
+
+                        actorService.UpdateMessagePump("Sending your transaction ...");
+
+                        var sendResult = await actorService.PostArticle(sender.Cast<BaseCoinDto>(), RestApiMethod.PostCoin);
+                        if (sendResult.Result == null)
                         {
-                            var sender = db.Query<SenderCoinDto>().Where(s => s.TransactionId.Equals(session.SessionId)).FirstOrDefault();
-                            var sendResult = await actorService.PostArticle(sender.Cast<BaseCoinDto>(), RestApiMethod.PostCoin);
-                            if (sendResult.Result == null)
-                            {
-                                throw new NullReferenceException("Sender failed to post the request!");
-                            }
-
-                            var receiver = db.Query<ReceiverCoinDto>().Where(s => s.TransactionId.Equals(session.SessionId)).FirstOrDefault();
-                            var receResult = await actorService.PostArticle(receiver.Cast<BaseCoinDto>(), RestApiMethod.PostCoin);
-                            if (receResult.Result == null)
-                            {
-                                que.ReceiverFailed = true;
-                            }
-
-                            if (session.ForwardMessage)
-                            {
-                                var publicKeyAgreement = db.Query<MessageDto>().Where(s => s.TransactionId.Equals(session.SessionId)).FirstOrDefault();
-                                var publResult = await actorService.PostArticle(publicKeyAgreement, RestApiMethod.PostMessage);
-                                if (publResult.Result == null)
-                                {
-                                    que.PublicAgreementFailed = true;
-                                }
-
-                                var redemptionKey = db.Query<MessageStoreDto>().Where(s => s.TransactionId.Equals(session.SessionId)).FirstOrDefault();
-                                var redeResult = await actorService.PostArticle(redemptionKey.Message, RestApiMethod.PostMessage);
-                                if (redeResult.Result == null)
-                                {
-                                    que.PaymentFailed = true;
-                                }
-                            }
-
-                            var checkList = new List<bool> { que.PaymentFailed, que.PublicAgreementFailed, que.ReceiverFailed };
-                            if (checkList.Any(l => l.Equals(true)))
-                            {
-                                db.Insert(que);
-                                logger.LogInformation("Added queue.. you might have to do some manual work ;(.. WIP");
-                            }
-                            else
-                            {
-                                db.Delete<SenderCoinDto>(session.SessionId);
-                                db.Delete<ReceiverCoinDto>(session.SessionId);
-                                db.Delete<MessageDto>(session.SessionId);
-                                db.Delete<MessageStoreDto>(session.SessionId);
-                            }
-
-                            machine.Fire(Trigger.Complete);
+                            throw new NullReferenceException("Sender failed to post the request!");
                         }
+
+                        var receiver = db.Query<ReceiverCoinDto>().Where(s => s.TransactionId.Equals(session.SessionId)).FirstOrDefault();
+
+                        actorService.UpdateMessagePump("Sending transaction for receiver ...");
+
+                        var receResult = await actorService.PostArticle(receiver.Cast<BaseCoinDto>(), RestApiMethod.PostCoin);
+                        if (receResult.Result == null)
+                        {
+                            que.ReceiverFailed = true;
+                        }
+
+                        if (session.ForwardMessage)
+                        {
+                            var publicKeyAgreement = db.Query<MessageDto>().Where(s => s.TransactionId.Equals(session.SessionId)).FirstOrDefault();
+
+                            actorService.UpdateMessagePump("Sending public key agreement ...");
+
+                            var publResult = await actorService.PostArticle(publicKeyAgreement, RestApiMethod.PostMessage);
+                            if (publResult.Result == null)
+                            {
+                                que.PublicAgreementFailed = true;
+                            }
+
+                            var redemptionKey = db.Query<MessageStoreDto>().Where(s => s.TransactionId.Equals(session.SessionId)).FirstOrDefault();
+
+                            actorService.UpdateMessagePump("Sending redemption key ...");
+
+                            var redeResult = await actorService.PostArticle(redemptionKey.Message, RestApiMethod.PostMessage);
+                            if (redeResult.Result == null)
+                            {
+                                que.PaymentFailed = true;
+                            }
+                        }
+
+                        var checkList = new List<bool> { que.PaymentFailed, que.PublicAgreementFailed, que.ReceiverFailed };
+                        if (checkList.Any(l => l.Equals(true)))
+                        {
+                            db.Insert(que);
+                            logger.LogInformation("Added queue.. you might have to do some manual work ;(.. WIP");
+                        }
+                        else
+                        {
+                            db.Delete<SenderCoinDto>(session.SessionId);
+                            db.Delete<ReceiverCoinDto>(session.SessionId);
+                            db.Delete<MessageDto>(session.SessionId);
+                            db.Delete<MessageStoreDto>(session.SessionId);
+                        }
+
+                        machine.Fire(Trigger.Complete);
                     }
                     catch (Exception ex)
                     {

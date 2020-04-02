@@ -9,13 +9,11 @@
 using System;
 using System.Threading.Tasks;
 using McMaster.Extensions.CommandLineUtils;
-using TangramCypher.ApplicationLayer.Vault;
 using Microsoft.Extensions.DependencyInjection;
 using TangramCypher.ApplicationLayer.Actor;
 using TangramCypher.Helper;
 using TangramCypher.ApplicationLayer.Wallet;
 using Kurukuru;
-using System.Security;
 using Microsoft.Extensions.Logging;
 using TangramCypher.Model;
 
@@ -26,7 +24,6 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
     {
         readonly IActorService actorService;
         readonly IWalletService walletService;
-        readonly IConsole console;
         readonly ILogger logger;
 
         private Spinner spinner;
@@ -35,53 +32,51 @@ namespace TangramCypher.ApplicationLayer.Commands.Wallet
         {
             actorService = serviceProvider.GetService<IActorService>();
             walletService = serviceProvider.GetService<IWalletService>();
-            console = serviceProvider.GetService<IConsole>();
             logger = serviceProvider.GetService<ILogger>();
 
-            actorService.SetMessagePump(ActorService_MessagePump);
+            actorService.MessagePump += ActorService_MessagePump;
         }
 
         public override async Task Execute()
         {
 
-            using (var identifier = Prompt.GetPasswordAsSecureString("Identifier:", ConsoleColor.Yellow))
-            using (var password = Prompt.GetPasswordAsSecureString("Password:", ConsoleColor.Yellow))
+            using var identifier = Prompt.GetPasswordAsSecureString("Identifier:", ConsoleColor.Yellow);
+            using var password = Prompt.GetPasswordAsSecureString("Password:", ConsoleColor.Yellow);
+
+            var address = Prompt.GetString("Address:", null, ConsoleColor.Red);
+
+            if (!string.IsNullOrEmpty(address))
             {
-                var address = Prompt.GetString("Address:", null, ConsoleColor.Red);
-
-                if (!string.IsNullOrEmpty(address))
+                await Spinner.StartAsync("Processing receive payment(s) ...", async spinner =>
                 {
-                    await Spinner.StartAsync("Processing receive payment(s) ...", async spinner =>
+                    this.spinner = spinner;
+
+                    await Task.Delay(500);
+
+                    try
                     {
-                        this.spinner = spinner;
+                        var session = new Session(identifier, password) { SenderAddress = address };
+                        await actorService.ReceivePayment(session);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
+                        throw ex;
+                    }
+                    finally
+                    {
+                        var transaction = walletService.LastTransaction(identifier, password, TransactionType.Receive);
+                        var txnReceivedAmount = transaction == null ? 0.ToString() : transaction.Amount.DivWithNaT().ToString("F9");
+                        var txnMemo = transaction == null ? "" : transaction.Memo;
+                        var balance = walletService.AvailableBalance(identifier, password);
 
-                        await Task.Delay(500);
-
-                        try
-                        {
-                            var session = new Session(identifier, password) { SenderAddress = address };
-                            await actorService.ReceivePayment(session);
-                        }
-                        catch (Exception ex)
-                        {
-                            logger.LogError($"Message: {ex.Message}\n Stack: {ex.StackTrace}");
-                            throw ex;
-                        }
-                        finally
-                        {
-                            var transaction = walletService.LastTransaction(identifier, password, TransactionType.Receive);
-                            var txnReceivedAmount = transaction == null ? 0.ToString() : transaction.Amount.DivWithNaT().ToString("F9");
-                            var txnMemo = transaction == null ? "" : transaction.Memo;
-                            var balance = walletService.AvailableBalance(identifier, password);
-
-                            spinner.Text = $"Memo: {txnMemo}  Received: {txnReceivedAmount}  Available Balance: {balance.Result.DivWithNaT().ToString("F9")}";
-                        }
-                    }, Patterns.Toggle3);
-                }
+                        spinner.Text = $"Memo: {txnMemo}  Received: {txnReceivedAmount}  Available Balance: {balance.Result.DivWithNaT().ToString("F9")}";
+                    }
+                }, Patterns.Toggle3);
             }
         }
 
-        private void ActorService_MessagePump(MessagePumpEventArgs e)
+        private void ActorService_MessagePump(object sender, MessagePumpEventArgs e)
         {
             spinner.Text = e.Message;
         }
