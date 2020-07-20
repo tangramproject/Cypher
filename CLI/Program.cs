@@ -72,7 +72,6 @@ namespace Tangram.Bamboo
                 .ConfigureLogging(logging =>
                 {
                     logging.ClearProviders();
-                    logging.AddDebug();
                     logging.AddSerilog();
                     logging.SetMinimumLevel(LogLevel.Trace);
                 })
@@ -95,8 +94,6 @@ namespace Tangram.Bamboo
                             config.ClearProviders();
                             config.AddProvider(new SerilogLoggerProvider(Log.Logger));
                         });
-
-                    services.AddSingleton<IHostedService, ApplicationLayer.HttpXy>();
 
                     services.Add(new ServiceDescriptor(typeof(IConsole), PhysicalConsole.Singleton));
                 })
