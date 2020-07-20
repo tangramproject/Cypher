@@ -22,7 +22,7 @@
     <Folder Include="LibSodium\" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="3.1.5" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="3.1.6" />
     <PackageReference Include="Dawn.Guard" Version="1.12.0" />
     <PackageReference Include="Sodium.Core" Version="1.2.3" />
     <PackageReference Include="SimpleBase" Version="3.0.1" />
@@ -34,7 +34,7 @@
     <PackageReference Include="Secp256k1.ZKP.Net" Version="1.1.2" />
     <PackageReference Include="Microsoft.AspNet.WebApi.Client" Version="5.2.7" />
     <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
-    <PackageReference Include="NBitcoin" Version="5.0.44" />
+    <PackageReference Include="NBitcoin" Version="5.0.45" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Tangram.Address">
