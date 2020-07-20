@@ -1,0 +1,45 @@
+language: csharp
+mono: none
+sudo: required
+dist: xenial
+dotnet: 3.0
+
+global:
+    - DOTNET_SKIP_FIRST_TIME_EXPERIENCE=true
+    - DOTNET_CLI_TELEMETRY_OPTOUT=1
+
+jobs:
+  include:
+    - stage: "Windows"
+      name: "Windows"
+      script:
+        - dotnet restore
+        - dotnet publish -r win-x64 -c release
+    - stage: "Mac"
+      name: "Mac"
+      script:
+        - dotnet restore
+        - dotnet publish -r osx-x64 -c release
+    - stage: "Linux"
+      name: "Linux"
+      script:
+        - dotnet restore
+        - dotnet publish -r linux-x64 -c release
+    - stage: "GitHub Release"
+      name: "GitHub Release"
+      script: echo "Deploying to GitHub releases ..."
+      deploy:
+        provider: releases
+        api_key: $GITHUB_OAUTH_TOKEN
+        skip_cleanup: true
+        on:
+          tags: true
+
+after_success:
+    - wget https://raw.githubusercontent.com/tangramproject/travis-ci-discord-webhook/master/send.sh
+    - chmod +x send.sh
+    - ./send.sh success $WEBHOOK_URL
+after_failure:
+    - wget https://raw.githubusercontent.com/tangramproject/travis-ci-discord-webhook/master/send.sh
+    - chmod +x send.sh
+    - ./send.sh failure $WEBHOOK_URL

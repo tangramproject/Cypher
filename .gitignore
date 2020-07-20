@@ -20,7 +20,8 @@ vault.json
 vault
 /Address/bin
 /Address/obj
-/CLi
+/CLI/.vs
+/CLI/nuget.config
 
 *.dll
 *.pdb
