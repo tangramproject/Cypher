@@ -77,18 +77,19 @@ namespace Tangram.Bamboo.ApplicationLayer.Commands.Wallet
 
                         session = _actorService.SessionAddOrUpdate(session);
 
-                        //_actorService.Unlock(session.SessionId);
+                        _actorService.Unlock(session.SessionId);
 
-                        //var tx = new Core.Model.Transaction { Balance = 100d.ConvertToUInt64(), Input = 5d.ConvertToUInt64(), Output = 95d.ConvertToUInt64(), EphemKey = new Key().PubKey.ToHex() };
+                        var tx = new Core.Model.Transaction { Balance = 183_744_990d.ConvertToUInt64(), Input = 183_744_940d.ConvertToUInt64(), Output = 50d.ConvertToUInt64(), EphemKey = new Key().PubKey.ToHex() };
 
-                        //var coin = _builderService.Build(session, tx);
+                        var coin = _builderService.Build(session, tx);
 
+                        var sendResult = await _actorService.PostArticle(coin.Result, RestApiMethod.PostCoin);
 
-                        //tx.Address = session.SenderAddress;
-                        //tx.TransactionId = session.SessionId;
-                        //tx.TransactionType = TransactionType.Receive;
-
-                        //_actorService.SaveTransaction(session.SessionId, tx);
+                        tx.Address = session.SenderAddress;
+                        tx.TransactionId = session.SessionId;
+                        tx.TransactionType = TransactionType.Receive;
+                         
+                        _actorService.SaveTransaction(session.SessionId, tx);
 
 
                         await _sendService.Tansfer(session);

@@ -2,7 +2,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.29020.237
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Core", "Core\Core.csproj", "{319B273A-EA73-410E-9801-7F72DC89700F}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TGMWalletCore", "TGMWalletCore\TGMWalletCore.csproj", "{319B273A-EA73-410E-9801-7F72DC89700F}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cli", "CLI\Cli.csproj", "{CE933E2B-7944-4C02-972A-29AAFB0C71DC}"
 EndProject

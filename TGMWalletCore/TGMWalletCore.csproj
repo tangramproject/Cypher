@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <RootNamespace>TGMWalletCore</RootNamespace>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <Optimize></Optimize>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <Folder Include="Actor\" />
+    <Folder Include="Builder\" />
+    <Folder Include="Send\" />
+    <Folder Include="Wallet\" />
+    <Folder Include="Model\" />
+    <Folder Include="Helper\" />
+    <Folder Include="LibSodium\" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="3.1.6" />
+    <PackageReference Include="Dawn.Guard" Version="1.12.0" />
+    <PackageReference Include="Sodium.Core" Version="1.2.3" />
+    <PackageReference Include="SimpleBase" Version="3.0.1" />
+    <PackageReference Include="Stateless" Version="5.1.2" />
+    <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
+    <PackageReference Include="LiteDB" Version="5.0.8" />
+    <PackageReference Include="protobuf-net" Version="3.0.29" />
+    <PackageReference Include="Polly" Version="7.2.1" />
+    <PackageReference Include="Secp256k1.ZKP.Net" Version="1.1.2" />
+    <PackageReference Include="Microsoft.AspNet.WebApi.Client" Version="5.2.7" />
+    <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
+    <PackageReference Include="NBitcoin" Version="5.0.47" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="Tangram.Address">
+      <HintPath>..\Tangram.Bamboo\Address\bin\Release\netcoreapp2.2\Tangram.Address.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+</Project>
