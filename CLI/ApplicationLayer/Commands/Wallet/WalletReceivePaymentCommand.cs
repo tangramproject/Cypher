@@ -10,12 +10,12 @@ using System;
 using System.Threading.Tasks;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.DependencyInjection;
-using Tangram.Core.Actor;
-using Tangram.Core.Helper;
-using Tangram.Core.Wallet;
 using Kurukuru;
 using Microsoft.Extensions.Logging;
-using Tangram.Core.Model;
+using TGMWalletCore.Actor;
+using TGMWalletCore.Wallet;
+using TGMWalletCore.Model;
+using TGMWalletCore.Helper;
 
 namespace Tangram.Bamboo.ApplicationLayer.Commands.Wallet
 {

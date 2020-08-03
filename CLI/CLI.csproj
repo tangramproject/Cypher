@@ -58,6 +58,6 @@
     <Folder Include="Helper\" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Core\Core.csproj" />
+    <ProjectReference Include="..\TGMWalletCore\TGMWalletCore.csproj" />
   </ItemGroup>
 </Project>

@@ -10,9 +10,9 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using McMaster.Extensions.CommandLineUtils;
-using Tangram.Core.Wallet;
 using ConsoleTables;
 using System.Linq;
+using TGMWalletCore.Wallet;
 
 namespace Tangram.Bamboo.ApplicationLayer.Commands.Wallet
 {

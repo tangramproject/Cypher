@@ -10,17 +10,17 @@ using System;
 using System.Threading.Tasks;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.DependencyInjection;
-using Tangram.Core.Actor;
-using Tangram.Core.Helper;
 using Newtonsoft.Json;
 using System.IO;
 using Kurukuru;
-using Tangram.Core.Wallet;
 using Microsoft.Extensions.Logging;
-using Tangram.Core.Model;
-using Tangram.Core.Send;
-using Tangram.Core.Coin;
 using NBitcoin;
+using TGMWalletCore.Coin;
+using TGMWalletCore.Actor;
+using TGMWalletCore.Wallet;
+using TGMWalletCore.Send;
+using TGMWalletCore.Helper;
+using TGMWalletCore.Model;
 
 namespace Tangram.Bamboo.ApplicationLayer.Commands.Wallet
 {
@@ -79,7 +79,7 @@ namespace Tangram.Bamboo.ApplicationLayer.Commands.Wallet
 
                         _actorService.Unlock(session.SessionId);
 
-                        var tx = new Core.Model.Transaction { Balance = 183_744_990d.ConvertToUInt64(), Input = 183_744_940d.ConvertToUInt64(), Output = 50d.ConvertToUInt64(), EphemKey = new Key().PubKey.ToHex() };
+                        var tx = new TGMWalletCore.Model.Transaction { Balance = 183_744_990d.ConvertToUInt64(), Input = 183_744_940d.ConvertToUInt64(), Output = 50d.ConvertToUInt64(), EphemKey = new Key().PubKey.ToHex() };
 
                         var coin = _builderService.Build(session, tx);
 

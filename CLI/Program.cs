@@ -19,10 +19,10 @@ using Microsoft.AspNetCore.Hosting;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Serilog.Extensions.Logging;
-using Tangram.Core.Actor;
-using Tangram.Core.Send;
-using Tangram.Core.Wallet;
-using Tangram.Core.Coin;
+using TGMWalletCore.Actor;
+using TGMWalletCore.Send;
+using TGMWalletCore.Wallet;
+using TGMWalletCore.Coin;
 
 namespace Tangram.Bamboo
 {
