@@ -36,9 +36,4 @@
     <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
     <PackageReference Include="NBitcoin" Version="5.0.48" />
   </ItemGroup>
-  <ItemGroup>
-    <Reference Include="Tangram.Address">
-      <HintPath>..\Tangram.Bamboo\Address\bin\Release\netcoreapp2.2\Tangram.Address.dll</HintPath>
-    </Reference>
-  </ItemGroup>
 </Project>
