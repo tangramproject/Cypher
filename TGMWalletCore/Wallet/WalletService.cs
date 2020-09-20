@@ -330,7 +330,7 @@ namespace TGMWalletCore.Wallet
         /// <returns>The identifier list.</returns>
         public IEnumerable<string> WalletList()
         {
-            var wallets = Path.Combine(Path.GetDirectoryName(AppDomain.CurrentDomain.BaseDirectory), "wallets");
+            var wallets = Path.Combine(Util.LocalApplicationDataPath, "wallets");
             string[] files = Directory.GetFiles(wallets, "*.db");
 
             if (files?.Any() != true)

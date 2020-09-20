@@ -42,14 +42,17 @@ namespace TGMWalletCore.Helper
             return osPlatform;
         }
 
-        public static string AppDomainDirectory()
+        public static string LocalApplicationDataPath
         {
-            return AppDomain.CurrentDomain.BaseDirectory;
+            get
+            {
+                return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Tangram");
+            }
         }
 
         public static Stream TangramData(string id)
         {
-            var wallets = Path.Combine(Path.GetDirectoryName(AppDomain.CurrentDomain.BaseDirectory), "wallets");
+            var wallets = Path.Combine(LocalApplicationDataPath, "wallets");
             var wallet = Path.Combine(wallets, $"{id}.db");
 
             if (!Directory.Exists(wallets))
@@ -69,7 +72,7 @@ namespace TGMWalletCore.Helper
 
         public static string WalletPath(string id)
         {
-            var wallets = Path.Combine(Path.GetDirectoryName(AppDomain.CurrentDomain.BaseDirectory), "wallets");
+            var wallets = Path.Combine(LocalApplicationDataPath, "wallets");
             var wallet = Path.Combine(wallets, $"{id}.db");
 
             if (!Directory.Exists(wallets))

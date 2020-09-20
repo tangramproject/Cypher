@@ -36,8 +36,6 @@ namespace Tangram.Bamboo.ApplicationLayer.Commands.Wallet
 
         private Spinner spinner;
 
-        private static readonly DirectoryInfo tangramDirectory = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
-
         public WalletTransferCommand(IServiceProvider serviceProvider)
         {
             _builderService = serviceProvider.GetService<IBuilderService>();
