@@ -11,7 +11,6 @@ using System.Security;
 using System.Text;
 using Dawn;
 using Newtonsoft.Json;
-using Sodium;
 using TGMWalletCore.Actor;
 
 namespace TGMWalletCore.Helper
@@ -20,9 +19,9 @@ namespace TGMWalletCore.Helper
     {
         public static StringContent AsJson(this object o)
           => new StringContent(JsonConvert.SerializeObject(o), Encoding.UTF8, "application/json");
-        public static string ToHexString(this byte[] data) => Utilities.BinaryToHex(data);
-        public static byte[] FromHexString(this string hex) => Utilities.HexToBinary(hex);
-        public static string ToBase64(this byte[] data) => Convert.ToBase64String(Encoding.UTF8.GetBytes(Utilities.BinaryToHex(data)));
+        public static string ToHexString(this byte[] data) => Util.BinaryToHex(data);
+        public static byte[] FromHexString(this string hex) => Util.HexToBinary(hex);
+        public static string ToBase64(this byte[] data) => Convert.ToBase64String(Encoding.UTF8.GetBytes(Util.BinaryToHex(data)));
         public static byte[] ToByteArrayWithPadding(this string str)
         {
             const int BlockingSize = 16;

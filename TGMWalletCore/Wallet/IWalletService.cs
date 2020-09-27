@@ -20,7 +20,6 @@ namespace TGMWalletCore.Wallet
         string CreateWallet(SecureString mnemonic, SecureString passphrase);
         SecureString NewID(int bytes = 32);
         Task<string[]> CreateMnemonic(Language language, WordCount wordCount);
-        byte[] HashPassphrase(SecureString passphrase);
         ulong TotalTransactionAmount(SecureString identifier, SecureString passphrase, string address);
         Transaction  LastTransaction(SecureString identifier, SecureString passphrase, TransactionType transactionType);
         TaskResult<Transaction> SortChange(Session session);

@@ -10,10 +10,11 @@ using System.Net;
 using System.Security;
 using Newtonsoft.Json;
 using System.Threading.Tasks;
-using Sodium;
 using TGMWalletCore.Model;
 using LiteDB;
 using ProtoBuf;
+using System.Security.Cryptography;
+using Dawn;
 
 namespace TGMWalletCore.Helper
 {
@@ -166,11 +167,36 @@ namespace TGMWalletCore.Helper
             return GetFileHash(file.FullName);
         }
 
+        public static string BinaryToHex(byte[] bytes)
+        {
+            return BitConverter.ToString(bytes).Replace("-", string.Empty).ToLower();
+        }
+
+        public static byte[] HexToBinary(string hex)
+        {
+            if(hex.Length % 2 != 0)
+            {
+                throw new Exception("Hex string length must be multiple of two");
+            }
+
+            var bytes = new byte[hex.Length / 2];
+
+            for (int i = 0, bCount = 0; i < hex.Length; i += 2, ++bCount) {
+                bytes[bCount] += Convert.ToByte($"{hex[i]}{hex[i + 1]}", 16);
+            }
+
+            return bytes;
+        }
+
         public static string GetFileHash(string fileFullName)
         {
             var bytes = File.ReadAllBytes(fileFullName);
-            var hash = CryptoHash.Sha256(bytes);
-            return Utilities.BinaryToHex(hash);
+
+            using (SHA256 sha256 = SHA256.Create())
+            {
+                var hash = sha256.ComputeHash(bytes);
+                return BinaryToHex(hash);
+            }
         }
 
         [CLSCompliant(false)]

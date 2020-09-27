@@ -201,13 +201,6 @@ namespace TGMWalletCore.Wallet
         }
 
         /// <summary>
-        /// Hashs the passphrase.
-        /// </summary>
-        /// <returns>The passphrase.</returns>
-        /// <param name="passphrase">Passphrase.</param>
-        public byte[] HashPassphrase(SecureString passphrase) => Crypto.ArgonHashString(passphrase);
-
-        /// <summary>
         /// Gets the total transaction amount.
         /// </summary>
         /// <returns>The transaction amount.</returns>
@@ -331,7 +324,16 @@ namespace TGMWalletCore.Wallet
         public IEnumerable<string> WalletList()
         {
             var wallets = Path.Combine(Util.LocalApplicationDataPath, "wallets");
-            string[] files = Directory.GetFiles(wallets, "*.db");
+
+            string[] files;
+            try
+            {
+                files = Directory.GetFiles(wallets, "*.db");
+            }
+            catch (DirectoryNotFoundException)
+            {
+                return Enumerable.Empty<string>();
+            }
 
             if (files?.Any() != true)
             {
